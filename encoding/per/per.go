@@ -100,6 +100,45 @@ func ShiftLeftMost(in []uint8, inlen int) (out []uint8, outlen int) {
 	return
 }
 
+// IntToByte is the type converter from uintX to []uint8.
+// XXX I wonder if there has already been more efficient converter, but I
+// haven't found it.
+func IntToByte(in interface {}) (out []uint8) {
+	switch in := in.(type) {
+	case uint8:
+		out = append([]uint8{uint8(in)}, out...)
+	case uint16:
+		for i:=0; i<2; i++ {
+			out = append([]uint8{uint8(in)}, out...)
+			in >>= 8
+		}
+	case int:
+		for i:=0; i<8; i++ {
+			out = append([]uint8{uint8(in)}, out...)
+			in >>= 8
+		}
+	case uint:
+		for i:=0; i<8; i++ {
+			out = append([]uint8{uint8(in)}, out...)
+			in >>= 8
+		}
+	case uint32:
+		for i:=0; i<4; i++ {
+			out = append([]uint8{uint8(in)}, out...)
+			in >>= 8
+		}
+	case uint64:
+		for i:=0; i<8; i++ {
+			out = append([]uint8{uint8(in)}, out...)
+			in >>= 8
+		}
+	default:
+		fmt.Print("IntToByte: unknown type\n")
+		return
+	}
+	return
+}
+
 // EncConstrainedWholeNumber is the implementation for
 // 10.5 Encoding of constrained whole number.
 func EncConstrainedWholeNumber(input, min, max int) (
@@ -120,17 +159,15 @@ func EncConstrainedWholeNumber(input, min, max int) (
 		return
 	case inputRange < 256: // the bit-field case
 		bitlen = bits.Len(uint(inputRange))
-		//v = append(v, uint8(inputEnc << uint((8 - bitlen))))
-		v = append(v, uint8(inputEnc))
+		v = IntToByte(uint8(inputEnc))
 		return
 	case inputRange == 256: // the one-octet case
 		bitlen = 8
-		v = append(v, uint8(inputEnc))
+		v = IntToByte(uint8(inputEnc))
 		return
 	case inputRange <= 65536: // the two-octet case
 		bitlen = 16
-		v = append(v, uint8((inputEnc>>8)&0xff))
-		v = append(v, uint8(inputEnc&0xff))
+		v = IntToByte(uint16(inputEnc))
 		return
 	case inputRange > 65537: // the indefinite length case
 		// not implemented yet
@@ -221,7 +258,6 @@ func EncEnumerated(input, min, max int, extmark bool) (
 func EncBitString(input []uint8, inputlen, min, max int, extmark bool) (
 	v []uint8, bitlen int, err error) {
 
-	//bitLen := bits.Len(uint(input))
 	if inputlen < min || inputlen > max {
 		err = fmt.Errorf("EncBitString: "+
 			"input len(value)=%d is out of range. "+
