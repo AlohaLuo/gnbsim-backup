@@ -43,6 +43,7 @@ const (
 type GNB struct {
 	GlobalGNBID GlobalGNBID
 	SupportedTAList []SupportedTA
+	PagingDRX PagingDRX
 }
 
 type GlobalGNBID struct {
@@ -65,6 +66,10 @@ type BroadcastPLMN struct {
 type SliceSupport struct {
 	SST uint8
 	SD string
+}
+
+type PagingDRX struct {
+	DRX string
 }
 
 func InitNGAP(filename string) (p *GNB) {
@@ -151,6 +156,9 @@ func MakeNGSetupRequest(p *GNB) {
 
 	v, _ = encSupportedTAList(&p.SupportedTAList)
 	fmt.Printf("result: Supported TA List = %02x\n", v)
+
+	v, _ = encPagingDRX(&p.PagingDRX)
+	fmt.Printf("result: PagingDRX = %02x\n", v)
 }
 
 /*
@@ -265,9 +273,20 @@ func encGNBID(gnbid uint32) (pv []uint8, plen int) {
 
 // 9.3.1.90 PagingDRX
 /*
-func encPagingDRX(drx string) (val []uint8) {
+PagingDRX ::= ENUMERATED {
+    v32,
+    v64,
+    v128,
+    v256,
+    ...
+}
+ */
+func encPagingDRX(p *PagingDRX) (v []uint8, err error) {
+
+	v, err = encProtocolIE(idDefaultPagingDRX, ignore)
+
 	n := 0
-	switch drx {
+	switch p.DRX {
 	case "v32":
 		n = 0
 	case "v64":
@@ -277,13 +296,17 @@ func encPagingDRX(drx string) (val []uint8) {
 	case "v256":
 		n = 3
 	default:
-		fmt.Printf("encPagingDRX: no such DRX value(%s)", drx)
+		fmt.Printf("encPagingDRX: no such DRX value(%s)", p.DRX)
 		return
 	}
-	val = per.EncEnumerated(n)
+	pv, _, _ := per.EncEnumerated(n, 0, 3, true)
+
+	v2, _, _ := per.EncLengthDeterminant(len(pv), 0)
+	v = append(v, v2...)
+	v = append(v, pv...)
+
 	return
 }
-*/
 
 // 9.3.3.5 PLMN Identity
 /*
