@@ -211,7 +211,7 @@ func encProtocolIE(id, criticality int) (v []uint8, err error) {
  */
 func encGlobalRANNodeID(p *GlobalGNBID) (v []uint8, err error) {
 
-	v, err = encProtocolIE(idGlobalRANNodeID, reject)
+	head, err := encProtocolIE(idGlobalRANNodeID, reject)
 
 	// NG-ENB and N3IWF are not implemented yet...
 	pv, plen, _ := per.EncChoice(globalGNB, 0, 2, false)
@@ -219,9 +219,9 @@ func encGlobalRANNodeID(p *GlobalGNBID) (v []uint8, err error) {
 	pv, plen = per.MergeBitField(pv, plen, pv2, plen2)
 	pv = append(pv, v2...)
 
-	v3, _, _ := per.EncLengthDeterminant(len(pv), 0)
-	v = append(v, v3...)
-	v = append(v, pv...)
+	length, _, _ := per.EncLengthDeterminant(len(pv), 0)
+	head = append(head, length...)
+	v = append(head, pv...)
 
 	return
 }
@@ -283,7 +283,7 @@ PagingDRX ::= ENUMERATED {
  */
 func encPagingDRX(p *PagingDRX) (v []uint8, err error) {
 
-	v, err = encProtocolIE(idDefaultPagingDRX, ignore)
+	head, err := encProtocolIE(idDefaultPagingDRX, ignore)
 
 	n := 0
 	switch p.DRX {
@@ -301,9 +301,9 @@ func encPagingDRX(p *PagingDRX) (v []uint8, err error) {
 	}
 	pv, _, _ := per.EncEnumerated(n, 0, 3, true)
 
-	v2, _, _ := per.EncLengthDeterminant(len(pv), 0)
-	v = append(v, v2...)
-	v = append(v, pv...)
+	length, _, _ := per.EncLengthDeterminant(len(pv), 0)
+	head = append(head, length...)
+	v = append(head, pv...)
 
 	return
 }
@@ -400,19 +400,22 @@ func encSNSSAI(sstInt uint8, sdString string) (pv []uint8, plen int, v []uint8) 
 // Supported TA List
 /*
 SupportedTAList ::= SEQUENCE (SIZE(1..maxnoofTACs)) OF SupportedTAItem
+maxnoofTACs INTEGER ::= 256
  */
 func encSupportedTAList(p *[]SupportedTA) (v []uint8, err error) {
 
-	v, err = encProtocolIE(idSupportedTAList, reject)
+	head, err := encProtocolIE(idSupportedTAList, reject)
 
-	// maxnoofTACs INTEGER ::= 256
 	const maxnoofTACs = 256
-	pv, _, _ := per.EncSequenceOf(1, 1, maxnoofTACs, false)
-	v = append(v, pv...)
+	v, _, _ = per.EncSequenceOf(1, 1, maxnoofTACs, false)
 
 	for _, item := range *p {
 		v = append(v, encSupportedTAItem(&item)...)
 	}
+
+	length, _, _ := per.EncLengthDeterminant(len(v), 0)
+	head = append(head, length...)
+	v = append(head, v...)
 
 	return
 }
