@@ -1,0 +1,24 @@
+{
+	"GlobalGNBID": {
+		"mcc": 123,
+		"mnc": 45,
+		"gnbid": 1
+	},
+	"SupportedTAList" : [
+		{
+			"TAC": "0x000102",
+			"BroadcastPLMNList": [
+				{
+					"MCC": 123,
+					"MNC": 45,
+					"SliceSupportList": [
+						{
+							"SST": 1,
+							"SD": "0x123456"
+						}
+					]
+				}
+			]
+		}
+	]
+}

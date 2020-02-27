@@ -53,9 +53,16 @@ func TestMakeGlobalRANNodeID(t *testing.T) {
 }
 */
 
-func TestMakeNGSetupRequest(t *testing.T) {
-	MakeNGSetupRequest()
+/*
+func TestInitNGAP(t *testing.T) {
+	_ = InitNGAP("../nofile.json")
 }
+*/
 
-
+func TestMakeNGSetupRequest(t *testing.T) {
+	gnbp := InitNGAP("gnb.json")
+	fmt.Printf("gnbp: %p\n", gnbp)
+	fmt.Printf("gnbp: %+v\n", *gnbp)
+	MakeNGSetupRequest(gnbp)
+}
 
