@@ -143,22 +143,32 @@ NGSetupRequestIEs NGAP-PROTOCOL-IES ::= {
     ...
 }
 */
-func MakeNGSetupRequest(p *GNB) {
+func MakeNGSetupRequest(p *GNB) (pdu []uint8) {
 
-	pdu := encNgapPdu(initiatingMessage, procCodeNGSetup, reject)
+	pdu = encNgapPdu(initiatingMessage, procCodeNGSetup, reject)
 	fmt.Printf("result: pdu = %02x\n", pdu)
 
 	v := encProtocolIEContainer(3)
 	fmt.Printf("result: ie container = %02x\n", v)
 
-	v, _ = encGlobalRANNodeID(&p.GlobalGNBID)
+	tmp, _ := encGlobalRANNodeID(&p.GlobalGNBID)
 	fmt.Printf("result: global RAN Node ID = %02x\n", v)
+	v = append(v, tmp...)
 
-	v, _ = encSupportedTAList(&p.SupportedTAList)
+	tmp, _ = encSupportedTAList(&p.SupportedTAList)
 	fmt.Printf("result: Supported TA List = %02x\n", v)
+	v = append(v, tmp...)
 
-	v, _ = encPagingDRX(&p.PagingDRX)
+	tmp, _ = encPagingDRX(&p.PagingDRX)
 	fmt.Printf("result: PagingDRX = %02x\n", v)
+	v = append(v, tmp...)
+
+	length, _, _ := per.EncLengthDeterminant(len(v), 0)
+
+	pdu = append(pdu, length...)
+	pdu = append(pdu, v...)
+
+	return
 }
 
 /*

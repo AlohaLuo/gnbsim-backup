@@ -63,6 +63,7 @@ func TestMakeNGSetupRequest(t *testing.T) {
 	gnbp := InitNGAP("gnb.json")
 	fmt.Printf("gnbp: %p\n", gnbp)
 	fmt.Printf("gnbp: %+v\n", *gnbp)
-	MakeNGSetupRequest(gnbp)
+	v := MakeNGSetupRequest(gnbp)
+	fmt.Printf("ngsetup = %02x\n", v)
 }
 
