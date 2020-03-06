@@ -6,7 +6,7 @@ import (
 )
 
 
-func compareSlice(actual, expect []uint8) bool {
+func compareSlice(actual, expect []byte) bool {
 	if len(actual) != len(expect) {
 		return false
 	}
@@ -20,13 +20,13 @@ func compareSlice(actual, expect []uint8) bool {
 }
 
 /*
-//func encGlobalRANNodeID() (v []uint8, err error) {
+//func encGlobalRANNodeID() (v []byte, err error) {
 func TestMakeGlobalRANNodeID(t *testing.T) {
 	v, _ := encGlobalRANNodeID()
 	fmt.Printf("v = 0x%02x\n", v)
 }
 
-//func encSliceSupportList() (v []uint8, bitlen int) {
+//func encSliceSupportList() (v []byte, bitlen int) {
 func TestMakeSliceSupportList(t *testing.T) {
 	v := encSliceSupportList()
 	fmt.Printf("v = 0x%02x\n", v)
@@ -34,7 +34,7 @@ func TestMakeSliceSupportList(t *testing.T) {
 
 func TestMakePLMNIdentity(t *testing.T) {
 
-	expect := make([]uint8, 3, 3)
+	expect := make([]byte, 3, 3)
 	expect[0] = 0x21
 	expect[1] = 0xf3
 	expect[2] = 0x54

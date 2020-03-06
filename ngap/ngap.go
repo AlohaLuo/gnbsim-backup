@@ -102,7 +102,7 @@ InitiatingMessage ::= SEQUENCE {
     value           NGAP-ELEMENTARY-PROCEDURE.&InitiatingMessage    ({NGAP-ELEMENTARY-PROCEDURES}{@procedureCode})
 }
 */
-func encNgapPdu(pduType, procCode, criticality int) (pdu []uint8) {
+func encNgapPdu(pduType, procCode, criticality int) (pdu []byte) {
 	pdu, _, _ = per.EncChoice(pduType, 0, 2, true)
 	v, _, _ := per.EncInteger(procCode, 0, 255, false)
 	pdu = append(pdu, v...)
@@ -123,7 +123,7 @@ ProtocolIE-Container {NGAP-PROTOCOL-IES : IEsSetParam} ::=
 
 maxProtocolIEs                          INTEGER ::= 65535
 */
-func encProtocolIEContainer(num int) (container []uint8) {
+func encProtocolIEContainer(num int) (container []byte) {
 	const maxProtocolIEs = 65535
 	container, _, _ = per.EncSequence(true, 0, 0)
 	v, _, _ := per.EncSequenceOf(num, 0, maxProtocolIEs, false)
@@ -143,7 +143,7 @@ NGSetupRequestIEs NGAP-PROTOCOL-IES ::= {
     ...
 }
 */
-func MakeNGSetupRequest(p *GNB) (pdu []uint8) {
+func MakeNGSetupRequest(p *GNB) (pdu []byte) {
 
 	pdu = encNgapPdu(initiatingMessage, procCodeNGSetup, reject)
 	fmt.Printf("result: pdu = %02x\n", pdu)
@@ -175,7 +175,7 @@ func MakeNGSetupRequest(p *GNB) (pdu []uint8) {
 BroadcastPLMNList ::= SEQUENCE (SIZE(1..maxnoofBPLMNs)) OF BroadcastPLMNItem
     maxnoofBPLMNs                       INTEGER ::= 12
  */
-func encBroadcastPLMNList(p *[]BroadcastPLMN) (v []uint8) {
+func encBroadcastPLMNList(p *[]BroadcastPLMN) (v []byte) {
 	const maxnoofBPLMNs = 12
 	v, _, _ = per.EncSequenceOf(1, 1, maxnoofBPLMNs, false)
 
@@ -193,14 +193,14 @@ BroadcastPLMNItem ::= SEQUENCE {
     ...
 }
  */
-func encBroadcastPLMNItem(p *BroadcastPLMN) (v []uint8) {
+func encBroadcastPLMNItem(p *BroadcastPLMN) (v []byte) {
 	v, _, _ = per.EncSequence(true, 1, 0)
 	v = append(v, encPLMNIdentity(p.MCC, p.MNC)...)
 	v = append(v, encSliceSupportList(&p.SliceSupportList)...)
 	return
 }
 
-func encProtocolIE(id, criticality int) (v []uint8, err error) {
+func encProtocolIE(id, criticality int) (v []byte, err error) {
 
 	v1, _, _ := per.EncInteger(id, 0, 65535, false)
 	v2, _, _ := per.EncEnumerated(criticality, 0, 2, false)
@@ -219,7 +219,7 @@ func encProtocolIE(id, criticality int) (v []uint8, err error) {
        choice-Extensions   ProtocolIE-SingleContainer { {GlobalRANNodeID-ExtIEs} }
    }
  */
-func encGlobalRANNodeID(p *GlobalGNBID) (v []uint8, err error) {
+func encGlobalRANNodeID(p *GlobalGNBID) (v []byte, err error) {
 
 	head, err := encProtocolIE(idGlobalRANNodeID, reject)
 
@@ -246,7 +246,7 @@ func encGlobalRANNodeID(p *GlobalGNBID) (v []uint8, err error) {
        ...
    }
  */
-func encGlobalGNBID(p *GlobalGNBID) (pv []uint8, plen int, v []uint8) {
+func encGlobalGNBID(p *GlobalGNBID) (pv []byte, plen int, v []byte) {
 
 	pv, plen, _ = per.EncSequence(true, 1, 0)
 	v = append(v, encPLMNIdentity(p.MCC, p.MNC)...)
@@ -262,7 +262,7 @@ func encGlobalGNBID(p *GlobalGNBID) (pv []uint8, plen int, v []uint8) {
        choice-Extensions       ProtocolIE-SingleContainer { {GNB-ID-ExtIEs} }
    }
  */
-func encGNBID(gnbid uint32) (pv []uint8, plen int) {
+func encGNBID(gnbid uint32) (pv []byte, plen int) {
 	const minGNBIDSize = 22
 	const maxGNBIDSize = 22
 
@@ -291,7 +291,7 @@ PagingDRX ::= ENUMERATED {
     ...
 }
  */
-func encPagingDRX(p *PagingDRX) (v []uint8, err error) {
+func encPagingDRX(p *PagingDRX) (v []byte, err error) {
 
 	head, err := encProtocolIE(idDefaultPagingDRX, ignore)
 
@@ -322,17 +322,17 @@ func encPagingDRX(p *PagingDRX) (v []uint8, err error) {
 /*
 PLMNIdentity ::= OCTET STRING (SIZE(3)) 
  */
-func encPLMNIdentity(mcc, mnc uint16) (v []uint8) {
+func encPLMNIdentity(mcc, mnc uint16) (v []byte) {
 
-	v = make([]uint8, 3, 3)
-	v[0] = uint8(mcc % 1000 / 100)
-	v[0] |= uint8(mcc%100/10) << 4
+	v = make([]byte, 3, 3)
+	v[0] = byte(mcc % 1000 / 100)
+	v[0] |= byte(mcc%100/10) << 4
 
-	v[1] = uint8(mcc % 10)
+	v[1] = byte(mcc % 10)
 	v[1] |= 0xf0 // filler digit
 
-	v[2] = uint8(mnc % 100 / 10)
-	v[2] |= uint8(mnc%10) << 4
+	v[2] = byte(mnc % 100 / 10)
+	v[2] |= byte(mnc%10) << 4
 
 	_, _, v, _ = per.EncOctetString(v, 3, 3, false)
 
@@ -343,7 +343,7 @@ func encPLMNIdentity(mcc, mnc uint16) (v []uint8) {
 SliceSupportList ::= SEQUENCE (SIZE(1..maxnoofSliceItems)) OF SliceSupportItem
     maxnoofSliceItems                   INTEGER ::= 1024
  */
-func encSliceSupportList(p *[]SliceSupport) (v []uint8) {
+func encSliceSupportList(p *[]SliceSupport) (v []byte) {
 	v, _, _ = per.EncSequenceOf(1, 1, 1024, false)
 	for _, item := range *p {
 		v = append(v, encSliceSupportItem(&item)...)
@@ -358,7 +358,7 @@ SliceSupportItem ::= SEQUENCE {
     ...
 }
  */
-func encSliceSupportItem(p *SliceSupport) (v []uint8) {
+func encSliceSupportItem(p *SliceSupport) (v []byte) {
 	/*
 	ex.1
 	    .    .   .          .    .   .    .   .    .   .
@@ -393,7 +393,7 @@ S-NSSAI ::= SEQUENCE {
 SST ::= OCTET STRING (SIZE(1))
 SD ::= OCTET STRING (SIZE(3))
 */
-func encSNSSAI(sstInt uint8, sdString string) (pv []uint8, plen int, v []uint8) {
+func encSNSSAI(sstInt uint8, sdString string) (pv []byte, plen int, v []byte) {
 	pv, plen, _ = per.EncSequence(true, 2, 0x02)
 
 	sst := per.IntToByte(sstInt)
@@ -412,7 +412,7 @@ func encSNSSAI(sstInt uint8, sdString string) (pv []uint8, plen int, v []uint8) 
 SupportedTAList ::= SEQUENCE (SIZE(1..maxnoofTACs)) OF SupportedTAItem
 maxnoofTACs INTEGER ::= 256
  */
-func encSupportedTAList(p *[]SupportedTA) (v []uint8, err error) {
+func encSupportedTAList(p *[]SupportedTA) (v []byte, err error) {
 
 	head, err := encProtocolIE(idSupportedTAList, reject)
 
@@ -439,7 +439,7 @@ SupportedTAItem ::= SEQUENCE {
     ...
 }
  */
-func encSupportedTAItem(p *SupportedTA) (v []uint8) {
+func encSupportedTAItem(p *SupportedTA) (v []byte) {
 
 	pv, _, _ := per.EncSequence(true, 1, 0)
 	v = append(pv, encTAC(p.TAC)...)
@@ -451,7 +451,7 @@ func encSupportedTAItem(p *SupportedTA) (v []uint8) {
 /*
 TAC ::= OCTET STRING (SIZE(3))
  */
-func encTAC(tacString string) (v []uint8) {
+func encTAC(tacString string) (v []byte) {
 	const tacSize = 3
 	tmp, _ := strconv.ParseUint(tacString, 0, 32)
 	tac := per.IntToByte(tmp)
