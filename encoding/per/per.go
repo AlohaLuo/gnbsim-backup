@@ -103,32 +103,32 @@ func ShiftLeftMost(in []byte, inlen int) (out []byte, outlen int) {
 // IntToByte is the type converter from uintX to []byte.
 // XXX I wonder if there has already been more efficient converter, but I
 // haven't found it.
-func IntToByte(in interface {}) (out []byte) {
+func IntToByte(in interface{}) (out []byte) {
 	switch in := in.(type) {
 	case uint8:
 		out = append([]byte{byte(in)}, out...)
 	case uint16:
-		for i:=0; i<2; i++ {
+		for i := 0; i < 2; i++ {
 			out = append([]byte{byte(in)}, out...)
 			in >>= 8
 		}
 	case int:
-		for i:=0; i<8; i++ {
+		for i := 0; i < 8; i++ {
 			out = append([]byte{byte(in)}, out...)
 			in >>= 8
 		}
 	case uint:
-		for i:=0; i<8; i++ {
+		for i := 0; i < 8; i++ {
 			out = append([]byte{byte(in)}, out...)
 			in >>= 8
 		}
 	case uint32:
-		for i:=0; i<4; i++ {
+		for i := 0; i < 4; i++ {
 			out = append([]byte{byte(in)}, out...)
 			in >>= 8
 		}
 	case uint64:
-		for i:=0; i<8; i++ {
+		for i := 0; i < 8; i++ {
 			out = append([]byte{byte(in)}, out...)
 			in >>= 8
 		}

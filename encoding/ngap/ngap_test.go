@@ -5,7 +5,6 @@ import (
 	"testing"
 )
 
-
 func compareSlice(actual, expect []byte) bool {
 	if len(actual) != len(expect) {
 		return false
@@ -66,4 +65,3 @@ func TestMakeNGSetupRequest(t *testing.T) {
 	v := MakeNGSetupRequest(gnbp)
 	fmt.Printf("ngsetup = %02x\n", v)
 }
-
