@@ -1,13 +1,14 @@
 package ngap
 
 import (
-	"../per"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"math/bits"
 	"strconv"
+
+	"github.com/hhorai/gnbsim/encoding/per"
 )
 
 const (
