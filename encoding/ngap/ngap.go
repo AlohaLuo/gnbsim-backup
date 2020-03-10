@@ -73,7 +73,7 @@ type PagingDRX struct {
 	DRX string
 }
 
-func InitNGAP(filename string) (p *GNB) {
+func NewNGAP(filename string) (p *GNB) {
 
 	bytes, err := ioutil.ReadFile(filename)
 	if err != nil {
@@ -83,6 +83,45 @@ func InitNGAP(filename string) (p *GNB) {
 	var gnb GNB
 	p = &gnb
 	json.Unmarshal(bytes, p)
+
+	return
+}
+
+// 9.2.6.1 NG SETUP REQUEST
+/*
+NGSetupRequestIEs NGAP-PROTOCOL-IES ::= {
+    { ID id-GlobalRANNodeID         CRITICALITY reject  TYPE GlobalRANNodeID            PRESENCE mandatory  }|
+    { ID id-RANNodeName             CRITICALITY ignore  TYPE RANNodeName                PRESENCE optional}|
+    { ID id-SupportedTAList         CRITICALITY reject  TYPE SupportedTAList            PRESENCE mandatory  }|
+    { ID id-DefaultPagingDRX        CRITICALITY ignore  TYPE PagingDRX                  PRESENCE mandatory  }|
+    { ID id-UERetentionInformation  CRITICALITY ignore  TYPE UERetentionInformation     PRESENCE optional   },
+    ...
+}
+*/
+func (p *GNB) MakeNGSetupRequest() (pdu []byte) {
+
+	pdu = encNgapPdu(initiatingMessage, procCodeNGSetup, reject)
+	fmt.Printf("result: pdu = %02x\n", pdu)
+
+	v := encProtocolIEContainer(3)
+	fmt.Printf("result: ie container = %02x\n", v)
+
+	tmp, _ := encGlobalRANNodeID(&p.GlobalGNBID)
+	fmt.Printf("result: global RAN Node ID = %02x\n", v)
+	v = append(v, tmp...)
+
+	tmp, _ = encSupportedTAList(&p.SupportedTAList)
+	fmt.Printf("result: Supported TA List = %02x\n", v)
+	v = append(v, tmp...)
+
+	tmp, _ = encPagingDRX(&p.PagingDRX)
+	fmt.Printf("result: PagingDRX = %02x\n", v)
+	v = append(v, tmp...)
+
+	length, _, _ := per.EncLengthDeterminant(len(v), 0)
+
+	pdu = append(pdu, length...)
+	pdu = append(pdu, v...)
 
 	return
 }
@@ -129,45 +168,6 @@ func encProtocolIEContainer(num int) (container []byte) {
 	container, _, _ = per.EncSequence(true, 0, 0)
 	v, _, _ := per.EncSequenceOf(num, 0, maxProtocolIEs, false)
 	container = append(container, v...)
-
-	return
-}
-
-// 9.2.6.1 NG SETUP REQUEST
-/*
-NGSetupRequestIEs NGAP-PROTOCOL-IES ::= {
-    { ID id-GlobalRANNodeID         CRITICALITY reject  TYPE GlobalRANNodeID            PRESENCE mandatory  }|
-    { ID id-RANNodeName             CRITICALITY ignore  TYPE RANNodeName                PRESENCE optional}|
-    { ID id-SupportedTAList         CRITICALITY reject  TYPE SupportedTAList            PRESENCE mandatory  }|
-    { ID id-DefaultPagingDRX        CRITICALITY ignore  TYPE PagingDRX                  PRESENCE mandatory  }|
-    { ID id-UERetentionInformation  CRITICALITY ignore  TYPE UERetentionInformation     PRESENCE optional   },
-    ...
-}
-*/
-func MakeNGSetupRequest(p *GNB) (pdu []byte) {
-
-	pdu = encNgapPdu(initiatingMessage, procCodeNGSetup, reject)
-	fmt.Printf("result: pdu = %02x\n", pdu)
-
-	v := encProtocolIEContainer(3)
-	fmt.Printf("result: ie container = %02x\n", v)
-
-	tmp, _ := encGlobalRANNodeID(&p.GlobalGNBID)
-	fmt.Printf("result: global RAN Node ID = %02x\n", v)
-	v = append(v, tmp...)
-
-	tmp, _ = encSupportedTAList(&p.SupportedTAList)
-	fmt.Printf("result: Supported TA List = %02x\n", v)
-	v = append(v, tmp...)
-
-	tmp, _ = encPagingDRX(&p.PagingDRX)
-	fmt.Printf("result: PagingDRX = %02x\n", v)
-	v = append(v, tmp...)
-
-	length, _, _ := per.EncLengthDeterminant(len(v), 0)
-
-	pdu = append(pdu, length...)
-	pdu = append(pdu, v...)
 
 	return
 }
