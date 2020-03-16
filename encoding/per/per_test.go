@@ -22,7 +22,7 @@ func TestMergeBitField(t *testing.T) {
 	in1 := []byte{}
 	in2 := []byte{0x00, 0x11}
 	out, outlen := MergeBitField(nil, 0, in2, 8)
-	expect := []byte{0x11, 0x00}
+	expect := []byte{0x11}
 	expectlen := 8
 	if expectlen != outlen || compareSlice(expect, out) == false {
 		t.Errorf("bitlen expect: %d, actual %d", expectlen, outlen)

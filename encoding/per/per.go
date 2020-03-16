@@ -66,6 +66,9 @@ func ShiftLeft(in []byte, shiftlen int) (out []byte) {
 			}
 		}
 	}
+	for n := 0; n < (shiftlen / 8); n++ {
+		out = out[:len(out)-1]
+	}
 	return
 }
 
