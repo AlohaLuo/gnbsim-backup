@@ -292,10 +292,10 @@ func EncBitString(input []byte, inputlen, min, max int, extmark bool) (
 	}
 
 	// range is constrained whole number.
-	pv, plen, _ := encConstrainedWholeNumberWithExtmark(inputlen,
+	v2, _, _ := encConstrainedWholeNumberWithExtmark(inputlen,
 		min, max, extmark)
 
-	v, bitlen = MergeBitField(pv, plen, v, bitlen)
+	v = append(v2, v...)
 	return
 }
 
