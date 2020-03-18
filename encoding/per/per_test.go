@@ -222,67 +222,86 @@ func TestChoice(t *testing.T) {
 
 func TestBitString(t *testing.T) {
 
-	in := []byte{}
-	v, bitlen, err := EncBitString(in, 0, 16, 63, false)
+	var pv, v, in, pexpect, vexpect []byte
+	var plen int
+	var err error
+
+	pv, plen, v, err = EncBitString(in, 0, 16, 63, false)
 	if err == nil {
 		t.Errorf("BitString error")
 	}
 
-	v, bitlen, err = EncBitString(in, 100, 0, 63, false)
+	pv, plen, v, err = EncBitString(in, 100, 0, 63, false)
 	if err == nil {
 		t.Errorf("BitString error")
 	}
 
 	in = []byte{0x00, 0x00, 0x00}
-	v, bitlen, err = EncBitString(in, 25, 22, 32, false)
+	pv, plen, v, err = EncBitString(in, 25, 22, 32, false)
 	if err == nil {
 		t.Errorf("BitString error")
 	}
 
 	in = []byte{0x00, 0x00}
-	v, bitlen, err = EncBitString(in, 16, 64, 64, false)
+	pv, plen, v, err = EncBitString(in, 16, 64, 64, false)
 	if err == nil {
 		t.Errorf("BitString error")
 	}
 
 	//fixed length case. but not implemented yet.
 	in = []byte{0x00, 0x00}
-	v, bitlen, err = EncBitString(in, 16, 16, 16, false)
-	expect := []byte{0x00, 0x00}
-	if bitlen != 16 || compareSlice(expect, v) == false {
-		t.Errorf("bitlen expect: %d, actual %d", 16, bitlen)
-		t.Errorf("value expect: 0x%02x, actual 0x%02x", expect, v)
+	pv, plen, v, err = EncBitString(in, 16, 16, 16, false)
+	pexpect = []byte{}
+	vexpect = []byte{0x00, 0x00}
+	if plen != 0 ||
+	    compareSlice(pexpect, pv) == false ||
+	    compareSlice(vexpect, v) == false {
+		t.Errorf("plen expect: %d, actual %d", 16, plen)
+		t.Errorf("value expect: 0x%02x, actual 0x%02x", pexpect, pv)
+		t.Errorf("value expect: 0x%02x, actual 0x%02x", vexpect, v)
 	}
 
 	in = []byte{0x00, 0x10}
-	v, bitlen, err = EncBitString(in, 16, 0, 255, false)
-	expect = []byte{0x10, 0x00, 0x10}
-	expectlen := 24
-	if bitlen != expectlen || compareSlice(expect, v) == false {
-		t.Errorf("bitlen expect: %d, actual %d", expectlen, bitlen)
-		t.Errorf("value expect: 0x%02x, actual 0x%02x", expect, v)
+	pv, plen, v, err = EncBitString(in, 16, 0, 255, false)
+	pexpect = []byte{0x10}
+	vexpect = []byte{0x00, 0x10}
+	expectlen := 8
+	if plen != expectlen ||
+	    compareSlice(pexpect, pv) == false ||
+	    compareSlice(vexpect, v) == false {
+		t.Errorf("plen expect: %d, actual %d", expectlen, plen)
+		t.Errorf("value expect: 0x%02x, actual 0x%02x", pexpect, pv)
+		t.Errorf("value expect: 0x%02x, actual 0x%02x", vexpect, v)
 	}
 
 	in = []byte{0x00, 0x00, 0x02}
 	//b x000 0000 0000 0000 0000 0010
-	v, bitlen, err = EncBitString(in, 23, 22, 32, false)
-	expect = []byte{0x10, 0x00, 0x00, 0x40}
+	pv, plen, v, err = EncBitString(in, 23, 22, 32, false)
+	pexpect = []byte{0x10}
+	vexpect = []byte{0x00, 0x00, 0x04}
 	//b 0001 0000 0000 0000 0000 0000 010x xxxx
-	expectlen = 27
-	if bitlen != expectlen || compareSlice(expect, v) == false {
-		t.Errorf("bitlen expect: %d, actual %d", expectlen, bitlen)
-		t.Errorf("value expect: 0x%02x, actual 0x%02x", expect, v)
+	expectlen = 4
+	if plen != expectlen ||
+	    compareSlice(pexpect, pv) == false ||
+	    compareSlice(vexpect, v) == false {
+		t.Errorf("plen expect: %d, actual %d", expectlen, plen)
+		t.Errorf("value expect: 0x%02x, actual 0x%02x", pexpect, pv)
+		t.Errorf("value expect: 0x%02x, actual 0x%02x", vexpect, v)
 	}
 
 	in = []byte{0x00, 0x00, 0x00, 0x03}
 	//b xxxx xxx0 0000 0000 0000 0000 0000 0011
-	v, bitlen, err = EncBitString(in, 25, 22, 32, false)
-	expect = []byte{0x30, 0x00, 0x00, 0x18}
+	pv, plen, v, err = EncBitString(in, 25, 22, 32, false)
+	pexpect = []byte{0x30}
+	vexpect = []byte{0x00, 0x00, 0x01, 0x80}
 	//b 0011  0000 0000 0000 0000 0000 0001 1xxx
-	expectlen = 29
-	if bitlen != expectlen || compareSlice(expect, v) == false {
-		t.Errorf("bitlen expect: %d, actual %d", expectlen, bitlen)
-		t.Errorf("value expect: 0x%02x, actual 0x%02x", expect, v)
+	expectlen = 4
+	if plen != expectlen ||
+	    compareSlice(pexpect, pv) == false ||
+	    compareSlice(vexpect, v) == false {
+		t.Errorf("plen expect: %d, actual %d", expectlen, plen)
+		t.Errorf("value expect: 0x%02x, actual 0x%02x", pexpect, pv)
+		t.Errorf("value expect: 0x%02x, actual 0x%02x", vexpect, v)
 	}
 }
 
