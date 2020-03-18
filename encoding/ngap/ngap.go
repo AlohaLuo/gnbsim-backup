@@ -107,15 +107,15 @@ func (p *GNB) MakeNGSetupRequest() (pdu []byte) {
 	fmt.Printf("result: ie container = %02x\n", v)
 
 	tmp, _ := encGlobalRANNodeID(&p.GlobalGNBID)
-	fmt.Printf("result: global RAN Node ID = %02x\n", v)
+	fmt.Printf("result: global RAN Node ID = %02x\n", tmp)
 	v = append(v, tmp...)
 
 	tmp, _ = encSupportedTAList(&p.SupportedTAList)
-	fmt.Printf("result: Supported TA List = %02x\n", v)
+	fmt.Printf("result: Supported TA List = %02x\n", tmp)
 	v = append(v, tmp...)
 
 	tmp, _ = encPagingDRX(&p.PagingDRX)
-	fmt.Printf("result: PagingDRX = %02x\n", v)
+	fmt.Printf("result: PagingDRX = %02x\n", tmp)
 	v = append(v, tmp...)
 
 	length, _, _ := per.EncLengthDeterminant(len(v), 0)
@@ -264,7 +264,7 @@ func encGlobalGNBID(p *GlobalGNBID) (pv []byte, plen int, v []byte) {
 */
 func encGNBID(gnbid uint32) (pv []byte, plen int) {
 	const minGNBIDSize = 22
-	const maxGNBIDSize = 22
+	const maxGNBIDSize = 32
 
 	bitlen := bits.Len32(gnbid)
 	if bitlen < minGNBIDSize {
@@ -272,11 +272,18 @@ func encGNBID(gnbid uint32) (pv []byte, plen int) {
 	}
 
 	pv, plen, _ = per.EncChoice(0, 0, 1, false)
+	fmt.Printf("EncChoice(%d): %02x\n", plen, pv)
 
 	tmp := per.IntToByte(gnbid)
-	pv2, plen2, _ := per.EncBitString(tmp, bitlen, 22, 32, false)
+	pv2, plen2, v, _ := per.EncBitString(tmp, bitlen,
+		minGNBIDSize, maxGNBIDSize, false)
+	fmt.Printf("EncBitString(%d): %02x\n", plen2, pv2)
 
 	pv, plen = per.MergeBitField(pv, plen, pv2, plen2)
+
+	pv = append(pv, v...)
+
+	fmt.Printf("gNB-ID = %02x\n", pv)
 
 	return
 }
