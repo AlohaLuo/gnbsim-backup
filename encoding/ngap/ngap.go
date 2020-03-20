@@ -178,10 +178,16 @@ BroadcastPLMNList ::= SEQUENCE (SIZE(1..maxnoofBPLMNs)) OF BroadcastPLMNItem
 */
 func encBroadcastPLMNList(p *[]BroadcastPLMN) (v []byte) {
 	const maxnoofBPLMNs = 12
-	v, _, _ = per.EncSequenceOf(1, 1, maxnoofBPLMNs, false)
+	pv, plen, _ := per.EncSequenceOf(1, 1, maxnoofBPLMNs, false)
 
 	for _, item := range *p {
-		v = append(v, encBroadcastPLMNItem(&item)...)
+		pv2, plen2, v2 := encBroadcastPLMNItem(&item)
+		if plen != 0 {
+			pv, _ = per.MergeBitField(pv, plen, pv2, plen2)
+		}
+		v = append(v, pv...)
+		v = append(v, v2...)
+		plen = 0
 	}
 	return
 }
@@ -194,8 +200,8 @@ BroadcastPLMNItem ::= SEQUENCE {
     ...
 }
 */
-func encBroadcastPLMNItem(p *BroadcastPLMN) (v []byte) {
-	v, _, _ = per.EncSequence(true, 1, 0)
+func encBroadcastPLMNItem(p *BroadcastPLMN) (pv []byte, plen int, v []byte) {
+	pv, plen, _ = per.EncSequence(true, 1, 0)
 	v = append(v, encPLMNIdentity(p.MCC, p.MNC)...)
 	v = append(v, encSliceSupportList(&p.SliceSupportList)...)
 	return
