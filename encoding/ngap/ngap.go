@@ -462,7 +462,7 @@ func encTAC(tacString string) (v []byte) {
 	const tacSize = 3
 	tmp, _ := strconv.ParseUint(tacString, 0, 32)
 	tac := per.IntToByte(tmp)
-	tac = tac[:1]
+	tac = tac[len(tac)-3:]
 
 	_, _, v, _ = per.EncOctetString(tac, tacSize, tacSize, false)
 	return
