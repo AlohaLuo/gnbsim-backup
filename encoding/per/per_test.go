@@ -254,8 +254,8 @@ func TestBitString(t *testing.T) {
 	pexpect = []byte{}
 	vexpect = []byte{0x00, 0x00}
 	if plen != 0 ||
-	    compareSlice(pexpect, pv) == false ||
-	    compareSlice(vexpect, v) == false {
+		compareSlice(pexpect, pv) == false ||
+		compareSlice(vexpect, v) == false {
 		t.Errorf("plen expect: %d, actual %d", 16, plen)
 		t.Errorf("value expect: 0x%02x, actual 0x%02x", pexpect, pv)
 		t.Errorf("value expect: 0x%02x, actual 0x%02x", vexpect, v)
@@ -267,8 +267,8 @@ func TestBitString(t *testing.T) {
 	vexpect = []byte{0x00, 0x10}
 	expectlen := 8
 	if plen != expectlen ||
-	    compareSlice(pexpect, pv) == false ||
-	    compareSlice(vexpect, v) == false {
+		compareSlice(pexpect, pv) == false ||
+		compareSlice(vexpect, v) == false {
 		t.Errorf("plen expect: %d, actual %d", expectlen, plen)
 		t.Errorf("value expect: 0x%02x, actual 0x%02x", pexpect, pv)
 		t.Errorf("value expect: 0x%02x, actual 0x%02x", vexpect, v)
@@ -282,8 +282,8 @@ func TestBitString(t *testing.T) {
 	//b 0001 0000 0000 0000 0000 0000 010x xxxx
 	expectlen = 4
 	if plen != expectlen ||
-	    compareSlice(pexpect, pv) == false ||
-	    compareSlice(vexpect, v) == false {
+		compareSlice(pexpect, pv) == false ||
+		compareSlice(vexpect, v) == false {
 		t.Errorf("plen expect: %d, actual %d", expectlen, plen)
 		t.Errorf("value expect: 0x%02x, actual 0x%02x", pexpect, pv)
 		t.Errorf("value expect: 0x%02x, actual 0x%02x", vexpect, v)
@@ -297,8 +297,8 @@ func TestBitString(t *testing.T) {
 	//b 0011  0000 0000 0000 0000 0000 0001 1xxx
 	expectlen = 4
 	if plen != expectlen ||
-	    compareSlice(pexpect, pv) == false ||
-	    compareSlice(vexpect, v) == false {
+		compareSlice(pexpect, pv) == false ||
+		compareSlice(vexpect, v) == false {
 		t.Errorf("plen expect: %d, actual %d", expectlen, plen)
 		t.Errorf("value expect: 0x%02x, actual 0x%02x", pexpect, pv)
 		t.Errorf("value expect: 0x%02x, actual 0x%02x", vexpect, v)
