@@ -416,6 +416,7 @@ func encSNSSAI(sstInt uint8, sdString string) (pv []byte, plen int, v []byte) {
 
 	tmp, _ := strconv.ParseUint(sdString, 0, 32)
 	sd := per.IntToByte(tmp)
+	sd = sd[len(sd)-3:]
 	_, _, v, _ = per.EncOctetString(sd, 3, 3, false)
 	return
 }
