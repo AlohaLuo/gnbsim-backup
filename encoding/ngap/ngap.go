@@ -25,14 +25,18 @@ const (
 
 // Elementary Procedures constants
 const (
-	procCodeInitialUEMessage = 15
-	procCodeNGSetup          = 21
+	idInitialUEMessage = 15
+	idNGSetup          = 21
 )
 
 const (
-	idDefaultPagingDRX = 21
-	idGlobalRANNodeID  = 27
-	idSupportedTAList  = 102
+	idDefaultPagingDRX          = 21
+	idGlobalRANNodeID           = 27
+	idNASPDU                    = 38
+	idRANUENGAPID               = 85
+	idRRCEstablishmentCause     = 90
+	idSupportedTAList           = 102
+	idUserLocationInformation   = 121
 )
 
 const (
@@ -87,8 +91,36 @@ func NewNGAP(filename string) (p *GNB) {
 	return
 }
 
+// 9.2.5.1 INITIAL UE MESSAGE
+/*
+InitialUEMessage ::= SEQUENCE {
+    protocolIEs     ProtocolIE-Container        { {InitialUEMessage-IEs} },
+    ...
+}
+
+InitialUEMessage-IEs NGAP-PROTOCOL-IES ::= {
+    { ID id-RAN-UE-NGAP-ID              CRITICALITY reject  TYPE RAN-UE-NGAP-ID             PRESENCE mandatory  }|
+    { ID id-NAS-PDU                     CRITICALITY reject  TYPE NAS-PDU                    PRESENCE mandatory  }|
+    { ID id-UserLocationInformation     CRITICALITY reject  TYPE UserLocationInformation    PRESENCE mandatory  }|
+    { ID id-RRCEstablishmentCause       CRITICALITY ignore  TYPE RRCEstablishmentCause      PRESENCE mandatory  }|
+    { ID id-FiveG-S-TMSI                CRITICALITY reject  TYPE FiveG-S-TMSI               PRESENCE optional   }|
+    { ID id-AMFSetID                    CRITICALITY ignore  TYPE AMFSetID                   PRESENCE optional   }|
+    { ID id-UEContextRequest            CRITICALITY ignore  TYPE UEContextRequest           PRESENCE optional   }|
+    { ID id-AllowedNSSAI                CRITICALITY reject  TYPE AllowedNSSAI               PRESENCE optional   },
+    ...
+}
+*/
+func (p *GNB) MakeInitialUEMessage() (pdu []byte) {
+	return
+}
+
 // 9.2.6.1 NG SETUP REQUEST
 /*
+NGSetupRequest ::= SEQUENCE {
+    protocolIEs     ProtocolIE-Container        { {NGSetupRequestIEs} },
+    ...
+}
+
 NGSetupRequestIEs NGAP-PROTOCOL-IES ::= {
     { ID id-GlobalRANNodeID         CRITICALITY reject  TYPE GlobalRANNodeID            PRESENCE mandatory  }|
     { ID id-RANNodeName             CRITICALITY ignore  TYPE RANNodeName                PRESENCE optional}|
@@ -100,7 +132,7 @@ NGSetupRequestIEs NGAP-PROTOCOL-IES ::= {
 */
 func (p *GNB) MakeNGSetupRequest() (pdu []byte) {
 
-	pdu = encNgapPdu(initiatingMessage, procCodeNGSetup, reject)
+	pdu = encNgapPdu(initiatingMessage, idNGSetup, reject)
 	fmt.Printf("result: pdu = %02x\n", pdu)
 
 	v := encProtocolIEContainer(3)
