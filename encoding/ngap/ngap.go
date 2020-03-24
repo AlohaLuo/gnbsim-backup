@@ -1,6 +1,7 @@
 package ngap
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -312,7 +313,8 @@ func encGNBID(gnbid uint32) (pv []byte, plen int) {
 	pv, plen, _ = per.EncChoice(0, 0, 1, false)
 	fmt.Printf("EncChoice(%d): %02x\n", plen, pv)
 
-	tmp := per.IntToByte(gnbid)
+	tmp := make([]byte, 4)
+	binary.BigEndian.PutUint32(tmp, gnbid)
 	pv2, plen2, v, _ := per.EncBitString(tmp, bitlen,
 		minGNBIDSize, maxGNBIDSize, false)
 	fmt.Printf("EncBitString(%d): %02x\n", plen2, pv2)
@@ -441,13 +443,14 @@ SD ::= OCTET STRING (SIZE(3))
 func encSNSSAI(sstInt uint8, sdString string) (pv []byte, plen int, v []byte) {
 	pv, plen, _ = per.EncSequence(true, 2, 0x02)
 
-	sst := per.IntToByte(sstInt)
+	sst := []byte{byte(sstInt)}
 	pv2, plen2, _, _ := per.EncOctetString(sst, 1, 1, false)
 
 	pv, plen = per.MergeBitField(pv, plen, pv2, plen2)
 
 	tmp, _ := strconv.ParseUint(sdString, 0, 32)
-	sd := per.IntToByte(tmp)
+	sd := make([]byte, 8)
+	binary.BigEndian.PutUint64(sd, tmp)
 	sd = sd[len(sd)-3:]
 	_, _, v, _ = per.EncOctetString(sd, 3, 3, false)
 	return
@@ -500,7 +503,8 @@ TAC ::= OCTET STRING (SIZE(3))
 func encTAC(tacString string) (v []byte) {
 	const tacSize = 3
 	tmp, _ := strconv.ParseUint(tacString, 0, 32)
-	tac := per.IntToByte(tmp)
+	tac := make([]byte, 8)
+	binary.BigEndian.PutUint64(tac, tmp)
 	tac = tac[len(tac)-3:]
 
 	_, _, v, _ = per.EncOctetString(tac, tacSize, tacSize, false)
