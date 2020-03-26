@@ -4,9 +4,11 @@
 
 // Package per is implementation for Basic Pckage Encoding Rule (PER) in
 // ALIGNED variant.
+// standard version T-REC-X.691-201508
 package per
 
 import (
+	"encoding/binary"
 	"fmt"
 	"math/bits"
 )
@@ -103,50 +105,13 @@ func ShiftLeftMost(in []byte, inlen int) (out []byte, outlen int) {
 	return
 }
 
-// IntToByte is the type converter from uintX to []byte.
-// XXX I wonder if there has already been more efficient converter, but I
-// haven't found it.
-func IntToByte(in interface{}) (out []byte) {
-	switch in := in.(type) {
-	case uint8:
-		out = append([]byte{byte(in)}, out...)
-	case uint16:
-		for i := 0; i < 2; i++ {
-			out = append([]byte{byte(in)}, out...)
-			in >>= 8
-		}
-	case int:
-		for i := 0; i < 8; i++ {
-			out = append([]byte{byte(in)}, out...)
-			in >>= 8
-		}
-	case uint:
-		for i := 0; i < 8; i++ {
-			out = append([]byte{byte(in)}, out...)
-			in >>= 8
-		}
-	case uint32:
-		for i := 0; i < 4; i++ {
-			out = append([]byte{byte(in)}, out...)
-			in >>= 8
-		}
-	case uint64:
-		for i := 0; i < 8; i++ {
-			out = append([]byte{byte(in)}, out...)
-			in >>= 8
-		}
-	default:
-		fmt.Print("IntToByte: unknown type\n")
-		return
-	}
-	return
-}
-
 // EncConstrainedWholeNumber is the implementation for
-// 10.5 Encoding of constrained whole number.
-func EncConstrainedWholeNumber(input, min, max int) (
+// 11.5 Encoding of constrained whole number.
+func EncConstrainedWholeNumber(input_tmp, min_tmp int, max int64) (
 	v []byte, bitlen int, err error) {
 
+	input := int64(input_tmp)
+	min := int64(min_tmp)
 	if input < min || input > max {
 		err = fmt.Errorf("EncConstrainedWholeNumber: "+
 			"input value=%d is out of range. "+
@@ -162,20 +127,32 @@ func EncConstrainedWholeNumber(input, min, max int) (
 		return
 	case inputRange < 256: // the bit-field case
 		bitlen = bits.Len(uint(inputRange))
-		v = IntToByte(byte(inputEnc))
+		v = []byte{byte(inputEnc)}
 		return
 	case inputRange == 256: // the one-octet case
 		bitlen = 8
-		v = IntToByte(byte(inputEnc))
+		v = []byte{byte(inputEnc)}
 		return
 	case inputRange <= 65536: // the two-octet case
 		bitlen = 16
-		v = IntToByte(uint16(inputEnc))
+		v = make([]byte, 2)
+		binary.BigEndian.PutUint16(v, uint16(inputEnc))
 		return
-	case inputRange > 65537: // the indefinite length case
-		// not implemented yet
-		err = fmt.Errorf("EncConstrainedWholeNumber: "+
-			"not implemented yet for %d", input)
+	case inputRange > 65536: // the indefinite length case
+		v, _ = EncNonNegativeBinaryInteger(uint(input))
+		bytelen := len(v)
+		v = append([]byte{byte(bytelen)}, v...)
+		bitlen = len(v) * 8
+		/*
+			bytelen := bits.Len64(uint64(inputRange)) / 8 + 1
+			bitlen = bytelen * 8
+			v = []byte{byte(bytelen)}
+			tmp := []byte{}
+			for i := 0; i < bytelen; i++ {
+				tmp = append([]byte{byte(input)}, tmp...)
+				input >>= 8
+			}
+		*/
 		return
 	}
 	err = fmt.Errorf("EncConstrainedWholeNumber: "+
@@ -184,12 +161,12 @@ func EncConstrainedWholeNumber(input, min, max int) (
 }
 
 // EncLengthDeterminant is the implementation for
-// 10.9 General rules for encoding a length determinant
+// 11.9 General rules for encoding a length determinant
 func EncLengthDeterminant(input, max int) (
 	v []byte, bitlen int, err error) {
 
 	if max != 0 && max < 65536 {
-		v, bitlen, err = EncConstrainedWholeNumber(input, 0, max)
+		v, bitlen, err = EncConstrainedWholeNumber(input, 0, int64(max))
 		return
 	}
 
@@ -210,7 +187,7 @@ func EncLengthDeterminant(input, max int) (
 
 func encConstrainedWholeNumberWithExtmark(input, min, max int, extmark bool) (
 	v []byte, bitlen int, err error) {
-	v, bitlen, err = EncConstrainedWholeNumber(input, min, max)
+	v, bitlen, err = EncConstrainedWholeNumber(input, min, int64(max))
 	if err != nil {
 		return
 	}
@@ -227,8 +204,25 @@ func encConstrainedWholeNumberWithExtmark(input, min, max int, extmark bool) (
 	return
 }
 
+// EncNonNegativeBinaryInteger is the implementation for
+// 11.3 Encoding as a non-negative-binary-integer
+func EncNonNegativeBinaryInteger(input uint) (v []byte, err error) {
+
+	bytelen := bits.Len(input)/8 + 1
+	if bytelen == 1 {
+		v = []byte{0x00, byte(input)}
+		return
+	}
+
+	for i := 0; i < bytelen; i++ {
+		v = append([]byte{byte(input)}, v...)
+		input >>= 8
+	}
+	return
+}
+
 // EncInteger is the implementation for
-// 12. Encoding the integer type
+// 13. Encoding the integer type
 // but it is only for the case of single value and constrained whole nuber.
 func EncInteger(input, min, max int, extmark bool) (
 	v []byte, bitlen int, err error) {
@@ -241,14 +235,14 @@ func EncInteger(input, min, max int, extmark bool) (
 		return
 	}
 
-	// 12.2.2 constrained whole number
+	// 13.2.2 constrained whole number
 	v, bitlen, err = encConstrainedWholeNumberWithExtmark(input,
 		min, max, extmark)
 	return
 }
 
 // EncEnumerated is the implementation for
-// 13. Encoding the enumerated type
+// 14. Encoding the enumerated type
 func EncEnumerated(input, min, max int, extmark bool) (
 	v []byte, bitlen int, err error) {
 	v, bitlen, err =
@@ -257,7 +251,7 @@ func EncEnumerated(input, min, max int, extmark bool) (
 }
 
 // EncBitString returns multi-byte BIT STRING
-// 15. Encoding the bitstering type
+// 16. Encoding the bitstering type
 func EncBitString(input []byte, inputlen, min, max int, extmark bool) (
 	pv []byte, plen int, v []byte, err error) {
 
@@ -299,7 +293,7 @@ func EncBitString(input []byte, inputlen, min, max int, extmark bool) (
 }
 
 // EncOctetString returns multi-byte OCTET STRING
-// 16. Encoding the octetstring type
+// 17. Encoding the octetstring type
 //
 // - the length of returned value can be calculated by len().
 // - returned value can be len(value) == 0 if the specified octet string has
@@ -350,7 +344,7 @@ func EncOctetString(input []byte, min, max int, extmark bool) (
 }
 
 // EncSequence return Sequence Preamble but it just returns 0x00 for now.
-// 18. Encoding the sequence type
+// 19. Encoding the sequence type
 func EncSequence(extmark bool, optnum int, optflag uint) (
 	pv []byte, plen int, err error) {
 	if optnum > 7 {
@@ -372,11 +366,11 @@ func EncSequence(extmark bool, optnum int, optflag uint) (
 }
 
 // EncSequenceOf return Sequence-Of Preamble.
-// 19. Encoding the sequence-of type
+// 20. Encoding the sequence-of type
 var EncSequenceOf = EncEnumerated
 
 // EncChoice is the implementation for
-// 22. Encoding the choice type
+// 23. Encoding the choice type
 func EncChoice(input, min, max int, extmark bool) (
 	pv []byte, plen int, err error) {
 	pv, plen, err = EncInteger(input, min, max, extmark)
