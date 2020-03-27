@@ -94,15 +94,22 @@ func TestEncConstrainedWholeNumber(t *testing.T) {
 	}
 
 	v, bitlen, err = EncConstrainedWholeNumber(256, 0, 65536)
-	expect = []byte{2, 1, 0}
-	if bitlen != 24 || compareSlice(expect, v) == false {
+	expect = []byte{1, 0}
+	if bitlen != 16 || compareSlice(expect, v) == false {
 		t.Errorf("bitlen expect: %d, actual %d", 24, bitlen)
 		t.Errorf("expect: 0x%02x, actual 0x%02x", expect, v)
 	}
 
 	v, bitlen, err = EncConstrainedWholeNumber(255, 0, 4294967295)
-	expect = []byte{2, 0, 255}
-	if bitlen != 24 || compareSlice(expect, v) == false {
+	expect = []byte{0, 255}
+	if bitlen != 16 || compareSlice(expect, v) == false {
+		t.Errorf("bitlen expect: %d, actual %d", 40, bitlen)
+		t.Errorf("expect: 0x%02x, actual 0x%02x", expect, v)
+	}
+
+	v, bitlen, err = EncConstrainedWholeNumber(0x0fffffff, 0, 4294967295)
+	expect = []byte{0x0f, 0xff, 0xff, 0xff}
+	if bitlen != 32 || compareSlice(expect, v) == false {
 		t.Errorf("bitlen expect: %d, actual %d", 40, bitlen)
 		t.Errorf("expect: 0x%02x, actual 0x%02x", expect, v)
 	}

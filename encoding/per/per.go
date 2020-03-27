@@ -140,19 +140,7 @@ func EncConstrainedWholeNumber(input_tmp, min_tmp int, max int64) (
 		return
 	case inputRange > 65536: // the indefinite length case
 		v, _ = EncNonNegativeBinaryInteger(uint(input))
-		bytelen := len(v)
-		v = append([]byte{byte(bytelen)}, v...)
 		bitlen = len(v) * 8
-		/*
-			bytelen := bits.Len64(uint64(inputRange)) / 8 + 1
-			bitlen = bytelen * 8
-			v = []byte{byte(bytelen)}
-			tmp := []byte{}
-			for i := 0; i < bytelen; i++ {
-				tmp = append([]byte{byte(input)}, tmp...)
-				input >>= 8
-			}
-		*/
 		return
 	}
 	err = fmt.Errorf("EncConstrainedWholeNumber: "+
