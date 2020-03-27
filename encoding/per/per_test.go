@@ -193,6 +193,12 @@ func TestEncInteger(t *testing.T) {
 		t.Errorf("expect: 0x%02x, actual 0x%02x", expect, v)
 	}
 
+	v, bitlen, err = EncInteger(1, 0, 4294967295, false)
+	expect = []byte{0, 1}
+	if bitlen != 16 || compareSlice(expect, v) == false {
+		t.Errorf("bitlen expect: %d, actual %d", 16, bitlen)
+		t.Errorf("expect: 0x%02x, actual 0x%02x", expect, v)
+	}
 }
 
 // 13

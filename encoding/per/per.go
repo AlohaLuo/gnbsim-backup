@@ -107,11 +107,9 @@ func ShiftLeftMost(in []byte, inlen int) (out []byte, outlen int) {
 
 // EncConstrainedWholeNumber is the implementation for
 // 11.5 Encoding of constrained whole number.
-func EncConstrainedWholeNumber(input_tmp, min_tmp int, max int64) (
+func EncConstrainedWholeNumber(input, min, max int64) (
 	v []byte, bitlen int, err error) {
 
-	input := int64(input_tmp)
-	min := int64(min_tmp)
 	if input < min || input > max {
 		err = fmt.Errorf("EncConstrainedWholeNumber: "+
 			"input value=%d is out of range. "+
@@ -154,7 +152,7 @@ func EncLengthDeterminant(input, max int) (
 	v []byte, bitlen int, err error) {
 
 	if max != 0 && max < 65536 {
-		v, bitlen, err = EncConstrainedWholeNumber(input, 0, int64(max))
+		v, bitlen, err = EncConstrainedWholeNumber(int64(input), 0, int64(max))
 		return
 	}
 
@@ -173,9 +171,9 @@ func EncLengthDeterminant(input, max int) (
 	return
 }
 
-func encConstrainedWholeNumberWithExtmark(input, min, max int, extmark bool) (
+func encConstrainedWholeNumberWithExtmark(input, min, max int64, extmark bool) (
 	v []byte, bitlen int, err error) {
-	v, bitlen, err = EncConstrainedWholeNumber(input, min, int64(max))
+	v, bitlen, err = EncConstrainedWholeNumber(input, min, max)
 	if err != nil {
 		return
 	}
@@ -212,7 +210,7 @@ func EncNonNegativeBinaryInteger(input uint) (v []byte, err error) {
 // EncInteger is the implementation for
 // 13. Encoding the integer type
 // but it is only for the case of single value and constrained whole nuber.
-func EncInteger(input, min, max int, extmark bool) (
+func EncInteger(input, min, max int64, extmark bool) (
 	v []byte, bitlen int, err error) {
 
 	if min == max { // 12.2.1 single value
@@ -231,10 +229,11 @@ func EncInteger(input, min, max int, extmark bool) (
 
 // EncEnumerated is the implementation for
 // 14. Encoding the enumerated type
-func EncEnumerated(input, min, max int, extmark bool) (
+func EncEnumerated(input, min, max uint, extmark bool) (
 	v []byte, bitlen int, err error) {
 	v, bitlen, err =
-		encConstrainedWholeNumberWithExtmark(input, min, max, extmark)
+		encConstrainedWholeNumberWithExtmark(int64(input),
+	        int64(min), int64(max), extmark)
 	return
 }
 
@@ -274,8 +273,8 @@ func EncBitString(input []byte, inputlen, min, max int, extmark bool) (
 	}
 
 	// range is constrained whole number.
-	pv, plen, _ = encConstrainedWholeNumberWithExtmark(inputlen,
-		min, max, extmark)
+	pv, plen, _ = encConstrainedWholeNumberWithExtmark(int64(inputlen),
+		int64(min), int64(max), extmark)
 
 	return
 }
@@ -321,8 +320,8 @@ func EncOctetString(input []byte, min, max int, extmark bool) (
 
 	v = input
 	pv, plen, perr :=
-		encConstrainedWholeNumberWithExtmark(inputlen,
-			min, max, extmark)
+		encConstrainedWholeNumberWithExtmark(int64(inputlen),
+			int64(min), int64(max), extmark)
 
 	if perr != nil {
 		err = fmt.Errorf("EncOctetString: unexpected error.")
@@ -361,7 +360,7 @@ var EncSequenceOf = EncEnumerated
 // 23. Encoding the choice type
 func EncChoice(input, min, max int, extmark bool) (
 	pv []byte, plen int, err error) {
-	pv, plen, err = EncInteger(input, min, max, extmark)
+	pv, plen, err = EncInteger(int64(input), int64(min), int64(max), extmark)
 	pv, plen = ShiftLeftMost(pv, plen)
 	return
 }
