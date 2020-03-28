@@ -19,6 +19,12 @@ func compareSlice(actual, expect []byte) bool {
 	return true
 }
 
+func TestMakeInitialUEMessage(t *testing.T) {
+	gnbp := NewNGAP("ngap_test.json")
+	v := gnbp.MakeInitialUEMessage()
+	fmt.Printf("MakeInitialUEMessage: %02x\n", v)
+}
+
 func TestMakeNGSetupRequest(t *testing.T) {
 	gnbp := NewNGAP("ngap_test.json")
 	v := gnbp.MakeNGSetupRequest()

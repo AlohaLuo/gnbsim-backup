@@ -31,13 +31,13 @@ const (
 )
 
 const (
-	idDefaultPagingDRX          = 21
-	idGlobalRANNodeID           = 27
-	idNASPDU                    = 38
-	idRANUENGAPID               = 85
-	idRRCEstablishmentCause     = 90
-	idSupportedTAList           = 102
-	idUserLocationInformation   = 121
+	idDefaultPagingDRX        = 21
+	idGlobalRANNodeID         = 27
+	idNASPDU                  = 38
+	idRANUENGAPID             = 85
+	idRRCEstablishmentCause   = 90
+	idSupportedTAList         = 102
+	idUserLocationInformation = 121
 )
 
 const (
@@ -50,6 +50,8 @@ type GNB struct {
 	GlobalGNBID     GlobalGNBID
 	SupportedTAList []SupportedTA
 	PagingDRX       PagingDRX
+
+	RANUENGAPID uint32
 }
 
 type GlobalGNBID struct {
@@ -112,6 +114,17 @@ InitialUEMessage-IEs NGAP-PROTOCOL-IES ::= {
 }
 */
 func (p *GNB) MakeInitialUEMessage() (pdu []byte) {
+
+	pdu = encNgapPdu(initiatingMessage, idInitialUEMessage, ignore)
+	fmt.Printf("result: pdu = %02x\n", pdu)
+
+	v := encProtocolIEContainer(4)
+	fmt.Printf("result: ie container = %02x\n", v)
+
+	tmp := encRANUENGAPID(p.RANUENGAPID)
+	fmt.Printf("result: global RAN-UE-NGAP-ID = %02x\n", tmp)
+	v = append(v, tmp...)
+
 	return
 }
 
@@ -175,7 +188,7 @@ InitiatingMessage ::= SEQUENCE {
     value           NGAP-ELEMENTARY-PROCEDURE.&InitiatingMessage    ({NGAP-ELEMENTARY-PROCEDURES}{@procedureCode})
 }
 */
-func encNgapPdu(pduType, procCode, criticality int) (pdu []byte) {
+func encNgapPdu(pduType int, procCode int64, criticality uint) (pdu []byte) {
 	pdu, _, _ = per.EncChoice(pduType, 0, 2, true)
 	v, _, _ := per.EncInteger(procCode, 0, 255, false)
 	pdu = append(pdu, v...)
@@ -196,7 +209,7 @@ ProtocolIE-Container {NGAP-PROTOCOL-IES : IEsSetParam} ::=
 
 maxProtocolIEs                          INTEGER ::= 65535
 */
-func encProtocolIEContainer(num int) (container []byte) {
+func encProtocolIEContainer(num uint) (container []byte) {
 	const maxProtocolIEs = 65535
 	container, _, _ = per.EncSequence(true, 0, 0)
 	v, _, _ := per.EncSequenceOf(num, 0, maxProtocolIEs, false)
@@ -240,7 +253,7 @@ func encBroadcastPLMNItem(p *BroadcastPLMN) (pv []byte, plen int, v []byte) {
 	return
 }
 
-func encProtocolIE(id, criticality int) (v []byte, err error) {
+func encProtocolIE(id int64, criticality uint) (v []byte, err error) {
 
 	v1, _, _ := per.EncInteger(id, 0, 65535, false)
 	v2, _, _ := per.EncEnumerated(criticality, 0, 2, false)
@@ -342,7 +355,8 @@ func encPagingDRX(p *PagingDRX) (v []byte, err error) {
 
 	head, err := encProtocolIE(idDefaultPagingDRX, ignore)
 
-	n := 0
+	var n uint = 0
+
 	switch p.DRX {
 	case "v32":
 		n = 0
@@ -353,7 +367,7 @@ func encPagingDRX(p *PagingDRX) (v []byte, err error) {
 	case "v256":
 		n = 3
 	default:
-		fmt.Printf("encPagingDRX: no such DRX value(%s)", p.DRX)
+		fmt.Printf("encPagingDRX: no such DRX value(%s)\n", p.DRX)
 		return
 	}
 	pv, _, _ := per.EncEnumerated(n, 0, 3, true)
@@ -493,6 +507,20 @@ func encSupportedTAItem(p *SupportedTA) (v []byte) {
 	pv, _, _ := per.EncSequence(true, 1, 0)
 	v = append(pv, encTAC(p.TAC)...)
 	v = append(v, encBroadcastPLMNList(&p.BroadcastPLMNList)...)
+	return
+}
+
+// 9.3.3.2 RAN UE NGAP ID
+/*
+RAN-UE-NGAP-ID ::= INTEGER (0..4294967295)
+*/
+func encRANUENGAPID(id uint32) (v []byte) {
+	head, _ := encProtocolIE(idRANUENGAPID, reject)
+	v, _, _ = per.EncInteger(int64(id), 0, 4294967295, false)
+
+	length, _, _ := per.EncLengthDeterminant(len(v), 0)
+	head = append(head, length...)
+	v = append(head, v...)
 	return
 }
 
