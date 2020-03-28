@@ -1,3 +1,10 @@
+// Copyright 2019-2020 hhorai. All rights reserved.
+// Use of this source code is governed by a MIT license that can be found
+// in the LICENSE file.
+
+// Package ngap is implementation for NG Application Protocol (NGAP)
+// in the 5GS Sytem.
+// document version: 3GPP TS 38.413 v16.0.0 (2019-12)
 package ngap
 
 import (
