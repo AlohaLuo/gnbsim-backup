@@ -1,0 +1,7 @@
+{
+	"MSIN": "0123456789",
+	"MCC": 123,
+	"MNC": 45,
+	"RoutingIndicator": 1234,
+	"ProtectionScheme": "null"
+}
