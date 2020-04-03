@@ -106,6 +106,25 @@ const (
 	KeySetIdentityFlagMappedSecurityContext = 0x08
 )
 
+// 9.11.3.54 UE security capability
+type UESecurityCapability struct {
+	iei uint8
+	length uint8
+	ea uint8
+	ia uint8
+	eea uint8
+	eia uint8
+}
+
+const (
+	EA0 = 0x80
+	EA1 = 0x40
+	EA2 = 0x20
+	IA0 = 0x80
+	IA1 = 0x40
+	IA2 = 0x20
+)
+
 func Str2BCD(str string) (bcd []byte) {
 
 	byteArray := []byte(str)
@@ -173,12 +192,10 @@ func (p *UE) MakeRegistrationRequest() (pdu []byte) {
 	f.schemeOutput = encSchemeOutput(p.MSIN)
 
 	data := new(bytes.Buffer)
-	err := binary.Write(data, binary.BigEndian, req)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+	binary.Write(data, binary.BigEndian, req)
+	fmt.Printf("%02x\n", pdu)
 
+	binary.Write(data, binary.BigEndian, encUESecurityCapability())
 	pdu = data.Bytes()
 	fmt.Printf("%02x\n", pdu)
 
@@ -218,5 +235,15 @@ func encSchemeOutput(msin string) (so [5]byte) {
 	for i, v := range Str2BCD(msin) {
 		so[i] = v
 	}
+	return
+}
+
+// 9.11.3.54 UE security capability
+func encUESecurityCapability() (sc UESecurityCapability) {
+	sc.iei = 0x2e
+	sc.length = 4
+	sc.ea = EA0 | EA2
+	sc.ia = IA0 | IA2
+
 	return
 }
