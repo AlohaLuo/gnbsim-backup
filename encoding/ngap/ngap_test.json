@@ -24,5 +24,12 @@
 	"PagingDRX" : {
 		"DRX": "v32"
 	},
-	"RANUENGAPID" : 0
+	"RANUENGAPID" : 0,
+	"UE": {
+		"MSIN": "0123456789",
+		"MCC": 123,
+		"MNC": 45,
+		"RoutingIndicator": 1234,
+		"ProtectionScheme": "null"
+	}
 }

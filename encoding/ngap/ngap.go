@@ -16,6 +16,7 @@ import (
 	"math/bits"
 	"strconv"
 
+	"github.com/hhorai/gnbsim/encoding/nas"
 	"github.com/hhorai/gnbsim/encoding/per"
 )
 
@@ -57,8 +58,8 @@ type GNB struct {
 	GlobalGNBID     GlobalGNBID
 	SupportedTAList []SupportedTA
 	PagingDRX       PagingDRX
-
 	RANUENGAPID uint32
+	UE nas.UE
 }
 
 type GlobalGNBID struct {
@@ -130,6 +131,10 @@ func (p *GNB) MakeInitialUEMessage() (pdu []byte) {
 
 	tmp := encRANUENGAPID(p.RANUENGAPID)
 	fmt.Printf("result: global RAN-UE-NGAP-ID = %02x\n", tmp)
+	v = append(v, tmp...)
+
+	tmp = encNASPDU(p.UE.MakeRegistrationRequest())
+	fmt.Printf("result: 5G NAS PDU = %02x\n", tmp)
 	v = append(v, tmp...)
 
 	return
@@ -528,6 +533,19 @@ func encRANUENGAPID(id uint32) (v []byte) {
 	length, _, _ := per.EncLengthDeterminant(len(v), 0)
 	head = append(head, length...)
 	v = append(head, v...)
+	return
+}
+
+// 9.3.3.4 NAS-PDU
+/*
+NAS-PDU ::= OCTET STRING
+*/
+func encNASPDU(pdu []byte) (v []byte) {
+
+	head, _ := encProtocolIE(idNASPDU, reject)
+	length, _, _ := per.EncLengthDeterminant(len(pdu), 0)
+	head = append(head, length...)
+	v = append(head, pdu...)
 	return
 }
 
