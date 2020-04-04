@@ -48,44 +48,13 @@ const (
 	idUserLocationInformation = 121
 )
 
-const (
-	globalGNB = iota
-	globalNgGNB
-	globalN3IWF
-)
-
 type GNB struct {
 	GlobalGNBID     GlobalGNBID
 	SupportedTAList []SupportedTA
-	PagingDRX       PagingDRX
-	RANUENGAPID uint32
-	UE nas.UE
-}
-
-type GlobalGNBID struct {
-	MCC   uint16
-	MNC   uint16
-	GNBID uint32
-}
-
-type SupportedTA struct {
-	TAC               string
-	BroadcastPLMNList []BroadcastPLMN
-}
-
-type BroadcastPLMN struct {
-	MCC              uint16
-	MNC              uint16
-	SliceSupportList []SliceSupport
-}
-
-type SliceSupport struct {
-	SST uint8
-	SD  string
-}
-
-type PagingDRX struct {
-	DRX string
+	PagingDRX       string
+	RANUENGAPID     uint32
+	UE              nas.UE
+	NRCellID        uint32
 }
 
 func NewNGAP(filename string) (p *GNB) {
@@ -137,6 +106,10 @@ func (p *GNB) MakeInitialUEMessage() (pdu []byte) {
 	fmt.Printf("result: 5G NAS PDU = %02x\n", tmp)
 	v = append(v, tmp...)
 
+	tmp = encUserLocationInformation()
+	fmt.Printf("result: User Location Information = %02x\n", tmp)
+	v = append(v, tmp...)
+
 	return
 }
 
@@ -172,7 +145,7 @@ func (p *GNB) MakeNGSetupRequest() (pdu []byte) {
 	fmt.Printf("result: Supported TA List = %02x\n", tmp)
 	v = append(v, tmp...)
 
-	tmp, _ = encPagingDRX(&p.PagingDRX)
+	tmp, _ = encPagingDRX(p.PagingDRX)
 	fmt.Printf("result: PagingDRX = %02x\n", tmp)
 	v = append(v, tmp...)
 
@@ -258,6 +231,12 @@ BroadcastPLMNItem ::= SEQUENCE {
     ...
 }
 */
+type BroadcastPLMN struct {
+	MCC              uint16
+	MNC              uint16
+	SliceSupportList []SliceSupport
+}
+
 func encBroadcastPLMNItem(p *BroadcastPLMN) (pv []byte, plen int, v []byte) {
 	pv, plen, _ = per.EncSequence(true, 1, 0)
 	v = append(v, encPLMNIdentity(p.MCC, p.MNC)...)
@@ -284,6 +263,12 @@ func encProtocolIE(id int64, criticality uint) (v []byte, err error) {
        choice-Extensions   ProtocolIE-SingleContainer { {GlobalRANNodeID-ExtIEs} }
    }
 */
+const (
+	globalGNB = iota
+	globalNgGNB
+	globalN3IWF
+)
+
 func encGlobalRANNodeID(p *GlobalGNBID) (v []byte, err error) {
 
 	head, err := encProtocolIE(idGlobalRANNodeID, reject)
@@ -310,6 +295,12 @@ func encGlobalRANNodeID(p *GlobalGNBID) (v []byte, err error) {
        ...
    }
 */
+type GlobalGNBID struct {
+	MCC   uint16
+	MNC   uint16
+	GNBID uint32
+}
+
 func encGlobalGNBID(p *GlobalGNBID) (pv []byte, plen int, v []byte) {
 
 	pv, plen, _ = per.EncSequence(true, 1, 0)
@@ -353,6 +344,30 @@ func encGNBID(gnbid uint32) (pv []byte, plen int) {
 	return
 }
 
+// 9.3.1.7 NR CGI
+/*
+NR-CGI ::= SEQUENCE {
+    pLMNIdentity        PLMNIdentity,
+    nRCellIdentity      NRCellIdentity,
+    iE-Extensions       ProtocolExtensionContainer { {NR-CGI-ExtIEs} } OPTIONAL,
+    ...
+}
+NRCellIdentity ::= BIT STRING (SIZE(36))
+*/
+
+// 9.3.1.16 User Location Information
+/*
+UserLocationInformation ::= CHOICE {
+    userLocationInformationEUTRA    UserLocationInformationEUTRA,
+    userLocationInformationNR       UserLocationInformationNR,
+    userLocationInformationN3IWF    UserLocationInformationN3IWF,
+    choice-Extensions       ProtocolIE-SingleContainer { {UserLocationInformation-ExtIEs} }
+}
+*/
+func encUserLocationInformation() (v []byte) {
+	return
+}
+
 // 9.3.1.90 PagingDRX
 /*
 PagingDRX ::= ENUMERATED {
@@ -363,13 +378,13 @@ PagingDRX ::= ENUMERATED {
     ...
 }
 */
-func encPagingDRX(p *PagingDRX) (v []byte, err error) {
+func encPagingDRX(drx string) (v []byte, err error) {
 
 	head, err := encProtocolIE(idDefaultPagingDRX, ignore)
 
 	var n uint = 0
 
-	switch p.DRX {
+	switch drx {
 	case "v32":
 		n = 0
 	case "v64":
@@ -379,7 +394,7 @@ func encPagingDRX(p *PagingDRX) (v []byte, err error) {
 	case "v256":
 		n = 3
 	default:
-		fmt.Printf("encPagingDRX: no such DRX value(%s)\n", p.DRX)
+		fmt.Printf("encPagingDRX: no such DRX value(%s)\n", drx)
 		return
 	}
 	pv, _, _ := per.EncEnumerated(n, 0, 3, true)
@@ -431,6 +446,11 @@ SliceSupportItem ::= SEQUENCE {
     ...
 }
 */
+type SliceSupport struct {
+	SST uint8
+	SD  string
+}
+
 func encSliceSupportItem(p *SliceSupport) (v []byte) {
 	/*
 		ex.1
@@ -514,6 +534,11 @@ SupportedTAItem ::= SEQUENCE {
     ...
 }
 */
+type SupportedTA struct {
+	TAC               string
+	BroadcastPLMNList []BroadcastPLMN
+}
+
 func encSupportedTAItem(p *SupportedTA) (v []byte) {
 
 	pv, _, _ := per.EncSequence(true, 1, 0)
