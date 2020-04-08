@@ -361,6 +361,5 @@ var EncSequenceOf = EncEnumerated
 func EncChoice(input, min, max int, extmark bool) (
 	pv []byte, plen int, err error) {
 	pv, plen, err = EncInteger(int64(input), int64(min), int64(max), extmark)
-	pv, plen = ShiftLeftMost(pv, plen)
 	return
 }
