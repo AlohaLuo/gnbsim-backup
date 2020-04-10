@@ -239,17 +239,6 @@ func TestEncSequence(t *testing.T) {
 
 }
 
-/*
-func TestChoice(t *testing.T) {
-
-	expect := []byte{0x00}
-	actual := EncChoice(0)
-	if compareSlice(actual, expect) == false {
-		t.Errorf("expect: 0x%02x, actual 0x%02x", expect, actual)
-	}
-}
-*/
-
 func TestBitString(t *testing.T) {
 
 	var pv, v, in, pexpect, vexpect []byte
@@ -399,4 +388,33 @@ func TestOctetString(t *testing.T) {
 		t.Errorf("value pexpect: 0x%02x, actual 0x%02x", pexpect, pv)
 		t.Errorf("value expect: 0x%02x, actual 0x%02x", expect, v)
 	}
+}
+
+func TestChoice(t *testing.T) {
+
+	pattern := []struct {
+		input int
+		min int
+		max int
+		mark bool
+		epv []byte
+		eplen int
+		eerr error
+	} {
+		{0, 0, 0, false, []byte{}, 0, nil },
+		{1, 0, 2, false, []byte{0x40}, 2, nil },
+	}
+
+    for _, p := range pattern {
+
+        pv, plen, err := EncChoice(p.input, p.min, p.max, p.mark)
+
+		if compareSlice(pv, p.epv) == false ||
+		    plen != p.eplen || err != p.eerr {
+			// fmt.Printf("len = %d, %d\n", len(pv), len(p.epv))
+			t.Errorf("value expect: 0x%02x, got 0x%02x", p.epv, pv)
+			t.Errorf("plen expect: %d, actual %d", p.eplen, plen)
+			t.Errorf("error: %v, actual %v", p.eerr, err)
+		}
+    }
 }
