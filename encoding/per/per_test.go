@@ -19,374 +19,307 @@ func compareSlice(actual, expect []byte) bool {
 }
 
 func TestMergeBitField(t *testing.T) {
-	in1 := []byte{}
-	in2 := []byte{0x00, 0x11}
-	out, outlen := MergeBitField(nil, 0, in2, 8)
-	expect := []byte{0x11}
-	expectlen := 8
-	if expectlen != outlen || compareSlice(expect, out) == false {
-		t.Errorf("bitlen expect: %d, actual %d", expectlen, outlen)
-		t.Errorf("value expect: 0x%02x, actual 0x%02x", expect, out)
+
+	pattern := []struct {
+		in1    []byte
+		inlen1 int
+		in2    []byte
+		inlen2 int
+		ev     []byte
+		elen   int
+	}{
+		{nil, 0, []byte{0x00, 0x11}, 8, []byte{0x11}, 8},
+		{[]byte{0x80, 0x80}, 9, []byte{0x08, 0x80}, 9, []byte{0x80, 0x84, 0x40}, 18},
 	}
 
-	/* XXX need to fix here */
-	in1 = []byte{0x80, 0x80} //b1000 0000 1000 0000
-	in2 = []byte{0x08, 0x80} //b0000 1000 1000 0000
-	out, outlen = MergeBitField(in1, 9, in2, 9)
-	expect = []byte{0x80, 0x84, 0x40} //b1000 0000 1000 0100 01xx xxxx
-	expectlen = 18
-	if expectlen != outlen || compareSlice(expect, out) == false {
-		t.Errorf("bitlen expect: %d, actual %d", expectlen, outlen)
-		t.Errorf("value expect: 0x%02x, actual 0x%02x", expect, out)
+	for _, p := range pattern {
+
+		out, outlen := MergeBitField(p.in1, p.inlen1, p.in2, p.inlen2)
+
+		if compareSlice(out, p.ev) == false || outlen != p.elen {
+			t.Errorf("pattern = %v\n", p)
+			t.Errorf("expect value 0x%02x, got 0x%02x", p.ev, out)
+			t.Errorf("expect length %d, actual %d", p.elen, outlen)
+		}
 	}
 }
 
 func TestShiftLeft(t *testing.T) {
-	in := []byte{0x00, 0x11, 0x22}
-	expect := []byte{0x01, 0x12, 0x20}
-	out := ShiftLeft(in, 4)
-	if compareSlice(expect, out) == false {
-		t.Errorf("value expect: 0x%02x, actual 0x%02x", expect, out)
+
+	pattern := []struct {
+		in    []byte
+		inlen int
+		ev    []byte
+	}{
+		{[]byte{0x00, 0x11, 0x22}, 4, []byte{0x01, 0x12, 0x20}},
+	}
+
+	for _, p := range pattern {
+
+		out := ShiftLeft(p.in, p.inlen)
+
+		if compareSlice(out, p.ev) == false {
+			t.Errorf("pattern = %v\n", p)
+			t.Errorf("expect value 0x%02x, got 0x%02x", p.ev, out)
+		}
 	}
 }
 
 func TestShiftRight(t *testing.T) {
-	in := []byte{0x00, 0x11, 0x22}
-	expect := []byte{0x00, 0x01, 0x12}
-	out := ShiftRight(in, 4)
-	if compareSlice(expect, out) == false {
-		t.Errorf("value expect: 0x%02x, actual 0x%02x", expect, out)
+
+	pattern := []struct {
+		in    []byte
+		inlen int
+		ev    []byte
+	}{
+		{[]byte{0x00, 0x11, 0x22}, 4, []byte{0x00, 0x01, 0x12}},
+	}
+
+	for _, p := range pattern {
+
+		out := ShiftRight(p.in, p.inlen)
+
+		if compareSlice(out, p.ev) == false {
+			t.Errorf("pattern = %v\n", p)
+			t.Errorf("expect value 0x%02x, got 0x%02x", p.ev, out)
+		}
 	}
 }
 
-// 10.5
 func TestEncConstrainedWholeNumber(t *testing.T) {
-	v, bitlen, err := EncConstrainedWholeNumber(256, 0, 255)
-	if err == nil {
-		t.Errorf("EncConstrainedWholeNumber: unexpected error")
+
+	pattern := []struct {
+		in    int64
+		min   int64
+		max   int64
+		ev    []byte
+		evlen int
+		eerr  bool
+	}{
+		{256, 0, 255, []byte{}, 0, true},
+		{1, 0, 0, []byte{}, 0, true},
+		{1, 1, 1, []byte{}, 0, false},
+		{1, 0, 7, []byte{0x01}, 4, false},
+		{128, 0, 255, []byte{128}, 8, false},
+		{256, 0, 65535, []byte{1, 0}, 16, false},
+		{256, 0, 65536, []byte{1, 0}, 16, false},
+		{255, 0, 4294967295, []byte{0, 255}, 16, false},
+		{0x0fffffff, 0, 4294967295, []byte{0x0f, 0xff, 0xff, 0xff}, 32, false},
 	}
 
-	v, bitlen, err = EncConstrainedWholeNumber(1, 0, 0)
-	expect := []byte{}
-	if bitlen != 0 {
-		t.Errorf("bitlen expect: %d, actual %d", 4, bitlen)
-	}
+	for _, p := range pattern {
 
-	v, bitlen, err = EncConstrainedWholeNumber(1, 0, 7)
-	expect = []byte{0x01}
-	if bitlen != 4 || compareSlice(expect, v) == false {
-		t.Errorf("bitlen expect: %d, actual %d", 4, bitlen)
-		t.Errorf("value expect: 0x%02x, actual 0x%02x", expect, v)
-	}
+		out, outlen, err := EncConstrainedWholeNumber(p.in, p.min, p.max)
 
-	v, bitlen, err = EncConstrainedWholeNumber(128, 0, 255)
-	expect = []byte{128}
-	if bitlen != 8 || compareSlice(expect, v) == false {
-		t.Errorf("bitlen expect: %d, actual %d", 4, bitlen)
-		t.Errorf("expect: 0x%02x, actual 0x%02x", expect, v)
-	}
+		if compareSlice(out, p.ev) == false || outlen != p.evlen ||
+			(p.eerr == true && err == nil) || (p.eerr == false && err != nil) {
 
-	v, bitlen, err = EncConstrainedWholeNumber(256, 0, 65535)
-	expect = []byte{1, 0}
-	if bitlen != 16 || compareSlice(expect, v) == false {
-		t.Errorf("bitlen expect: %d, actual %d", 4, bitlen)
-		t.Errorf("expect: 0x%02x, actual 0x%02x", expect, v)
+			t.Errorf("pattern = %v\n", p)
+			t.Errorf("expect value 0x%02x, got 0x%02x", p.ev, out)
+			t.Errorf("expect length %d, got %d", p.evlen, outlen)
+			t.Errorf("expect error: %v, got %v", p.eerr, err)
+		}
 	}
-
-	v, bitlen, err = EncConstrainedWholeNumber(256, 0, 65536)
-	expect = []byte{1, 0}
-	if bitlen != 16 || compareSlice(expect, v) == false {
-		t.Errorf("bitlen expect: %d, actual %d", 24, bitlen)
-		t.Errorf("expect: 0x%02x, actual 0x%02x", expect, v)
-	}
-
-	v, bitlen, err = EncConstrainedWholeNumber(255, 0, 4294967295)
-	expect = []byte{0, 255}
-	if bitlen != 16 || compareSlice(expect, v) == false {
-		t.Errorf("bitlen expect: %d, actual %d", 40, bitlen)
-		t.Errorf("expect: 0x%02x, actual 0x%02x", expect, v)
-	}
-
-	v, bitlen, err = EncConstrainedWholeNumber(0x0fffffff, 0, 4294967295)
-	expect = []byte{0x0f, 0xff, 0xff, 0xff}
-	if bitlen != 32 || compareSlice(expect, v) == false {
-		t.Errorf("bitlen expect: %d, actual %d", 40, bitlen)
-		t.Errorf("expect: 0x%02x, actual 0x%02x", expect, v)
-	}
-
 }
 
-// 10.9
 func TestEncLengthDeterminant(t *testing.T) {
-	v, bitlen, _ := EncLengthDeterminant(1, 255)
-	expect := []byte{0x01}
-	expectlen := 8
-	if bitlen != expectlen || compareSlice(expect, v) == false {
-		t.Errorf("bitlen expect: %d, actual %d", expectlen, bitlen)
-		t.Errorf("value expect: 0x%02x, actual 0x%02x", expect, v)
+
+	pattern := []struct {
+		in     int
+		max    int
+		v      []byte
+		bitlen int
+		err    bool
+	}{
+		{1, 255, []byte{1}, 8, false},
+		{1, 0, []byte{1}, 0, false},
+		{16383, 0, []byte{0xbf, 0xff}, 0, false},
+		{16384, 0, []byte{}, 0, true},
 	}
 
-	v, bitlen, _ = EncLengthDeterminant(1, 0)
-	expect = []byte{0x01}
-	expectlen = 0
-	if bitlen != expectlen || compareSlice(expect, v) == false {
-		t.Errorf("bitlen expect: %d, actual %d", expectlen, bitlen)
-		t.Errorf("value expect: 0x%02x, actual 0x%02x", expect, v)
-	}
+	for _, p := range pattern {
 
-	v, bitlen, _ = EncLengthDeterminant(16383, 0)
-	expect = []byte{0xbf, 0xff}
-	expectlen = 0
-	if bitlen != expectlen || compareSlice(expect, v) == false {
-		t.Errorf("bitlen expect: %d, actual %d", expectlen, bitlen)
-		t.Errorf("value expect: 0x%02x, actual 0x%02x", expect, v)
-	}
+		v, bitlen, err := EncLengthDeterminant(p.in, p.max)
 
-	v, bitlen, err := EncLengthDeterminant(16384, 0)
-	if err == nil {
-		t.Errorf("EncLengthDeterminant: unexpected error")
+		if compareSlice(v, p.v) == false || bitlen != p.bitlen ||
+			(p.err == true && err == nil) || (p.err == false && err != nil) {
+
+			t.Errorf("pattern = %v\n", p)
+			t.Errorf("expect value 0x%02x, got 0x%02x", p.v, v)
+			t.Errorf("expect length %d, got %d", p.bitlen, bitlen)
+			t.Errorf("expect error: %v, got %v", p.err, err)
+		}
 	}
 }
 
-// 12
 func TestEncInteger(t *testing.T) {
-	v, bitlen, err := EncInteger(3, 0, 2, true)
-	if err == nil {
-		t.Errorf("EncInteger: unexpected error")
+
+	pattern := []struct {
+		in     int64
+		min    int64
+		max    int64
+		ext    bool
+		v      []byte
+		bitlen int
+		err    bool
+	}{
+		{3, 0, 2, true, []byte{}, 0, true},
+		{2, 2, 2, false, []byte{}, 0, false},
+		{2, 2, 2, true, []byte{0x00}, 1, false},
+		{128, 0, 255, false, []byte{128}, 8, false},
+		{1, 0, 7, true, []byte{0x08}, 5, false},
+		{128, 0, 255, true, []byte{0x00, 128}, 16, false},
+		{256, 0, 65535, false, []byte{1, 0}, 16, false},
+		{1, 0, 4294967295, false, []byte{0, 1}, 16, false},
 	}
 
-	v, bitlen, err = EncInteger(2, 2, 2, false)
-	if bitlen != 0 && len(v) == 0 {
-		t.Errorf("bitlen expect: %d, actual %d", 2, bitlen)
-	}
+	for _, p := range pattern {
 
-	v, bitlen, err = EncInteger(2, 2, 2, true)
-	expect := []byte{0x00}
-	if bitlen != 1 || compareSlice(expect, v) == false {
-		t.Errorf("bitlen expect: %d, actual %d", 2, bitlen)
-	}
+		v, bitlen, err := EncInteger(p.in, p.min, p.max, p.ext)
 
-	v, bitlen, err = EncInteger(128, 0, 255, false)
-	expect = []byte{128}
-	if bitlen != 8 || compareSlice(expect, v) == false {
-		t.Errorf("expect: 0x%02x, actual 0x%02x", expect, v)
-	}
+		if compareSlice(v, p.v) == false || bitlen != p.bitlen ||
+			(p.err == true && err == nil) || (p.err == false && err != nil) {
 
-	v, bitlen, err = EncInteger(1, 0, 7, true)
-	expect = []byte{0x08}
-	if bitlen != 5 || compareSlice(expect, v) == false {
-		t.Errorf("bitlen expect: %d, actual %d", 5, bitlen)
-		t.Errorf("value expect: 0x%02x, actual 0x%02x", expect, v)
-	}
-
-	v, bitlen, err = EncInteger(128, 0, 255, true)
-	expect = []byte{0x00, 128}
-	if bitlen != 16 || compareSlice(expect, v) == false {
-		t.Errorf("bitlen expect: %d, actual %d", 16, bitlen)
-		t.Errorf("expect: 0x%02x, actual 0x%02x", expect, v)
-	}
-
-	v, bitlen, err = EncInteger(256, 0, 65535, false)
-	expect = []byte{1, 0}
-	if bitlen != 16 || compareSlice(expect, v) == false {
-		t.Errorf("bitlen expect: %d, actual %d", 16, bitlen)
-		t.Errorf("expect: 0x%02x, actual 0x%02x", expect, v)
-	}
-
-	v, bitlen, err = EncInteger(1, 0, 4294967295, false)
-	expect = []byte{0, 1}
-	if bitlen != 16 || compareSlice(expect, v) == false {
-		t.Errorf("bitlen expect: %d, actual %d", 16, bitlen)
-		t.Errorf("expect: 0x%02x, actual 0x%02x", expect, v)
+			t.Errorf("pattern = %v\n", p)
+			t.Errorf("expect value 0x%02x, got 0x%02x", p.v, v)
+			t.Errorf("expect length %d, got %d", p.bitlen, bitlen)
+			t.Errorf("expect error: %v, got %v", p.err, err)
+		}
 	}
 }
 
-// 13
 func TestEncEnumerated(t *testing.T) {
-	v, bitlen, err := EncEnumerated(3, 0, 2, false)
-	if err == nil {
-		t.Errorf("EncEnumerated: unexpected error")
+
+	pattern := []struct {
+		in     uint
+		min    uint
+		max    uint
+		ext    bool
+		v      []byte
+		bitlen int
+		err    bool
+	}{
+		{3, 0, 2, false, []byte{}, 0, true},
+		{2, 0, 2, false, []byte{0x80}, 2, false},
+		{1, 0, 2, true, []byte{0x20}, 3, false},
 	}
 
-	v, bitlen, err = EncEnumerated(2, 0, 2, false)
-	expect := []byte{0x80}
-	if bitlen != 2 || compareSlice(expect, v) == false {
-		t.Errorf("bitlen expect: %d, actual %d", 2, bitlen)
-		t.Errorf("value expect: 0x%02x, actual 0x%02x", expect, v)
-	}
+	for _, p := range pattern {
 
-	v, bitlen, err = EncEnumerated(1, 0, 2, true)
-	expect = []byte{0x20}
-	if bitlen != 3 || compareSlice(expect, v) == false {
-		t.Errorf("bitlen expect: %d, actual %d", 3, bitlen)
-		t.Errorf("value expect: 0x%02x, actual 0x%02x", expect, v)
+		v, bitlen, err := EncEnumerated(p.in, p.min, p.max, p.ext)
+
+		if compareSlice(v, p.v) == false || bitlen != p.bitlen ||
+			(p.err == true && err == nil) || (p.err == false && err != nil) {
+
+			t.Errorf("pattern = %v\n", p)
+			t.Errorf("expect value 0x%02x, got 0x%02x", p.v, v)
+			t.Errorf("expect length %d, got %d", p.bitlen, bitlen)
+			t.Errorf("expect error: %v, got %v", p.err, err)
+		}
 	}
 }
 
-// 13
 func TestEncSequence(t *testing.T) {
-	v, bitlen, err := EncSequence(false, 8, 0x00)
-	if err == nil {
-		t.Errorf("EncSequence: unexpected error")
+
+	pattern := []struct {
+		ext    bool
+		opt    int
+		flag   uint
+		v      []byte
+		bitlen int
+		err    bool
+	}{
+		{false, 8, 0x00, []byte{}, 0, true},
+		{true, 1, 0x00, []byte{0x00}, 2, false},
 	}
 
-	v, bitlen, err = EncSequence(true, 1, 0x00)
-	expect := []byte{0x00}
-	if bitlen != 2 || compareSlice(expect, v) == false {
-		t.Errorf("bitlen expect: %d, actual %d", 2, bitlen)
-		t.Errorf("value expect: 0x%02x, actual 0x%02x", expect, v)
-	}
+	for _, p := range pattern {
 
+		v, bitlen, err := EncSequence(p.ext, p.opt, p.flag)
+
+		if compareSlice(v, p.v) == false || bitlen != p.bitlen ||
+			(p.err == true && err == nil) || (p.err == false && err != nil) {
+
+			t.Errorf("pattern = %v\n", p)
+			t.Errorf("expect value 0x%02x, got 0x%02x", p.v, v)
+			t.Errorf("expect length %d, got %d", p.bitlen, bitlen)
+			t.Errorf("expect error: %v, got %v", p.err, err)
+		}
+	}
 }
 
 func TestBitString(t *testing.T) {
 
-	var pv, v, in, pexpect, vexpect []byte
-	var plen int
-	var err error
-
-	pv, plen, v, err = EncBitString(in, 0, 16, 63, false)
-	if err == nil {
-		t.Errorf("BitString error")
+	pattern := []struct {
+		in    []byte
+		inlen int
+		min   int
+		max   int
+		ext   bool
+		pv    []byte
+		plen  int
+		v     []byte
+		err   bool
+	}{
+		{[]byte{}, 0, 16, 63, false, []byte{}, 0, []byte{}, true},
+		{[]byte{}, 100, 0, 63, false, []byte{}, 0, []byte{}, true},
+		{[]byte{0, 0, 0}, 25, 22, 32, false, []byte{}, 0, []byte{}, true},
+		{[]byte{0, 0}, 16, 16, 16, false, []byte{}, 0, []byte{0, 0}, false},
+		{[]byte{0, 0x10}, 16, 0, 255, false, []byte{0x10}, 8, []byte{0, 0x10}, false},
+		{[]byte{0, 0, 0x02}, 23, 22, 32, false, []byte{0x10}, 4, []byte{0, 0, 0x04}, false},
+		{[]byte{0, 0, 0, 0x03}, 25, 22, 32, false, []byte{0x30}, 4, []byte{0, 0, 0x01, 0x80}, false},
 	}
 
-	pv, plen, v, err = EncBitString(in, 100, 0, 63, false)
-	if err == nil {
-		t.Errorf("BitString error")
-	}
+	for _, p := range pattern {
 
-	in = []byte{0x00, 0x00, 0x00}
-	pv, plen, v, err = EncBitString(in, 25, 22, 32, false)
-	if err == nil {
-		t.Errorf("BitString error")
-	}
+		pv, plen, v, err := EncBitString(p.in, p.inlen, p.min, p.max, p.ext)
 
-	in = []byte{0x00, 0x00}
-	pv, plen, v, err = EncBitString(in, 16, 64, 64, false)
-	if err == nil {
-		t.Errorf("BitString error")
-	}
+		if compareSlice(pv, p.pv) == false || plen != p.plen ||
+			compareSlice(v, p.v) == false ||
+			(p.err == true && err == nil) || (p.err == false && err != nil) {
 
-	//fixed length case. but not implemented yet.
-	in = []byte{0x00, 0x00}
-	pv, plen, v, err = EncBitString(in, 16, 16, 16, false)
-	pexpect = []byte{}
-	vexpect = []byte{0x00, 0x00}
-	if plen != 0 ||
-		compareSlice(pexpect, pv) == false ||
-		compareSlice(vexpect, v) == false {
-		t.Errorf("plen expect: %d, actual %d", 16, plen)
-		t.Errorf("value expect: 0x%02x, actual 0x%02x", pexpect, pv)
-		t.Errorf("value expect: 0x%02x, actual 0x%02x", vexpect, v)
-	}
-
-	in = []byte{0x00, 0x10}
-	pv, plen, v, err = EncBitString(in, 16, 0, 255, false)
-	pexpect = []byte{0x10}
-	vexpect = []byte{0x00, 0x10}
-	expectlen := 8
-	if plen != expectlen ||
-		compareSlice(pexpect, pv) == false ||
-		compareSlice(vexpect, v) == false {
-		t.Errorf("plen expect: %d, actual %d", expectlen, plen)
-		t.Errorf("value expect: 0x%02x, actual 0x%02x", pexpect, pv)
-		t.Errorf("value expect: 0x%02x, actual 0x%02x", vexpect, v)
-	}
-
-	in = []byte{0x00, 0x00, 0x02}
-	//b x000 0000 0000 0000 0000 0010
-	pv, plen, v, err = EncBitString(in, 23, 22, 32, false)
-	pexpect = []byte{0x10}
-	vexpect = []byte{0x00, 0x00, 0x04}
-	//b 0001 0000 0000 0000 0000 0000 010x xxxx
-	expectlen = 4
-	if plen != expectlen ||
-		compareSlice(pexpect, pv) == false ||
-		compareSlice(vexpect, v) == false {
-		t.Errorf("plen expect: %d, actual %d", expectlen, plen)
-		t.Errorf("value expect: 0x%02x, actual 0x%02x", pexpect, pv)
-		t.Errorf("value expect: 0x%02x, actual 0x%02x", vexpect, v)
-	}
-
-	in = []byte{0x00, 0x00, 0x00, 0x03}
-	//b xxxx xxx0 0000 0000 0000 0000 0000 0011
-	pv, plen, v, err = EncBitString(in, 25, 22, 32, false)
-	pexpect = []byte{0x30}
-	vexpect = []byte{0x00, 0x00, 0x01, 0x80}
-	//b 0011  0000 0000 0000 0000 0000 0001 1xxx
-	expectlen = 4
-	if plen != expectlen ||
-		compareSlice(pexpect, pv) == false ||
-		compareSlice(vexpect, v) == false {
-		t.Errorf("plen expect: %d, actual %d", expectlen, plen)
-		t.Errorf("value expect: 0x%02x, actual 0x%02x", pexpect, pv)
-		t.Errorf("value expect: 0x%02x, actual 0x%02x", vexpect, v)
+			t.Errorf("pattern = %v\n", p)
+			t.Errorf("expect value 0x%02x, got 0x%02x", p.pv, pv)
+			t.Errorf("expect length %d, got %d", p.plen, plen)
+			t.Errorf("expect value 0x%02x, got 0x%02x", p.v, v)
+			t.Errorf("expect error: %v, got %v", p.err, err)
+		}
 	}
 }
 
 func TestOctetString(t *testing.T) {
 
-	in := make([]byte, 10, 10)
-	pv, plen, v, err := EncOctetString(in, 16, 64, false)
-	if err == nil {
-		t.Errorf("BitString error")
+	pattern := []struct {
+		in   []byte
+		min  int
+		max  int
+		ext  bool
+		pv   []byte
+		plen int
+		v    []byte
+		err  bool
+	}{
+		{[]byte{0}, 16, 64, false, []byte{}, 0, []byte{}, true},
+		{make([]byte, 8, 8), 8, 8, false, []byte{}, 0, make([]byte, 8, 8), false},
+		{[]byte{0x01, 0x80}, 2, 2, true, []byte{0x00, 0xc0, 0x00}, 17, []byte{}, false},
+		{make([]byte, 8, 8), 8, 8, true, []byte{0x00}, 1, make([]byte, 8, 8), false},
+		{make([]byte, 3, 3), 0, 7, true, []byte{0x18}, 5, make([]byte, 3, 3), false},
 	}
 
-	min := 8
-	max := 8
-	in = make([]byte, max, max)
-	pexpect := []byte{}
-	expect := in
-	pv, plen, v, err = EncOctetString(in, min, max, false)
-	expectplen := 0
-	if compareSlice(pexpect, pv) == false || plen != expectplen ||
-		compareSlice(expect, v) == false {
-		t.Errorf("plen expect: %d, actual %d", expectplen, plen)
-		t.Errorf("value pexpect: 0x%02x, actual 0x%02x", pexpect, pv)
-		t.Errorf("value expect: 0x%02x, actual 0x%02x", expect, v)
-	}
+	for _, p := range pattern {
 
-	min = 2
-	max = 2
-	//in = make([]byte, max, max)
-	in = []byte{0x01, 0x80}
-	pexpect = []byte{0x00, 0xc0, 0x00}
-	expect = []byte{}
-	pv, plen, v, err = EncOctetString(in, min, max, true)
-	expectplen = 17
-	if compareSlice(pexpect, pv) == false || plen != expectplen ||
-		compareSlice(expect, v) == false {
-		t.Errorf("plen expect: %d, actual %d", expectplen, plen)
-		t.Errorf("value pexpect: 0x%02x, actual 0x%02x", pexpect, pv)
-		t.Errorf("value expect: 0x%02x, actual 0x%02x", expect, v)
-	}
+		pv, plen, v, err := EncOctetString(p.in, p.min, p.max, p.ext)
 
-	min = 8
-	max = 8
-	in = make([]byte, max, max)
-	pexpect = []byte{0x00}
-	expect = in
-	pv, plen, v, err = EncOctetString(in, min, max, true)
-	expectplen = 1
-	if compareSlice(pexpect, pv) == false || plen != expectplen ||
-		compareSlice(expect, v) == false {
-		t.Errorf("plen expect: %d, actual %d", expectplen, plen)
-		t.Errorf("value pexpect: 0x%02x, actual 0x%02x", pexpect, pv)
-		t.Errorf("value expect: 0x%02x, actual 0x%02x", expect, v)
-	}
+		if compareSlice(pv, p.pv) == false || plen != p.plen ||
+			compareSlice(v, p.v) == false ||
+			(p.err == true && err == nil) || (p.err == false && err != nil) {
 
-	min = 0
-	max = 7
-	in = make([]byte, 3, 3)
-	pexpect = []byte{0x18}
-	expect = in
-	pv, plen, v, err = EncOctetString(in, min, max, true)
-	expectplen = 5
-	if compareSlice(pexpect, pv) == false || plen != expectplen ||
-		compareSlice(expect, v) == false {
-		t.Errorf("plen expect: %d, actual %d", expectplen, plen)
-		t.Errorf("value pexpect: 0x%02x, actual 0x%02x", pexpect, pv)
-		t.Errorf("value expect: 0x%02x, actual 0x%02x", expect, v)
+			t.Errorf("pattern = %v\n", p)
+			t.Errorf("expect value 0x%02x, got 0x%02x", p.pv, pv)
+			t.Errorf("expect length %d, got %d", p.plen, plen)
+			t.Errorf("expect value 0x%02x, got 0x%02x", p.v, v)
+			t.Errorf("expect error: %v, got %v", p.err, err)
+		}
 	}
 }
 
@@ -394,27 +327,27 @@ func TestChoice(t *testing.T) {
 
 	pattern := []struct {
 		input int
-		min int
-		max int
-		mark bool
-		epv []byte
+		min   int
+		max   int
+		mark  bool
+		epv   []byte
 		eplen int
-		eerr error
-	} {
-		{0, 0, 0, false, []byte{}, 0, nil },
-		{1, 0, 2, false, []byte{0x40}, 2, nil },
+		eerr  error
+	}{
+		{0, 0, 0, false, []byte{}, 0, nil},
+		{1, 0, 2, false, []byte{0x40}, 2, nil},
 	}
 
-    for _, p := range pattern {
+	for _, p := range pattern {
 
-        pv, plen, err := EncChoice(p.input, p.min, p.max, p.mark)
+		pv, plen, err := EncChoice(p.input, p.min, p.max, p.mark)
 
 		if compareSlice(pv, p.epv) == false ||
-		    plen != p.eplen || err != p.eerr {
-			// fmt.Printf("len = %d, %d\n", len(pv), len(p.epv))
-			t.Errorf("value expect: 0x%02x, got 0x%02x", p.epv, pv)
-			t.Errorf("plen expect: %d, actual %d", p.eplen, plen)
-			t.Errorf("error: %v, actual %v", p.eerr, err)
+			plen != p.eplen || err != p.eerr {
+			t.Errorf("pattern = %v\n", p)
+			t.Errorf("expect value 0x%02x, got 0x%02x", p.epv, pv)
+			t.Errorf("expect length %d, got %d", p.eplen, plen)
+			t.Errorf("expect error: %v, got %v", p.eerr, err)
 		}
-    }
+	}
 }

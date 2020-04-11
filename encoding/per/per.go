@@ -136,13 +136,10 @@ func EncConstrainedWholeNumber(input, min, max int64) (
 		v = make([]byte, 2)
 		binary.BigEndian.PutUint16(v, uint16(inputEnc))
 		return
-	case inputRange > 65536: // the indefinite length case
-		v, _ = EncNonNegativeBinaryInteger(uint(input))
-		bitlen = len(v) * 8
-		return
 	}
-	err = fmt.Errorf("EncConstrainedWholeNumber: "+
-		"invalid range min=%d, max=%d", min, max)
+	// case inputRange > 65536: // the indefinite length case
+	v, _ = EncNonNegativeBinaryInteger(uint(input))
+	bitlen = len(v) * 8
 	return
 }
 
@@ -249,12 +246,6 @@ func EncBitString(input []byte, inputlen, min, max int, extmark bool) (
 		return
 	}
 
-	if min == max && min != inputlen {
-		err = fmt.Errorf("EncBitString: "+
-			"input len(value)=%d must be %d", inputlen, min)
-		return
-	}
-
 	if len(input)*8 < inputlen {
 		err = fmt.Errorf("EncBitString: "+
 			"input len(value)=%d is too short.", len(input))
@@ -319,14 +310,9 @@ func EncOctetString(input []byte, min, max int, extmark bool) (
 	}
 
 	v = input
-	pv, plen, perr :=
+	pv, plen, err =
 		encConstrainedWholeNumberWithExtmark(int64(inputlen),
 			int64(min), int64(max), extmark)
-
-	if perr != nil {
-		err = fmt.Errorf("EncOctetString: unexpected error.")
-		return
-	}
 	return
 }
 
