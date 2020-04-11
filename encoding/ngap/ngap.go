@@ -45,6 +45,7 @@ const (
 	idRANUENGAPID             = 85
 	idRRCEstablishmentCause   = 90
 	idSupportedTAList         = 102
+	idUEContextRequest        = 112
 	idUserLocationInformation = 121
 )
 
@@ -112,6 +113,10 @@ func (gnb *GNB) MakeInitialUEMessage() (pdu []byte) {
 
 	tmp, _ = gnb.encRRCEstablishmentCause(rrcMoSignalling)
 	fmt.Printf("debug: RRC Establishment Cause = %02x\n", tmp)
+	v = append(v, tmp...)
+
+	tmp, _ = gnb.encUEContextRequest()
+	fmt.Printf("debug: UE Context Request = %02x\n", tmp)
 	v = append(v, tmp...)
 
 	return
@@ -204,47 +209,6 @@ func encProtocolIEContainer(num uint) (container []byte) {
 	v, _, _ := per.EncSequenceOf(num, 0, maxProtocolIEs, false)
 	container = append(container, v...)
 
-	return
-}
-
-/*
-BroadcastPLMNList ::= SEQUENCE (SIZE(1..maxnoofBPLMNs)) OF BroadcastPLMNItem
-    maxnoofBPLMNs                       INTEGER ::= 12
-*/
-func (gnb *GNB) encBroadcastPLMNList(p *[]BroadcastPLMN) (v []byte) {
-	const maxnoofBPLMNs = 12
-	pv, plen, _ := per.EncSequenceOf(1, 1, maxnoofBPLMNs, false)
-
-	for _, item := range *p {
-		pv2, plen2, v2 := gnb.encBroadcastPLMNItem(&item)
-		if plen != 0 {
-			pv, _ = per.MergeBitField(pv, plen, pv2, plen2)
-		}
-		v = append(v, pv...)
-		v = append(v, v2...)
-		plen = 0
-	}
-	return
-}
-
-/*
-BroadcastPLMNItem ::= SEQUENCE {
-    pLMNIdentity            PLMNIdentity,
-    tAISliceSupportList     SliceSupportList,
-    iE-Extensions           ProtocolExtensionContainer { {BroadcastPLMNItem-ExtIEs} } OPTIONAL,
-    ...
-}
-*/
-type BroadcastPLMN struct {
-	MCC              uint16
-	MNC              uint16
-	SliceSupportList []SliceSupport
-}
-
-func (gnb *GNB) encBroadcastPLMNItem(p *BroadcastPLMN) (pv []byte, plen int, v []byte) {
-	pv, plen, _ = per.EncSequence(true, 1, 0)
-	v = append(v, gnb.encPLMNIdentity(p.MCC, p.MNC)...)
-	v = append(v, encSliceSupportList(&p.SliceSupportList)...)
 	return
 }
 
@@ -645,51 +609,6 @@ func (gnb *GNB) encRRCEstablishmentCause(cause uint) (v []byte, err error) {
 	return
 }
 
-// Supported TA List
-/*
-SupportedTAList ::= SEQUENCE (SIZE(1..maxnoofTACs)) OF SupportedTAItem
-maxnoofTACs INTEGER ::= 256
-*/
-func (gnb *GNB) encSupportedTAList(p *[]SupportedTA) (v []byte, err error) {
-
-	head, err := encProtocolIE(idSupportedTAList, reject)
-
-	const maxnoofTACs = 256
-	v, _, _ = per.EncSequenceOf(1, 1, maxnoofTACs, false)
-
-	for _, item := range *p {
-		v = append(v, gnb.encSupportedTAItem(&item)...)
-	}
-
-	length, _, _ := per.EncLengthDeterminant(len(v), 0)
-	head = append(head, length...)
-	v = append(head, v...)
-
-	return
-}
-
-// Supported TA Item
-/*
-SupportedTAItem ::= SEQUENCE {
-    tAC                     TAC,
-    broadcastPLMNList       BroadcastPLMNList,
-    iE-Extensions           ProtocolExtensionContainer { {SupportedTAItem-ExtIEs} } OPTIONAL,
-    ...
-}
-*/
-type SupportedTA struct {
-	TAC               string
-	BroadcastPLMNList []BroadcastPLMN
-}
-
-func (gnb *GNB) encSupportedTAItem(p *SupportedTA) (v []byte) {
-
-	pv, _, _ := per.EncSequence(true, 1, 0)
-	v = append(pv, gnb.encTAC(p.TAC)...)
-	v = append(v, gnb.encBroadcastPLMNList(&p.BroadcastPLMNList)...)
-	return
-}
-
 // 9.3.3.2 RAN UE NGAP ID
 /*
 RAN-UE-NGAP-ID ::= INTEGER (0..4294967295)
@@ -750,5 +669,114 @@ func (gnb *GNB) encTAI(tai *TAI) (pv []byte, plen int, v []byte, err error) {
 	pv, plen, _ = per.EncSequence(true, 1, 0)
 	v = gnb.encPLMNIdentity(tai.PLMN.MCC, tai.PLMN.MNC)
 	v = append(v, gnb.encTAC(tai.TAC)...)
+	return
+}
+
+/*
+ * following IEs/Group Names are defined in each message definitions in 9.2.
+ * alphabetical order
+ */
+
+// Broadcast PLMN List is defined in 9.2.6.1 NG SETUP REQUEST
+/*
+BroadcastPLMNList ::= SEQUENCE (SIZE(1..maxnoofBPLMNs)) OF BroadcastPLMNItem
+    maxnoofBPLMNs                       INTEGER ::= 12
+*/
+func (gnb *GNB) encBroadcastPLMNList(p *[]BroadcastPLMN) (v []byte) {
+	const maxnoofBPLMNs = 12
+	pv, plen, _ := per.EncSequenceOf(1, 1, maxnoofBPLMNs, false)
+
+	for _, item := range *p {
+		pv2, plen2, v2 := gnb.encBroadcastPLMNItem(&item)
+		if plen != 0 {
+			pv, _ = per.MergeBitField(pv, plen, pv2, plen2)
+		}
+		v = append(v, pv...)
+		v = append(v, v2...)
+		plen = 0
+	}
+	return
+}
+
+// Broadcast PLMN Item is defined in 9.2.6.1 NG SETUP REQUEST
+/*
+BroadcastPLMNItem ::= SEQUENCE {
+    pLMNIdentity            PLMNIdentity,
+    tAISliceSupportList     SliceSupportList,
+    iE-Extensions           ProtocolExtensionContainer { {BroadcastPLMNItem-ExtIEs} } OPTIONAL,
+    ...
+}
+*/
+type BroadcastPLMN struct {
+	MCC              uint16
+	MNC              uint16
+	SliceSupportList []SliceSupport
+}
+
+func (gnb *GNB) encBroadcastPLMNItem(p *BroadcastPLMN) (pv []byte, plen int, v []byte) {
+	pv, plen, _ = per.EncSequence(true, 1, 0)
+	v = append(v, gnb.encPLMNIdentity(p.MCC, p.MNC)...)
+	v = append(v, encSliceSupportList(&p.SliceSupportList)...)
+	return
+}
+
+// Supported TA List is defined in 9.2.6.1 NG SETUP REQUEST
+/*
+SupportedTAList ::= SEQUENCE (SIZE(1..maxnoofTACs)) OF SupportedTAItem
+maxnoofTACs INTEGER ::= 256
+*/
+func (gnb *GNB) encSupportedTAList(p *[]SupportedTA) (v []byte, err error) {
+
+	head, err := encProtocolIE(idSupportedTAList, reject)
+
+	const maxnoofTACs = 256
+	v, _, _ = per.EncSequenceOf(1, 1, maxnoofTACs, false)
+
+	for _, item := range *p {
+		v = append(v, gnb.encSupportedTAItem(&item)...)
+	}
+
+	length, _, _ := per.EncLengthDeterminant(len(v), 0)
+	head = append(head, length...)
+	v = append(head, v...)
+
+	return
+}
+
+// Supported TA Item is defined in 9.2.6.1 NG SETUP REQUEST
+/*
+SupportedTAItem ::= SEQUENCE {
+    tAC                     TAC,
+    broadcastPLMNList       BroadcastPLMNList,
+    iE-Extensions           ProtocolExtensionContainer { {SupportedTAItem-ExtIEs} } OPTIONAL,
+    ...
+}
+*/
+type SupportedTA struct {
+	TAC               string
+	BroadcastPLMNList []BroadcastPLMN
+}
+
+func (gnb *GNB) encSupportedTAItem(p *SupportedTA) (v []byte) {
+
+	pv, _, _ := per.EncSequence(true, 1, 0)
+	v = append(pv, gnb.encTAC(p.TAC)...)
+	v = append(v, gnb.encBroadcastPLMNList(&p.BroadcastPLMNList)...)
+	return
+}
+
+// UE Context Request is defined in 9.2.5.1 INITIAL UE MESSAGE
+/*
+UEContextRequest ::= ENUMERATED {requested, ...}
+*/
+func (gnb *GNB) encUEContextRequest() (v []byte, err error) {
+
+	head, err := encProtocolIE(idUEContextRequest, ignore)
+
+	v, _, _ = per.EncEnumerated(0, 0, 0, true)
+
+	length, _, _ := per.EncLengthDeterminant(len(v), 0)
+	head = append(head, length...)
+	v = append(head, v...)
 	return
 }
