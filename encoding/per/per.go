@@ -233,7 +233,7 @@ func EncEnumerated(input, min, max uint, extmark bool) (
 	v []byte, bitlen int, err error) {
 	v, bitlen, err =
 		encConstrainedWholeNumberWithExtmark(int64(input),
-	        int64(min), int64(max), extmark)
+			int64(min), int64(max), extmark)
 	return
 }
 

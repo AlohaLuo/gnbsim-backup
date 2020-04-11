@@ -54,7 +54,7 @@ type GNB struct {
 	PagingDRX       string
 	RANUENGAPID     uint32
 	UE              nas.UE
-	NRCellID        uint32
+	ULInfoNR        UserLocationInformationNR
 }
 
 func NewNGAP(filename string) (p *GNB) {
@@ -90,24 +90,24 @@ InitialUEMessage-IEs NGAP-PROTOCOL-IES ::= {
     ...
 }
 */
-func (p *GNB) MakeInitialUEMessage() (pdu []byte) {
+func (gnb *GNB) MakeInitialUEMessage() (pdu []byte) {
 
 	pdu = encNgapPdu(initiatingMessage, idInitialUEMessage, ignore)
-	fmt.Printf("result: pdu = %02x\n", pdu)
+	fmt.Printf("debug: pdu = %02x\n", pdu)
 
 	v := encProtocolIEContainer(4)
-	fmt.Printf("result: ie container = %02x\n", v)
+	fmt.Printf("debug: ie container = %02x\n", v)
 
-	tmp := encRANUENGAPID(p.RANUENGAPID)
-	fmt.Printf("result: global RAN-UE-NGAP-ID = %02x\n", tmp)
+	tmp := encRANUENGAPID(gnb.RANUENGAPID)
+	fmt.Printf("debug: global RAN-UE-NGAP-ID = %02x\n", tmp)
 	v = append(v, tmp...)
 
-	tmp = encNASPDU(p.UE.MakeRegistrationRequest())
-	fmt.Printf("result: 5G NAS PDU = %02x\n", tmp)
+	tmp = encNASPDU(gnb.UE.MakeRegistrationRequest())
+	fmt.Printf("debug: 5G NAS PDU = %02x\n", tmp)
 	v = append(v, tmp...)
 
-	tmp = encUserLocationInformation()
-	fmt.Printf("result: User Location Information = %02x\n", tmp)
+	tmp, _ = gnb.encUserLocationInformation()
+	fmt.Printf("debug: User Location Information = %02x\n", tmp)
 	v = append(v, tmp...)
 
 	return
@@ -129,24 +129,24 @@ NGSetupRequestIEs NGAP-PROTOCOL-IES ::= {
     ...
 }
 */
-func (p *GNB) MakeNGSetupRequest() (pdu []byte) {
+func (gnb *GNB) MakeNGSetupRequest() (pdu []byte) {
 
 	pdu = encNgapPdu(initiatingMessage, idNGSetup, reject)
-	fmt.Printf("result: pdu = %02x\n", pdu)
+	fmt.Printf("debug: pdu = %02x\n", pdu)
 
 	v := encProtocolIEContainer(3)
-	fmt.Printf("result: ie container = %02x\n", v)
+	fmt.Printf("debug: ie container = %02x\n", v)
 
-	tmp, _ := encGlobalRANNodeID(&p.GlobalGNBID)
-	fmt.Printf("result: global RAN Node ID = %02x\n", tmp)
+	tmp, _ := gnb.encGlobalRANNodeID(&gnb.GlobalGNBID)
+	fmt.Printf("debug: global RAN Node ID = %02x\n", tmp)
 	v = append(v, tmp...)
 
-	tmp, _ = encSupportedTAList(&p.SupportedTAList)
-	fmt.Printf("result: Supported TA List = %02x\n", tmp)
+	tmp, _ = gnb.encSupportedTAList(&gnb.SupportedTAList)
+	fmt.Printf("debug: Supported TA List = %02x\n", tmp)
 	v = append(v, tmp...)
 
-	tmp, _ = encPagingDRX(p.PagingDRX)
-	fmt.Printf("result: PagingDRX = %02x\n", tmp)
+	tmp, _ = encPagingDRX(gnb.PagingDRX)
+	fmt.Printf("debug: PagingDRX = %02x\n", tmp)
 	v = append(v, tmp...)
 
 	length, _, _ := per.EncLengthDeterminant(len(v), 0)
@@ -207,12 +207,12 @@ func encProtocolIEContainer(num uint) (container []byte) {
 BroadcastPLMNList ::= SEQUENCE (SIZE(1..maxnoofBPLMNs)) OF BroadcastPLMNItem
     maxnoofBPLMNs                       INTEGER ::= 12
 */
-func encBroadcastPLMNList(p *[]BroadcastPLMN) (v []byte) {
+func (gnb *GNB) encBroadcastPLMNList(p *[]BroadcastPLMN) (v []byte) {
 	const maxnoofBPLMNs = 12
 	pv, plen, _ := per.EncSequenceOf(1, 1, maxnoofBPLMNs, false)
 
 	for _, item := range *p {
-		pv2, plen2, v2 := encBroadcastPLMNItem(&item)
+		pv2, plen2, v2 := gnb.encBroadcastPLMNItem(&item)
 		if plen != 0 {
 			pv, _ = per.MergeBitField(pv, plen, pv2, plen2)
 		}
@@ -237,9 +237,9 @@ type BroadcastPLMN struct {
 	SliceSupportList []SliceSupport
 }
 
-func encBroadcastPLMNItem(p *BroadcastPLMN) (pv []byte, plen int, v []byte) {
+func (gnb *GNB) encBroadcastPLMNItem(p *BroadcastPLMN) (pv []byte, plen int, v []byte) {
 	pv, plen, _ = per.EncSequence(true, 1, 0)
-	v = append(v, encPLMNIdentity(p.MCC, p.MNC)...)
+	v = append(v, gnb.encPLMNIdentity(p.MCC, p.MNC)...)
 	v = append(v, encSliceSupportList(&p.SliceSupportList)...)
 	return
 }
@@ -269,13 +269,13 @@ const (
 	globalN3IWF
 )
 
-func encGlobalRANNodeID(p *GlobalGNBID) (v []byte, err error) {
+func (gnb *GNB) encGlobalRANNodeID(p *GlobalGNBID) (v []byte, err error) {
 
 	head, err := encProtocolIE(idGlobalRANNodeID, reject)
 
 	// NG-ENB and N3IWF are not implemented yet...
 	pv, plen, _ := per.EncChoice(globalGNB, 0, 2, false)
-	pv2, plen2, v2 := encGlobalGNBID(p)
+	pv2, plen2, v2 := gnb.encGlobalGNBID(p)
 	pv, plen = per.MergeBitField(pv, plen, pv2, plen2)
 	pv = append(pv, v2...)
 
@@ -301,10 +301,10 @@ type GlobalGNBID struct {
 	GNBID uint32
 }
 
-func encGlobalGNBID(p *GlobalGNBID) (pv []byte, plen int, v []byte) {
+func (gnb *GNB) encGlobalGNBID(p *GlobalGNBID) (pv []byte, plen int, v []byte) {
 
 	pv, plen, _ = per.EncSequence(true, 1, 0)
-	v = append(v, encPLMNIdentity(p.MCC, p.MNC)...)
+	v = append(v, gnb.encPLMNIdentity(p.MCC, p.MNC)...)
 
 	pv2, _ := encGNBID(p.GNBID)
 	v = append(v, pv2...)
@@ -317,9 +317,12 @@ func encGlobalGNBID(p *GlobalGNBID) (pv []byte, plen int, v []byte) {
        choice-Extensions       ProtocolIE-SingleContainer { {GNB-ID-ExtIEs} }
    }
 */
+const (
+	minGNBIDSize = 22
+	maxGNBIDSize = 32
+)
+
 func encGNBID(gnbid uint32) (pv []byte, plen int) {
-	const minGNBIDSize = 22
-	const maxGNBIDSize = 32
 
 	bitlen := bits.Len32(gnbid)
 	if bitlen < minGNBIDSize {
@@ -327,19 +330,14 @@ func encGNBID(gnbid uint32) (pv []byte, plen int) {
 	}
 
 	pv, plen, _ = per.EncChoice(0, 0, 1, false)
-	fmt.Printf("EncChoice(%d): %02x\n", plen, pv)
 
 	tmp := make([]byte, 4)
 	binary.BigEndian.PutUint32(tmp, gnbid)
 	pv2, plen2, v, _ := per.EncBitString(tmp, bitlen,
 		minGNBIDSize, maxGNBIDSize, false)
-	fmt.Printf("EncBitString(%d): %02x\n", plen2, pv2)
 
 	pv, plen = per.MergeBitField(pv, plen, pv2, plen2)
-
 	pv = append(pv, v...)
-
-	fmt.Printf("gNB-ID = %02x\n", pv)
 
 	return
 }
@@ -354,6 +352,49 @@ NR-CGI ::= SEQUENCE {
 }
 NRCellIdentity ::= BIT STRING (SIZE(36))
 */
+type NRCGI struct {
+	PLMN     PLMN
+	NRCellID uint64
+}
+
+const (
+	nrCellIDSize = 36
+)
+
+func (gnb *GNB) encNRCGI(nrcgi *NRCGI) (pv []byte, plen int, v []byte,
+	err error) {
+
+	pv, plen, _ = per.EncSequence(true, 1, 0)
+	v = gnb.encPLMNIdentity(nrcgi.PLMN.MCC, nrcgi.PLMN.MNC)
+	v = append(v, gnb.encNRCellIdentity(nrcgi.NRCellID)...)
+
+	return
+}
+
+func (gnb *GNB) encNRCellIdentity(cellid uint64) (v []byte) {
+
+	// The leftmost bits of the NR Cell Identity IE correspond to the gNB ID
+	// (defined in subclause 9.3.1.6).
+	gnbid := gnb.GlobalGNBID.GNBID
+	gnbidlen := bits.Len32(gnbid)
+
+	if gnbidlen < minGNBIDSize {
+		gnbidlen = minGNBIDSize
+	}
+
+	tmp := make([]byte, 4)
+	binary.BigEndian.PutUint32(tmp, gnbid)
+	pv, plen := per.ShiftLeftMost(tmp, gnbidlen)
+
+	cellidlen := nrCellIDSize - gnbidlen
+	tmp = make([]byte, 8)
+	binary.BigEndian.PutUint64(tmp, cellid)
+	pv2, plen2 := per.ShiftLeftMost(tmp, cellidlen)
+
+	v, _ = per.MergeBitField(pv, plen, pv2, plen2)
+
+	return
+}
 
 // 9.3.1.16 User Location Information
 /*
@@ -364,7 +405,53 @@ UserLocationInformation ::= CHOICE {
     choice-Extensions       ProtocolIE-SingleContainer { {UserLocationInformation-ExtIEs} }
 }
 */
-func encUserLocationInformation() (v []byte) {
+const (
+	ULInfoEUTRA = iota
+	ULInfoNR
+	ULInfoN3IWF
+)
+
+func (gnb *GNB) encUserLocationInformation() (v []byte, err error) {
+	head, err := encProtocolIE(idUserLocationInformation, reject)
+
+	// NG-ENB and N3IWF are not implemented yet...
+	pv, plen, _ := per.EncChoice(ULInfoNR, 0, 2, false)
+
+	pv2, plen2, v := gnb.encUserLocationInformationNR(&gnb.ULInfoNR)
+	pv, plen = per.MergeBitField(pv, plen, pv2, plen2)
+
+	pv = append(pv, v...)
+
+	length, _, _ := per.EncLengthDeterminant(len(pv), 0)
+	head = append(head, length...)
+	v = append(head, pv...)
+
+	return
+}
+
+/*
+UserLocationInformationNR ::= SEQUENCE {
+    nR-CGI              NR-CGI,
+    tAI                 TAI,
+    timeStamp           TimeStamp                                                           OPTIONAL,
+    iE-Extensions       ProtocolExtensionContainer { {UserLocationInformationNR-ExtIEs} }   OPTIONAL,
+    ...
+}
+*/
+type UserLocationInformationNR struct {
+	NRCGI NRCGI
+	TAI   TAI
+}
+
+func (gnb *GNB) encUserLocationInformationNR(info *UserLocationInformationNR) (pv []byte, plen int, v []byte) {
+	pv, plen, _ = per.EncSequence(true, 2, 0)
+	pv2, plen2, v, _ := gnb.encNRCGI(&info.NRCGI)
+	pv, plen = per.MergeBitField(pv, plen, pv2, plen2)
+
+	pv2, plen2, v2, _ := gnb.encTAI(&info.TAI)
+	v = append(v, pv2...)
+	v = append(v, v2...)
+
 	return
 }
 
@@ -410,7 +497,12 @@ func encPagingDRX(drx string) (v []byte, err error) {
 /*
 PLMNIdentity ::= OCTET STRING (SIZE(3))
 */
-func encPLMNIdentity(mcc, mnc uint16) (v []byte) {
+type PLMN struct {
+	MCC uint16
+	MNC uint16
+}
+
+func (gnb *GNB) encPLMNIdentity(mcc, mnc uint16) (v []byte) {
 
 	v = make([]byte, 3, 3)
 	v[0] = byte(mcc % 1000 / 100)
@@ -507,7 +599,7 @@ func encSNSSAI(sstInt uint8, sdString string) (pv []byte, plen int, v []byte) {
 SupportedTAList ::= SEQUENCE (SIZE(1..maxnoofTACs)) OF SupportedTAItem
 maxnoofTACs INTEGER ::= 256
 */
-func encSupportedTAList(p *[]SupportedTA) (v []byte, err error) {
+func (gnb *GNB) encSupportedTAList(p *[]SupportedTA) (v []byte, err error) {
 
 	head, err := encProtocolIE(idSupportedTAList, reject)
 
@@ -515,7 +607,7 @@ func encSupportedTAList(p *[]SupportedTA) (v []byte, err error) {
 	v, _, _ = per.EncSequenceOf(1, 1, maxnoofTACs, false)
 
 	for _, item := range *p {
-		v = append(v, encSupportedTAItem(&item)...)
+		v = append(v, gnb.encSupportedTAItem(&item)...)
 	}
 
 	length, _, _ := per.EncLengthDeterminant(len(v), 0)
@@ -539,11 +631,11 @@ type SupportedTA struct {
 	BroadcastPLMNList []BroadcastPLMN
 }
 
-func encSupportedTAItem(p *SupportedTA) (v []byte) {
+func (gnb *GNB) encSupportedTAItem(p *SupportedTA) (v []byte) {
 
 	pv, _, _ := per.EncSequence(true, 1, 0)
-	v = append(pv, encTAC(p.TAC)...)
-	v = append(v, encBroadcastPLMNList(&p.BroadcastPLMNList)...)
+	v = append(pv, gnb.encTAC(p.TAC)...)
+	v = append(v, gnb.encBroadcastPLMNList(&p.BroadcastPLMNList)...)
 	return
 }
 
@@ -578,7 +670,7 @@ func encNASPDU(pdu []byte) (v []byte) {
 /*
 TAC ::= OCTET STRING (SIZE(3))
 */
-func encTAC(tacString string) (v []byte) {
+func (gnb *GNB) encTAC(tacString string) (v []byte) {
 	const tacSize = 3
 	tmp, _ := strconv.ParseUint(tacString, 0, 32)
 	tac := make([]byte, 8)
@@ -586,5 +678,26 @@ func encTAC(tacString string) (v []byte) {
 	tac = tac[len(tac)-3:]
 
 	_, _, v, _ = per.EncOctetString(tac, tacSize, tacSize, false)
+	return
+}
+
+// 9.3.3.11 TAI
+/*
+TAI ::= SEQUENCE {
+    pLMNIdentity        PLMNIdentity,
+    tAC                 TAC,
+    iE-Extensions       ProtocolExtensionContainer { {TAI-ExtIEs} } OPTIONAL,
+    ...
+}
+*/
+type TAI struct {
+	PLMN PLMN
+	TAC  string
+}
+
+func (gnb *GNB) encTAI(tai *TAI) (pv []byte, plen int, v []byte, err error) {
+	pv, plen, _ = per.EncSequence(true, 1, 0)
+	v = gnb.encPLMNIdentity(tai.PLMN.MCC, tai.PLMN.MNC)
+	v = append(v, gnb.encTAC(tai.TAC)...)
 	return
 }

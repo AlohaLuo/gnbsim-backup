@@ -9,12 +9,12 @@
 			"TAC": "0x000102",
 			"BroadcastPLMNList": [
 				{
-					"MCC": 123,
-					"MNC": 45,
+					"mcc": 123,
+					"mnc": 45,
 					"SliceSupportList": [
 						{
-							"SST": 1,
-							"SD": "0x123456"
+							"sst": 1,
+							"sd": "0x123456"
 						}
 					]
 				}
@@ -24,11 +24,26 @@
 	"PagingDRX" : "v32",
 	"RANUENGAPID" : 0,
 	"UE": {
-		"MSIN": "0123456789",
-		"MCC": 123,
-		"MNC": 45,
+		"msin": "0123456789",
+		"mcc": 123,
+		"mnc": 45,
 		"RoutingIndicator": 1234,
 		"ProtectionScheme": "null"
 	},
-	"NRCellID": 1
+	"ULInfoNR": {
+		"NRCGI": {
+			"PLMN": {
+				"mcc": 123,
+				"mnc": 45
+			},
+			"NRCellID": 1
+		},
+		"TAI": {
+			"PLMN": {
+				"mcc": 123,
+				"mnc": 45
+			},
+			"TAC": "0x000102"
+		}
+	}
 }

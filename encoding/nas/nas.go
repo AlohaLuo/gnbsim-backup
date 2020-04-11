@@ -19,9 +19,9 @@ import (
 )
 
 type UE struct {
-	MSIN string
-	MCC  uint8
-	MNC  uint8
+	MSIN             string
+	MCC              uint8
+	MNC              uint8
 	RoutingIndicator uint16
 	ProtectionScheme string
 }
@@ -73,7 +73,7 @@ type FiveGSMobileID struct {
 	supiFormatAndTypeID    uint8
 	plmn                   [3]uint8
 	routingIndicator       [2]uint8
-	protectionScheme      uint8
+	protectionScheme       uint8
 	homeNetworkPublicKeyID uint8
 	schemeOutput           [5]uint8
 }
@@ -108,12 +108,12 @@ const (
 
 // 9.11.3.54 UE security capability
 type UESecurityCapability struct {
-	iei uint8
+	iei    uint8
 	length uint8
-	ea uint8
-	ia uint8
-	eea uint8
-	eia uint8
+	ea     uint8
+	ia     uint8
+	eea    uint8
+	eia    uint8
 }
 
 const (
@@ -193,11 +193,8 @@ func (p *UE) MakeRegistrationRequest() (pdu []byte) {
 
 	data := new(bytes.Buffer)
 	binary.Write(data, binary.BigEndian, req)
-	fmt.Printf("%02x\n", pdu)
-
 	binary.Write(data, binary.BigEndian, encUESecurityCapability())
 	pdu = data.Bytes()
-	fmt.Printf("%02x\n", pdu)
 
 	return
 }
