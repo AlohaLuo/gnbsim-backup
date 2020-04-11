@@ -110,6 +110,10 @@ func (gnb *GNB) MakeInitialUEMessage() (pdu []byte) {
 	fmt.Printf("debug: User Location Information = %02x\n", tmp)
 	v = append(v, tmp...)
 
+	tmp, _ = gnb.encRRCEstablishmentCause(rrcMoSignalling)
+	fmt.Printf("debug: RRC Establishment Cause = %02x\n", tmp)
+	v = append(v, tmp...)
+
 	return
 }
 
@@ -591,6 +595,53 @@ func encSNSSAI(sstInt uint8, sdString string) (pv []byte, plen int, v []byte) {
 	binary.BigEndian.PutUint64(sd, tmp)
 	sd = sd[len(sd)-3:]
 	_, _, v, _ = per.EncOctetString(sd, 3, 3, false)
+	return
+}
+
+// 9.3.1.111 RRC Establishment Cause
+/*
+RRCEstablishmentCause ::= ENUMERATED {
+    emergency,
+    highPriorityAccess,
+    mt-Access,
+    mo-Signalling,
+    mo-Data,
+    mo-VoiceCall,
+    mo-VideoCall,
+    mo-SMS,
+    mps-PriorityAccess,
+    mcs-PriorityAccess,
+    ...,
+    notAvailable
+}
+*/
+const (
+	rrcEmergency = iota
+	rrcHighPriorityAccess
+	rrcMtAccess
+	rrcMoSignalling
+	rrcMoData
+	rrcMoVoiceCall
+	rrcMoVideoCall
+	rrcMoSMS
+	rrcMpsPriorityAccess
+	rrcMcsPriorityAccess
+)
+
+func (gnb *GNB) encRRCEstablishmentCause(cause uint) (v []byte, err error) {
+
+	head, err := encProtocolIE(idRRCEstablishmentCause, ignore)
+
+	/*
+	 * I couldn't find the max value for the Establishment Cause.
+	 * Wireshark does parse it as 4 bit field. It means that the number is
+	 * from 7 to 14.
+	 */
+	v, _, _ = per.EncEnumerated(cause, 0, 14, true)
+
+	length, _, _ := per.EncLengthDeterminant(len(v), 0)
+	head = append(head, length...)
+	v = append(head, v...)
 	return
 }
 
