@@ -156,11 +156,13 @@ func EncLengthDeterminant(input, max int) (
 	switch {
 	case input < 128:
 		v = append(v, byte(input))
+		bitlen = 8
 		return
 	case input < 16384:
 		v = append(v, byte((input>>8)&0xff))
 		v = append(v, byte(input&0xff))
 		v[0] |= 0x80
+		bitlen = 16
 		return
 	}
 	err = fmt.Errorf("EncLengthDeterminant: "+
@@ -281,14 +283,14 @@ func EncOctetString(input []byte, min, max int, extmark bool) (
 	pv []byte, plen int, v []byte, err error) {
 
 	inputlen := len(input)
-	if inputlen < min || inputlen > max {
+	if max != 0 && (inputlen < min || inputlen > max) {
 		err = fmt.Errorf("EncOctetString: "+
 			"input len(value)=%d is out of range. "+
 			"(should be %d <= %d)", inputlen, min, max)
 		return
 	}
 
-	if min == max {
+	if min == max && min != 0 {
 		switch {
 		case min < 3:
 			pv = input
@@ -310,6 +312,13 @@ func EncOctetString(input []byte, min, max int, extmark bool) (
 	}
 
 	v = input
+	if max == 0 {
+		// infinite upper bound case.
+		pv, plen, err = EncLengthDeterminant(inputlen, max)
+		return
+	}
+
+	// lower bound and upper bound are specified.
 	pv, plen, err =
 		encConstrainedWholeNumberWithExtmark(int64(inputlen),
 			int64(min), int64(max), extmark)

@@ -132,8 +132,8 @@ func TestEncLengthDeterminant(t *testing.T) {
 		err    bool
 	}{
 		{1, 255, []byte{1}, 8, false},
-		{1, 0, []byte{1}, 0, false},
-		{16383, 0, []byte{0xbf, 0xff}, 0, false},
+		{1, 0, []byte{1}, 8, false},
+		{16383, 0, []byte{0xbf, 0xff}, 16, false},
 		{16384, 0, []byte{}, 0, true},
 	}
 
@@ -303,6 +303,7 @@ func TestOctetString(t *testing.T) {
 		{make([]byte, 8, 8), 8, 8, false, []byte{}, 0, make([]byte, 8, 8), false},
 		{[]byte{0x01, 0x80}, 2, 2, true, []byte{0x00, 0xc0, 0x00}, 17, []byte{}, false},
 		{make([]byte, 8, 8), 8, 8, true, []byte{0x00}, 1, make([]byte, 8, 8), false},
+		{make([]byte, 3, 3), 0, 0, false, []byte{3}, 8, make([]byte, 3, 3), false},
 		{make([]byte, 3, 3), 0, 7, true, []byte{0x18}, 5, make([]byte, 3, 3), false},
 	}
 
