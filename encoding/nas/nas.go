@@ -15,7 +15,6 @@ import (
 	"io/ioutil"
 	"log"
 	"strconv"
-	"unsafe"
 )
 
 type UE struct {
@@ -183,7 +182,11 @@ func (p *UE) MakeRegistrationRequest() (pdu []byte) {
 	var typeID uint8 = TypeIDSUCI
 	var supiFormat uint8 = SUPIFormatIMSI
 
-	f.length = uint16(unsafe.Sizeof(*f) - 2)
+	/*
+	 * it doesn't work with "f.length = uint16(unsafe.Sizeof(*f) - 2)"
+	 * because of the octet alignment.
+	 */
+	f.length = 13
 	f.supiFormatAndTypeID = typeID | (supiFormat << 4)
 	f.plmn = encPLMN(p.MCC, p.MNC)
 	f.routingIndicator = encRoutingIndicator(p.RoutingIndicator)
