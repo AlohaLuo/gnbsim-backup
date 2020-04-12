@@ -119,6 +119,11 @@ func (gnb *GNB) MakeInitialUEMessage() (pdu []byte) {
 	fmt.Printf("debug: UE Context Request = %02x\n", tmp)
 	v = append(v, tmp...)
 
+	length, _, _ := per.EncLengthDeterminant(len(v), 0)
+
+	pdu = append(pdu, length...)
+	pdu = append(pdu, v...)
+
 	return
 }
 
