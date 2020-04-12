@@ -635,9 +635,13 @@ NAS-PDU ::= OCTET STRING
 func encNASPDU(pdu []byte) (v []byte) {
 
 	head, _ := encProtocolIE(idNASPDU, reject)
-	length, _, _ := per.EncLengthDeterminant(len(pdu), 0)
+
+	pv, _, v, _ := per.EncOctetString(pdu, 0, 0, false)
+	v = append(pv, v...)
+
+	length, _, _ := per.EncLengthDeterminant(len(v), 0)
 	head = append(head, length...)
-	v = append(head, pdu...)
+	v = append(head, v...)
 	return
 }
 
