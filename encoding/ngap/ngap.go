@@ -334,17 +334,21 @@ const (
 	nrCellIDSize = 36
 )
 
-func (gnb *GNB) encNRCGI(nrcgi *NRCGI) (pv []byte, plen int, v []byte,
-	err error) {
+func (gnb *GNB) encNRCGI(nrcgi *NRCGI) (pv []byte, plen int,
+	v []byte, bitlen int, err error) {
 
 	pv, plen, _ = per.EncSequence(true, 1, 0)
 	v = gnb.encPLMNIdentity(nrcgi.PLMN.MCC, nrcgi.PLMN.MNC)
-	v = append(v, gnb.encNRCellIdentity(nrcgi.NRCellID)...)
+	bitlen = len(v) * 8
+	v2, bitlen2 := gnb.encNRCellIdentity(nrcgi.NRCellID)
+
+	v = append(v, v2...)
+	bitlen += bitlen2
 
 	return
 }
 
-func (gnb *GNB) encNRCellIdentity(cellid uint64) (v []byte) {
+func (gnb *GNB) encNRCellIdentity(cellid uint64) (v []byte, bitlen int) {
 
 	// The leftmost bits of the NR Cell Identity IE correspond to the gNB ID
 	// (defined in subclause 9.3.1.6).
@@ -364,8 +368,7 @@ func (gnb *GNB) encNRCellIdentity(cellid uint64) (v []byte) {
 	binary.BigEndian.PutUint64(tmp, cellid)
 	pv2, plen2 := per.ShiftLeftMost(tmp, cellidlen)
 
-	v, _ = per.MergeBitField(pv, plen, pv2, plen2)
-
+	v, bitlen = per.MergeBitField(pv, plen, pv2, plen2)
 	return
 }
 
@@ -418,12 +421,14 @@ type UserLocationInformationNR struct {
 
 func (gnb *GNB) encUserLocationInformationNR(info *UserLocationInformationNR) (pv []byte, plen int, v []byte) {
 	pv, plen, _ = per.EncSequence(true, 2, 0)
-	pv2, plen2, v, _ := gnb.encNRCGI(&info.NRCGI)
+	pv2, plen2, v, bitlen, _ := gnb.encNRCGI(&info.NRCGI)
 	pv, plen = per.MergeBitField(pv, plen, pv2, plen2)
 
 	pv2, plen2, v2, _ := gnb.encTAI(&info.TAI)
-	v = append(v, pv2...)
-	v = append(v, v2...)
+	pv2, plen2 = per.MergeBitField(v, bitlen, pv2, plen2)
+
+	pv = append(pv, pv2...)
+	v = append(pv, v2...)
 
 	return
 }
