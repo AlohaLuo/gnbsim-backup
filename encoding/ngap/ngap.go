@@ -420,15 +420,15 @@ type UserLocationInformationNR struct {
 }
 
 func (gnb *GNB) encUserLocationInformationNR(info *UserLocationInformationNR) (pv []byte, plen int, v []byte) {
+
 	pv, plen, _ = per.EncSequence(true, 2, 0)
 	pv2, plen2, v, bitlen, _ := gnb.encNRCGI(&info.NRCGI)
 	pv, plen = per.MergeBitField(pv, plen, pv2, plen2)
 
 	pv2, plen2, v2, _ := gnb.encTAI(&info.TAI)
-	pv2, plen2 = per.MergeBitField(v, bitlen, pv2, plen2)
+	v, bitlen = per.MergeBitField(v, bitlen, pv2, plen2)
 
-	pv = append(pv, pv2...)
-	v = append(pv, v2...)
+	v = append(v, v2...)
 
 	return
 }
