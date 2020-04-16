@@ -66,6 +66,17 @@ const (
 	MessageTypeRegistrationRequest = 0x41
 )
 
+// 9.11.3.1 5GMM capability
+type FiveGMMCapability struct {
+	iei         uint8
+	length      uint8
+	capability1 uint8
+}
+
+const (
+	FiveGMMCapN3data = 0x20
+)
+
 // 9.11.3.4 5GS mobile identity
 type FiveGSMobileID struct {
 	length                 uint16
@@ -197,6 +208,7 @@ func (p *UE) MakeRegistrationRequest() (pdu []byte) {
 	data := new(bytes.Buffer)
 	binary.Write(data, binary.BigEndian, req)
 	binary.Write(data, binary.BigEndian, encUESecurityCapability())
+	binary.Write(data, binary.BigEndian, enc5GMMCapability())
 	pdu = data.Bytes()
 
 	return
@@ -244,6 +256,14 @@ func encUESecurityCapability() (sc UESecurityCapability) {
 	sc.length = 4
 	sc.ea = EA0 | EA2
 	sc.ia = IA0 | IA2
+
+	return
+}
+
+func enc5GMMCapability() (f FiveGMMCapability) {
+	f.iei = 0x04
+	f.length = 1
+	f.capability1 = FiveGMMCapN3data
 
 	return
 }
