@@ -207,8 +207,8 @@ func (p *UE) MakeRegistrationRequest() (pdu []byte) {
 
 	data := new(bytes.Buffer)
 	binary.Write(data, binary.BigEndian, req)
-	binary.Write(data, binary.BigEndian, encUESecurityCapability())
 	binary.Write(data, binary.BigEndian, enc5GMMCapability())
+	binary.Write(data, binary.BigEndian, encUESecurityCapability())
 	pdu = data.Bytes()
 
 	return
@@ -250,20 +250,21 @@ func encSchemeOutput(msin string) (so [5]byte) {
 	return
 }
 
+// 9.11.3.1 5GMM capability
+func enc5GMMCapability() (f FiveGMMCapability) {
+	f.iei = 0x10
+	f.length = 1
+	f.capability1 = FiveGMMCapN3data
+
+	return
+}
+
 // 9.11.3.54 UE security capability
 func encUESecurityCapability() (sc UESecurityCapability) {
 	sc.iei = 0x2e
 	sc.length = 4
 	sc.ea = EA0 | EA2
 	sc.ia = IA0 | IA2
-
-	return
-}
-
-func enc5GMMCapability() (f FiveGMMCapability) {
-	f.iei = 0x04
-	f.length = 1
-	f.capability1 = FiveGMMCapN3data
 
 	return
 }
