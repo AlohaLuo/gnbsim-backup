@@ -263,8 +263,10 @@ func enc5GMMCapability() (f FiveGMMCapability) {
 func encUESecurityCapability() (sc UESecurityCapability) {
 	sc.iei = 0x2e
 	sc.length = 4
-	sc.ea = EA0 | EA2
-	sc.ia = IA0 | IA2
+
+	// use null encryption at this moment.
+	sc.ea = EA0
+	sc.ia = IA0
 
 	return
 }

@@ -37,7 +37,7 @@ func TestMakeRegistrationRequest(t *testing.T) {
 	ue := NewNAS("nas_test.json")
 	v := ue.MakeRegistrationRequest()
 	//fmt.Printf("MakeRegistrationRequest: %02x\n", v)
-	expect_str := "7e004179000d0121f3542143000010325476981001202e04a0a00000"
+	expect_str := "7e004179000d0121f3542143000010325476981001202e0480800000"
 	expect, _ := hex.DecodeString(expect_str)
 	if compareSlice(expect, v) == false {
 		t.Errorf("RegistrationRequest\nexpect: %x\nactual: %x", expect, v)
