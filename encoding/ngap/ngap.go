@@ -5,6 +5,12 @@
 // Package ngap is implementation for NG Application Protocol (NGAP)
 // in the 5GS Sytem.
 // document version: 3GPP TS 38.413 v16.0.0 (2019-12)
+
+// Implementing generic aligned PER docoder is higly complicated to me as the
+// hobby coder. At this moment, I plan to use encoding/binary to decode NGAP.
+
+// TODO: implimenting generic PER decoder.
+
 package ngap
 
 import (
@@ -34,8 +40,9 @@ const (
 
 // Elementary Procedures constants
 const (
-	idInitialUEMessage = 15
-	idNGSetup          = 21
+	idDownlinkNASTransport = 4
+	idInitialUEMessage     = 15
+	idNGSetup              = 21
 )
 
 const (
@@ -69,6 +76,23 @@ func NewNGAP(filename string) (p *GNB) {
 	p = &gnb
 	json.Unmarshal(bytes, p)
 
+	return
+}
+
+func (gnb *GNB) Decode(in *[]byte) {
+
+	_, procCode, _ := decNgapPdu(in)
+
+	switch procCode {
+	case idDownlinkNASTransport:
+		fmt.Printf("decDownLinkNASTransport\n")
+		//gnb.decDownLinkNASTransport(in)
+		return
+	case idNGSetup:
+		fmt.Printf("decNGSetup\n")
+		//gnb.decNGSetupResponse(in)
+		return
+	}
 	return
 }
 
@@ -187,13 +211,30 @@ InitiatingMessage ::= SEQUENCE {
     value           NGAP-ELEMENTARY-PROCEDURE.&InitiatingMessage    ({NGAP-ELEMENTARY-PROCEDURES}{@procedureCode})
 }
 */
-func encNgapPdu(pduType int, procCode int64, criticality uint) (pdu []byte) {
+func encNgapPdu(pduType int, procCode int, criticality int) (pdu []byte) {
 	pdu, _, _ = per.EncChoice(pduType, 0, 2, true)
-	v, _, _ := per.EncInteger(procCode, 0, 255, false)
+	v, _, _ := per.EncInteger(int64(procCode), 0, 255, false)
 	pdu = append(pdu, v...)
-	v, _, _ = per.EncEnumerated(criticality, 0, 2, false)
+	v, _, _ = per.EncEnumerated(uint(criticality), 0, 2, false)
 	pdu = append(pdu, v...)
 
+	return
+}
+
+func decNgapPdu(pdu *[]byte) (pduType int, procCode int, criticality int) {
+
+	offset := 0
+
+	// pduType
+	offset += 1
+
+	procCode = int((*pdu)[1])
+	offset += 1
+
+	//criticality
+	offset += 1
+
+	*pdu = (*pdu)[offset:]
 	return
 }
 

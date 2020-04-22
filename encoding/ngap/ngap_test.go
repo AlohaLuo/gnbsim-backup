@@ -38,3 +38,16 @@ func TestMakeNGSetupRequest(t *testing.T) {
 		t.Errorf("NGSetupRequest\nexpect: %x\nactual: %x", expect, v)
 	}
 }
+
+func TestDecode(t *testing.T) {
+	gnbp := NewNGAP("ngap_test.json")
+	in_str := "00150028000003001b00080021f354000000040066001000000001020021f354000010081234560015400100"
+	in, _ := hex.DecodeString(in_str)
+	gnbp.Decode(&in)
+
+	expect_str := "28000003001b00080021f354000000040066001000000001020021f354000010081234560015400100"
+	expect, _ := hex.DecodeString(expect_str)
+	if compareSlice(expect, in) == false {
+		t.Errorf("NGSetupRequest\nexpect: %x\nactual: %x", expect, in)
+	}
+}
