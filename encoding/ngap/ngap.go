@@ -45,7 +45,14 @@ const (
 	idNGSetup              = 21
 )
 
+var procID = map[int]string{
+	idDownlinkNASTransport: "id-DownlinkNASTransport",
+	idInitialUEMessage:     "id-InitialUEMessage",
+	idNGSetup:              "id-NGSetup",
+}
+
 const (
+	idAMFUENGAPID             = 10
 	idDefaultPagingDRX        = 21
 	idGlobalRANNodeID         = 27
 	idNASPDU                  = 38
@@ -55,6 +62,12 @@ const (
 	idUEContextRequest        = 112
 	idUserLocationInformation = 121
 )
+
+var ieID = map[int]string{
+	idAMFUENGAPID: "id-AMF-UE-NGAP-ID",
+	idNASPDU:      "id-NAS-PDU",
+	idRANUENGAPID: "id-RAN-UE-NGAP-ID",
+}
 
 type GNB struct {
 	GlobalGNBID     GlobalGNBID
@@ -79,19 +92,23 @@ func NewNGAP(filename string) (p *GNB) {
 	return
 }
 
-func (gnb *GNB) Decode(in *[]byte) {
+func (gnb *GNB) Decode(pdu *[]byte) {
 
-	_, procCode, _ := decNgapPdu(in)
+	_, procCode, _, _ := decNgapPdu(pdu)
 
-	switch procCode {
-	case idDownlinkNASTransport:
-		fmt.Printf("decDownLinkNASTransport\n")
-		//gnb.decDownLinkNASTransport(in)
-		return
-	case idNGSetup:
-		fmt.Printf("decNGSetup\n")
-		//gnb.decNGSetupResponse(in)
-		return
+	fmt.Printf("Procedure Code: %s (%d)\n", procID[procCode], procCode)
+	offset := 0
+	length := (*pdu)[offset]
+	offset += 1
+	fmt.Printf("PDU Length: %d\n", length)
+	*pdu = (*pdu)[offset:]
+
+	num, _ := gnb.decProtocolIEContainer(pdu)
+	fmt.Printf("Protocol IEs: %d items\n", num)
+
+	for idx := 0; idx < num; idx++ {
+		fmt.Printf(" Item %d\n", idx)
+		gnb.decProtocolIE(pdu)
 	}
 	return
 }
@@ -150,6 +167,27 @@ func (gnb *GNB) MakeInitialUEMessage() (pdu []byte) {
 
 	return
 }
+
+// 9.2.5.2 DOWNLINK NAS TRANSPORT
+/*
+DownlinkNASTransport ::= SEQUENCE {
+    protocolIEs     ProtocolIE-Container        { {DownlinkNASTransport-IEs} },
+    ...
+}
+
+DownlinkNASTransport-IEs NGAP-PROTOCOL-IES ::= {
+    { ID id-AMF-UE-NGAP-ID                  CRITICALITY reject  TYPE AMF-UE-NGAP-ID                 PRESENCE mandatory  }|
+    { ID id-RAN-UE-NGAP-ID                  CRITICALITY reject  TYPE RAN-UE-NGAP-ID                 PRESENCE mandatory  }|
+    { ID id-OldAMF                          CRITICALITY reject  TYPE AMFName                        PRESENCE optional       }|
+    { ID id-RANPagingPriority               CRITICALITY ignore  TYPE RANPagingPriority              PRESENCE optional       }|
+    { ID id-NAS-PDU                         CRITICALITY reject  TYPE NAS-PDU                        PRESENCE mandatory  }|
+    { ID id-MobilityRestrictionList         CRITICALITY ignore  TYPE MobilityRestrictionList        PRESENCE optional       }|
+    { ID id-IndexToRFSP                     CRITICALITY ignore  TYPE IndexToRFSP                    PRESENCE optional       }|
+    { ID id-UEAggregateMaximumBitRate       CRITICALITY ignore  TYPE UEAggregateMaximumBitRate      PRESENCE optional       }|
+    { ID id-AllowedNSSAI                    CRITICALITY reject  TYPE AllowedNSSAI                   PRESENCE optional       },
+    ...
+}
+*/
 
 // 9.2.6.1 NG SETUP REQUEST
 /*
@@ -221,18 +259,20 @@ func encNgapPdu(pduType int, procCode int, criticality int) (pdu []byte) {
 	return
 }
 
-func decNgapPdu(pdu *[]byte) (pduType int, procCode int, criticality int) {
+func decNgapPdu(pdu *[]byte) (
+	pduType int, procCode int, criticality int, err error) {
+
+	if len(*pdu) < 3 {
+		err = fmt.Errorf("remaining pdu length is too short.")
+		return
+	}
 
 	offset := 0
+	offset += 1 // skip pduType
 
-	// pduType
+	procCode = int((*pdu)[offset])
 	offset += 1
-
-	procCode = int((*pdu)[1])
-	offset += 1
-
-	//criticality
-	offset += 1
+	offset += 1 // skip criticality
 
 	*pdu = (*pdu)[offset:]
 	return
@@ -258,12 +298,65 @@ func encProtocolIEContainer(num uint) (container []byte) {
 	return
 }
 
+func (gnb *GNB) decProtocolIEContainer(pdu *[]byte) (num int, err error) {
+
+	if len(*pdu) < 3 {
+		err = fmt.Errorf("remaining pdu length(%d) is too short. expect > %d",
+			len(*pdu), 3)
+		return
+	}
+	offset := 0
+	offset += 1 // skip Sequence
+
+	num = int(binary.BigEndian.Uint16((*pdu)[offset:]))
+	offset += 2
+
+	*pdu = (*pdu)[offset:]
+	return
+}
+
+/*
+ProtocolIE-ID       ::= INTEGER (0..65535)
+
+ProtocolIE-Field {NGAP-PROTOCOL-IES : IEsSetParam} ::= SEQUENCE {
+    id              NGAP-PROTOCOL-IES.&id               ({IEsSetParam}),
+    criticality     NGAP-PROTOCOL-IES.&criticality      ({IEsSetParam}{@id}),
+    value           NGAP-PROTOCOL-IES.&Value            ({IEsSetParam}{@id})
+}
+*/
 func encProtocolIE(id int64, criticality uint) (v []byte, err error) {
 
 	v1, _, _ := per.EncInteger(id, 0, 65535, false)
 	v2, _, _ := per.EncEnumerated(criticality, 0, 2, false)
 	v = append(v1, v2...)
 
+	return
+}
+
+func (gnb *GNB) decProtocolIE(pdu *[]byte) (err error) {
+
+	if len(*pdu) < 2 {
+		err = fmt.Errorf("remaining pdu length(%d) is too short. expect > %d",
+			len(*pdu), 2)
+		return
+	}
+	offset := 0
+	id := int(binary.BigEndian.Uint16((*pdu)[offset:]))
+	offset += 2
+	fmt.Printf("  Protocol IE: %s (%d)\n", ieID[id], id)
+
+	offset += 1 // skip ciritcality
+	*pdu = (*pdu)[offset:]
+
+	switch id {
+	default:
+		fmt.Printf("   decoding id(%d) not supported yet.\n", id)
+		offset = int((*pdu)[0])
+		offset += 1
+		*pdu = (*pdu)[offset:]
+		//	procCode = int((*pdu)[offset])
+		return
+	}
 	return
 }
 

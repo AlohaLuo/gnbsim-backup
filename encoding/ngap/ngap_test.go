@@ -41,11 +41,11 @@ func TestMakeNGSetupRequest(t *testing.T) {
 
 func TestDecode(t *testing.T) {
 	gnbp := NewNGAP("ngap_test.json")
-	in_str := "00150028000003001b00080021f354000000040066001000000001020021f354000010081234560015400100"
+	in_str := "0004403e000003000a000200010055000200000026002b2a7e0056070200002123e87a6d2b0cde95ca763ded3a017c3020102b3e6160baed8000b77ab234553870f1"
 	in, _ := hex.DecodeString(in_str)
 	gnbp.Decode(&in)
 
-	expect_str := "28000003001b00080021f354000000040066001000000001020021f354000010081234560015400100"
+	expect_str := ""
 	expect, _ := hex.DecodeString(expect_str)
 	if compareSlice(expect, in) == false {
 		t.Errorf("NGSetupRequest\nexpect: %x\nactual: %x", expect, in)
