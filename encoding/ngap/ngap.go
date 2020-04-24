@@ -346,17 +346,22 @@ func (gnb *GNB) decProtocolIE(pdu *[]byte) (err error) {
 	fmt.Printf("  Protocol IE: %s (%d)\n", ieID[id], id)
 
 	offset += 1 // skip ciritcality
+
+	length := int((*pdu)[offset])
+	fmt.Printf("   IE length: %d\n", length)
+	offset += 1
+
 	*pdu = (*pdu)[offset:]
 
 	switch id {
+	case idNASPDU:
+		gnb.decNASPDU(pdu, length)
 	default:
 		fmt.Printf("   decoding id(%d) not supported yet.\n", id)
-		offset = int((*pdu)[0])
-		offset += 1
-		*pdu = (*pdu)[offset:]
-		//	procCode = int((*pdu)[offset])
-		return
+		fmt.Printf("   %02x\n", (*pdu)[:length])
 	}
+
+	*pdu = (*pdu)[length:]
 	return
 }
 
@@ -781,6 +786,15 @@ func encNASPDU(pdu []byte) (v []byte) {
 	length, _, _ := per.EncLengthDeterminant(len(v), 0)
 	head = append(head, length...)
 	v = append(head, v...)
+	return
+}
+
+func (gnb *GNB) decNASPDU(pdu *[]byte, length int) (err error) {
+	fmt.Printf("   pseudo DecOctetString\n")
+
+	octlen := int((*pdu)[0])
+	fmt.Printf("   OctetString Len: %d\n", octlen)
+	fmt.Printf("   %02x\n", (*pdu)[1:length])
 	return
 }
 
