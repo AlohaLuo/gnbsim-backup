@@ -43,3 +43,18 @@ func TestMakeRegistrationRequest(t *testing.T) {
 		t.Errorf("RegistrationRequest\nexpect: %x\nactual: %x", expect, v)
 	}
 }
+
+func TestDecode(t *testing.T) {
+	ue := NewNAS("nas_test.json")
+
+	in_str := "7e0056070200002123e87a6d2b0cde95ca763ded3a017c3020102b3e6160baed8000b77ab234553870f1"
+	in, _ := hex.DecodeString(in_str)
+	length := len(in)
+	ue.Decode(&in, length)
+
+	expect_str := "7e0056070200002123e87a6d2b0cde95ca763ded3a017c3020102b3e6160baed8000b77ab234553870f1"
+	expect, _ := hex.DecodeString(expect_str)
+	if compareSlice(expect, in) == false {
+		t.Errorf("Decode\nexpect: %x\nactual: %x", expect, in)
+	}
+}

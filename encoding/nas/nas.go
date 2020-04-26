@@ -10,11 +10,15 @@ package nas
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"reflect"
 	"strconv"
+
+	"github.com/wmnsk/milenage"
 )
 
 type UE struct {
@@ -23,6 +27,7 @@ type UE struct {
 	MNC              uint8
 	RoutingIndicator uint16
 	ProtectionScheme string
+	auth             AuthParam
 }
 
 // 9.1.1 NAS message format
@@ -45,6 +50,11 @@ const (
 	EPD5GSMobilityManagement = 0x7e
 )
 
+var epdStr = map[int]string{
+	EPD5GSSessionManagement:  "5G Session Management",
+	EPD5GSMobilityManagement: "5G Mobility Management",
+}
+
 /*
 type NasMessageSM struct {
 	ExtendedProtocolDiscriminator uint8
@@ -63,8 +73,14 @@ const (
 
 // 9.7 Message type
 const (
-	MessageTypeRegistrationRequest = 0x41
+	MessageTypeRegistrationRequest   = 0x41
+	MessageTypeAuthenticationRequest = 0x56
 )
+
+var msgTypeStr = map[int]string{
+	MessageTypeRegistrationRequest:   "Registration Request",
+	MessageTypeAuthenticationRequest: "Authentication Request",
+}
 
 // 9.11.3.1 5GMM capability
 type FiveGMMCapability struct {
@@ -135,6 +151,13 @@ const (
 	IA2 = 0x20
 )
 
+const (
+	iei5GMMCapability       = 0x10
+	ieiAuthParamAUTN        = 0x20
+	ieiAuthParamRAND        = 0x21
+	ieiUESecurityCapability = 0x2e
+)
+
 func Str2BCD(str string) (bcd []byte) {
 
 	byteArray := []byte(str)
@@ -170,6 +193,97 @@ func NewNAS(filename string) (p *UE) {
 	p = &ue
 	json.Unmarshal(bytes, p)
 
+	ue.auth.k, _ = hex.DecodeString("8baf473f2f8fd09487cccbd7097c6862")
+	ue.auth.opc, _ = hex.DecodeString("8e27b6af0e692e750f32667a3b14605d")
+
+	return
+}
+
+func (ue *UE) Decode(pdu *[]byte, length int) (msgType int) {
+	offset := 0
+	epd := int((*pdu)[offset])
+	fmt.Printf("EPD: %s (0x%x)\n", epdStr[epd], epd)
+	offset++
+
+	secHeader := int((*pdu)[offset])
+	fmt.Printf("Security Header: 0x%x\n", secHeader)
+	offset++
+
+	msgType = int((*pdu)[offset])
+	fmt.Printf("Message Type: %s (0x%x)\n", msgTypeStr[msgType], msgType)
+	offset++
+
+	switch msgType {
+	case MessageTypeAuthenticationRequest:
+		ue.decAuthenticationRequest(pdu, length, offset)
+		break
+	default:
+		break
+	}
+	return
+}
+
+func (ue *UE) decInformationElement(pdu *[]byte, length, offset int) {
+
+	for offset < length {
+		iei := int((*pdu)[offset])
+		offset++
+
+		switch iei {
+		case ieiAuthParamAUTN:
+			offset = ue.decAuthParamAUTN(pdu, length, offset)
+			break
+		case ieiAuthParamRAND:
+			offset = ue.decAuthParamRAND(pdu, length, offset)
+			break
+		default:
+			fmt.Printf("unsupported IE\n")
+			offset = length
+			break
+		}
+	}
+}
+
+// 8.2.1 Authentication request
+func (ue *UE) decAuthenticationRequest(pdu *[]byte, length, offset int) {
+	fmt.Printf("decAuthenticationRequest\n")
+
+	ksi := int((*pdu)[offset])
+	fmt.Printf("ngKSI: 0x%x\n", ksi)
+	offset++
+
+	offset = ue.decABBA(pdu, offset)
+
+	ue.decInformationElement(pdu, length, offset)
+
+	amf := binary.BigEndian.Uint16(ue.auth.amf)
+	m := milenage.NewWithOPc(ue.auth.k, ue.auth.opc, ue.auth.rand, 0, amf)
+	m.F2345()
+	for n, v := range ue.auth.seqxorak {
+		m.SQN[n] = v ^ m.AK[n]
+	}
+	m.F1()
+
+	fmt.Printf("   K: %x\n", m.K)
+	fmt.Printf("   OP: %x\n", m.OP)
+	fmt.Printf("   OPc: %x\n", m.OPc)
+	fmt.Printf("   AMF: %x\n", m.AMF)
+	fmt.Printf("   SQN(%d): %x\n", len(m.SQN), m.SQN)
+	fmt.Printf("   CK: %x\n", m.CK)
+	fmt.Printf("   IK: %x\n", m.IK)
+	fmt.Printf("   AK(%d): %x\n", len(m.AK), m.AK)
+	fmt.Printf("   MACA: %x\n", m.MACA)
+	fmt.Printf("   MACS: %x\n", m.MACS)
+	fmt.Printf("   RAND: %x\n", m.RAND)
+	fmt.Printf("   RES: %x\n", m.RES)
+
+	if reflect.DeepEqual(ue.auth.mac, m.MACA) == false {
+		fmt.Printf("  received and calculated MAC values do not match.\n")
+		// need response for error.
+		return
+	}
+
+	fmt.Printf("  received and calculated MAC values match.\n")
 	return
 }
 
@@ -259,9 +373,71 @@ func enc5GMMCapability() (f FiveGMMCapability) {
 	return
 }
 
+// 9.11.3.10 ABBA
+func (ue *UE) decABBA(pdu *[]byte, baseOffset int) (offset int) {
+
+	offset = baseOffset
+
+	length := int((*pdu)[offset])
+	offset++
+	abba := (*pdu)[offset : offset+length]
+	offset += length
+
+	fmt.Printf("ABBA\n")
+	fmt.Printf(" Length: %d\n", length)
+	fmt.Printf(" Value: %02x\n", abba)
+
+	return
+}
+
+// 9.11.3.15 Authentication parameter AUTN
+// TS 24.008 10.5.3.1.1 Authentication Parameter AUTN (UMTS and EPS authentication challenge)
+type AuthParam struct {
+	k        []byte
+	opc      []byte
+	rand     []byte
+	autn     []byte
+	seqxorak []byte
+	amf      []byte
+	mac      []byte
+}
+
+func (ue *UE) decAuthParamAUTN(pdu *[]byte, length, orig int) (offset int) {
+
+	offset = orig
+	fmt.Printf("Auth Param AUTN\n")
+
+	autnlen := int((*pdu)[offset])
+	offset++
+	ue.auth.autn = (*pdu)[offset : offset+autnlen]
+	fmt.Printf(" AUTN: %02x\n", ue.auth.autn)
+	ue.auth.seqxorak = ue.auth.autn[:6]
+	ue.auth.amf = ue.auth.autn[6:8]
+	ue.auth.mac = ue.auth.autn[8:16]
+	fmt.Printf("  SEQ xor AK: %02x\n", ue.auth.seqxorak)
+	fmt.Printf("  AMF: %02x\n", ue.auth.amf)
+	fmt.Printf("  MAC: %02x\n", ue.auth.mac)
+	offset += autnlen
+	return
+}
+
+// 9.11.3.16 Authentication parameter RAND
+// TS 24.008 10.5.3.1 Authentication parameter RAND
+func (ue *UE) decAuthParamRAND(pdu *[]byte, length, orig int) (offset int) {
+
+	offset = orig
+	fmt.Printf("Auth Param RAND\n")
+
+	const randlen = 16
+	ue.auth.rand = (*pdu)[offset : offset+randlen]
+	fmt.Printf(" RAND: %02x\n", ue.auth.rand)
+	offset += randlen
+	return
+}
+
 // 9.11.3.54 UE security capability
 func encUESecurityCapability() (sc UESecurityCapability) {
-	sc.iei = 0x2e
+	sc.iei = ieiUESecurityCapability
 	sc.length = 4
 
 	// use null encryption at this moment.
