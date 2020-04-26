@@ -176,15 +176,15 @@ DownlinkNASTransport ::= SEQUENCE {
 }
 
 DownlinkNASTransport-IEs NGAP-PROTOCOL-IES ::= {
-    { ID id-AMF-UE-NGAP-ID                  CRITICALITY reject  TYPE AMF-UE-NGAP-ID                 PRESENCE mandatory  }|
-    { ID id-RAN-UE-NGAP-ID                  CRITICALITY reject  TYPE RAN-UE-NGAP-ID                 PRESENCE mandatory  }|
-    { ID id-OldAMF                          CRITICALITY reject  TYPE AMFName                        PRESENCE optional       }|
-    { ID id-RANPagingPriority               CRITICALITY ignore  TYPE RANPagingPriority              PRESENCE optional       }|
-    { ID id-NAS-PDU                         CRITICALITY reject  TYPE NAS-PDU                        PRESENCE mandatory  }|
-    { ID id-MobilityRestrictionList         CRITICALITY ignore  TYPE MobilityRestrictionList        PRESENCE optional       }|
-    { ID id-IndexToRFSP                     CRITICALITY ignore  TYPE IndexToRFSP                    PRESENCE optional       }|
-    { ID id-UEAggregateMaximumBitRate       CRITICALITY ignore  TYPE UEAggregateMaximumBitRate      PRESENCE optional       }|
-    { ID id-AllowedNSSAI                    CRITICALITY reject  TYPE AllowedNSSAI                   PRESENCE optional       },
+    { ID id-AMF-UE-NGAP-ID             CRITICALITY reject  TYPE AMF-UE-NGAP-ID            PRESENCE mandatory }|
+    { ID id-RAN-UE-NGAP-ID             CRITICALITY reject  TYPE RAN-UE-NGAP-ID            PRESENCE mandatory }|
+    { ID id-OldAMF                     CRITICALITY reject  TYPE AMFName                   PRESENCE optional  }|
+    { ID id-RANPagingPriority          CRITICALITY ignore  TYPE RANPagingPriority         PRESENCE optional  }|
+    { ID id-NAS-PDU                    CRITICALITY reject  TYPE NAS-PDU                   PRESENCE mandatory }|
+    { ID id-MobilityRestrictionList    CRITICALITY ignore  TYPE MobilityRestrictionList   PRESENCE optional  }|
+    { ID id-IndexToRFSP                CRITICALITY ignore  TYPE IndexToRFSP               PRESENCE optional  }|
+    { ID id-UEAggregateMaximumBitRate  CRITICALITY ignore  TYPE UEAggregateMaximumBitRate PRESENCE optional  }|
+    { ID id-AllowedNSSAI               CRITICALITY reject  TYPE AllowedNSSAI              PRESENCE optional  },
     ...
 }
 */
@@ -197,11 +197,11 @@ NGSetupRequest ::= SEQUENCE {
 }
 
 NGSetupRequestIEs NGAP-PROTOCOL-IES ::= {
-    { ID id-GlobalRANNodeID         CRITICALITY reject  TYPE GlobalRANNodeID            PRESENCE mandatory  }|
-    { ID id-RANNodeName             CRITICALITY ignore  TYPE RANNodeName                PRESENCE optional}|
-    { ID id-SupportedTAList         CRITICALITY reject  TYPE SupportedTAList            PRESENCE mandatory  }|
-    { ID id-DefaultPagingDRX        CRITICALITY ignore  TYPE PagingDRX                  PRESENCE mandatory  }|
-    { ID id-UERetentionInformation  CRITICALITY ignore  TYPE UERetentionInformation     PRESENCE optional   },
+    { ID id-GlobalRANNodeID         CRITICALITY reject  TYPE GlobalRANNodeID        PRESENCE mandatory }|
+    { ID id-RANNodeName             CRITICALITY ignore  TYPE RANNodeName            PRESENCE optional  }|
+    { ID id-SupportedTAList         CRITICALITY reject  TYPE SupportedTAList        PRESENCE mandatory }|
+    { ID id-DefaultPagingDRX        CRITICALITY ignore  TYPE PagingDRX              PRESENCE mandatory }|
+    { ID id-UERetentionInformation  CRITICALITY ignore  TYPE UERetentionInformation PRESENCE optional  },
     ...
 }
 */
@@ -244,9 +244,9 @@ ProcedureCode ::= INTEGER (0..255)
 Criticality   ::= ENUMERATED { reject, ignore, notify }
 
 InitiatingMessage ::= SEQUENCE {
-    procedureCode   NGAP-ELEMENTARY-PROCEDURE.&procedureCode        ({NGAP-ELEMENTARY-PROCEDURES}),
-    criticality     NGAP-ELEMENTARY-PROCEDURE.&criticality          ({NGAP-ELEMENTARY-PROCEDURES}{@procedureCode}),
-    value           NGAP-ELEMENTARY-PROCEDURE.&InitiatingMessage    ({NGAP-ELEMENTARY-PROCEDURES}{@procedureCode})
+    procedureCode   NGAP-ELEMENTARY-PROCEDURE.&procedureCode     ({NGAP-ELEMENTARY-PROCEDURES}),
+    criticality     NGAP-ELEMENTARY-PROCEDURE.&criticality       ({NGAP-ELEMENTARY-PROCEDURES}{@procedureCode}),
+    value           NGAP-ELEMENTARY-PROCEDURE.&InitiatingMessage ({NGAP-ELEMENTARY-PROCEDURES}{@procedureCode})
 }
 */
 func encNgapPdu(pduType int, procCode int, criticality int) (pdu []byte) {
@@ -793,8 +793,11 @@ func (gnb *GNB) decNASPDU(pdu *[]byte, length int) (err error) {
 	fmt.Printf("   pseudo DecOctetString\n")
 
 	octlen := int((*pdu)[0])
+	gnb.UE.Decode(pdu, octlen)
+/*
 	fmt.Printf("   OctetString Len: %d\n", octlen)
 	fmt.Printf("   %02x\n", (*pdu)[1:length])
+*/
 	return
 }
 
