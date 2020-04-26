@@ -359,9 +359,8 @@ func (gnb *GNB) decProtocolIE(pdu *[]byte) (err error) {
 	default:
 		fmt.Printf("   decoding id(%d) not supported yet.\n", id)
 		fmt.Printf("   %02x\n", (*pdu)[:length])
+		*pdu = (*pdu)[length:]
 	}
-
-	*pdu = (*pdu)[length:]
 	return
 }
 
@@ -790,14 +789,15 @@ func encNASPDU(pdu []byte) (v []byte) {
 }
 
 func (gnb *GNB) decNASPDU(pdu *[]byte, length int) (err error) {
-	fmt.Printf("   pseudo DecOctetString\n")
+	fmt.Printf("   pseudo DecOctetString(%x)\n", length)
 
 	octlen := int((*pdu)[0])
+	*pdu = (*pdu)[1:]
+
 	gnb.UE.Decode(pdu, octlen)
-/*
-	fmt.Printf("   OctetString Len: %d\n", octlen)
-	fmt.Printf("   %02x\n", (*pdu)[1:length])
-*/
+	fmt.Printf("RES = %x\n", gnb.UE.AuthParam.RES)
+
+	*pdu = (*pdu)[octlen:]
 	return
 }
 

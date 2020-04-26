@@ -193,9 +193,6 @@ func NewNAS(filename string) (p *UE) {
 	p = &ue
 	json.Unmarshal(bytes, p)
 
-	ue.AuthParam.Kbin, _ = hex.DecodeString(ue.AuthParam.K)
-	ue.AuthParam.OPcbin, _ = hex.DecodeString(ue.AuthParam.OPc)
-
 	return
 }
 
@@ -256,8 +253,11 @@ func (ue *UE) decAuthenticationRequest(pdu *[]byte, length, offset int) {
 
 	ue.decInformationElement(pdu, length, offset)
 
+	k, _ := hex.DecodeString(ue.AuthParam.K)
+	opc, _ := hex.DecodeString(ue.AuthParam.OPc)
 	amf := binary.BigEndian.Uint16(ue.AuthParam.amf)
-	m := milenage.NewWithOPc(ue.AuthParam.Kbin, ue.AuthParam.OPcbin, ue.AuthParam.rand, 0, amf)
+
+	m := milenage.NewWithOPc(k, opc, ue.AuthParam.rand, 0, amf)
 	m.F2345()
 	for n, v := range ue.AuthParam.seqxorak {
 		m.SQN[n] = v ^ m.AK[n]
@@ -282,6 +282,7 @@ func (ue *UE) decAuthenticationRequest(pdu *[]byte, length, offset int) {
 		// need response for error.
 		return
 	}
+	ue.AuthParam.RES = m.RES
 
 	fmt.Printf("  received and calculated MAC values match.\n")
 	return
@@ -395,13 +396,12 @@ func (ue *UE) decABBA(pdu *[]byte, baseOffset int) (offset int) {
 type AuthParam struct {
 	K        string
 	OPc      string
-	Kbin     []byte
-	OPcbin   []byte
 	rand     []byte
 	autn     []byte
 	seqxorak []byte
 	amf      []byte
 	mac      []byte
+	RES      []byte
 }
 
 func (ue *UE) decAuthParamAUTN(pdu *[]byte, length, orig int) (offset int) {
