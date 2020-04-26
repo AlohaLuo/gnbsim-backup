@@ -27,7 +27,7 @@ type UE struct {
 	MNC              uint8
 	RoutingIndicator uint16
 	ProtectionScheme string
-	auth             AuthParam
+	AuthParam        AuthParam
 }
 
 // 9.1.1 NAS message format
@@ -193,8 +193,8 @@ func NewNAS(filename string) (p *UE) {
 	p = &ue
 	json.Unmarshal(bytes, p)
 
-	ue.auth.k, _ = hex.DecodeString("8baf473f2f8fd09487cccbd7097c6862")
-	ue.auth.opc, _ = hex.DecodeString("8e27b6af0e692e750f32667a3b14605d")
+	ue.AuthParam.Kbin, _ = hex.DecodeString(ue.AuthParam.K)
+	ue.AuthParam.OPcbin, _ = hex.DecodeString(ue.AuthParam.OPc)
 
 	return
 }
@@ -256,10 +256,10 @@ func (ue *UE) decAuthenticationRequest(pdu *[]byte, length, offset int) {
 
 	ue.decInformationElement(pdu, length, offset)
 
-	amf := binary.BigEndian.Uint16(ue.auth.amf)
-	m := milenage.NewWithOPc(ue.auth.k, ue.auth.opc, ue.auth.rand, 0, amf)
+	amf := binary.BigEndian.Uint16(ue.AuthParam.amf)
+	m := milenage.NewWithOPc(ue.AuthParam.Kbin, ue.AuthParam.OPcbin, ue.AuthParam.rand, 0, amf)
 	m.F2345()
-	for n, v := range ue.auth.seqxorak {
+	for n, v := range ue.AuthParam.seqxorak {
 		m.SQN[n] = v ^ m.AK[n]
 	}
 	m.F1()
@@ -277,7 +277,7 @@ func (ue *UE) decAuthenticationRequest(pdu *[]byte, length, offset int) {
 	fmt.Printf("   RAND: %x\n", m.RAND)
 	fmt.Printf("   RES: %x\n", m.RES)
 
-	if reflect.DeepEqual(ue.auth.mac, m.MACA) == false {
+	if reflect.DeepEqual(ue.AuthParam.mac, m.MACA) == false {
 		fmt.Printf("  received and calculated MAC values do not match.\n")
 		// need response for error.
 		return
@@ -393,8 +393,10 @@ func (ue *UE) decABBA(pdu *[]byte, baseOffset int) (offset int) {
 // 9.11.3.15 Authentication parameter AUTN
 // TS 24.008 10.5.3.1.1 Authentication Parameter AUTN (UMTS and EPS authentication challenge)
 type AuthParam struct {
-	k        []byte
-	opc      []byte
+	K        string
+	OPc      string
+	Kbin     []byte
+	OPcbin   []byte
 	rand     []byte
 	autn     []byte
 	seqxorak []byte
@@ -409,14 +411,14 @@ func (ue *UE) decAuthParamAUTN(pdu *[]byte, length, orig int) (offset int) {
 
 	autnlen := int((*pdu)[offset])
 	offset++
-	ue.auth.autn = (*pdu)[offset : offset+autnlen]
-	fmt.Printf(" AUTN: %02x\n", ue.auth.autn)
-	ue.auth.seqxorak = ue.auth.autn[:6]
-	ue.auth.amf = ue.auth.autn[6:8]
-	ue.auth.mac = ue.auth.autn[8:16]
-	fmt.Printf("  SEQ xor AK: %02x\n", ue.auth.seqxorak)
-	fmt.Printf("  AMF: %02x\n", ue.auth.amf)
-	fmt.Printf("  MAC: %02x\n", ue.auth.mac)
+	ue.AuthParam.autn = (*pdu)[offset : offset+autnlen]
+	fmt.Printf(" AUTN: %02x\n", ue.AuthParam.autn)
+	ue.AuthParam.seqxorak = ue.AuthParam.autn[:6]
+	ue.AuthParam.amf = ue.AuthParam.autn[6:8]
+	ue.AuthParam.mac = ue.AuthParam.autn[8:16]
+	fmt.Printf("  SEQ xor AK: %02x\n", ue.AuthParam.seqxorak)
+	fmt.Printf("  AMF: %02x\n", ue.AuthParam.amf)
+	fmt.Printf("  MAC: %02x\n", ue.AuthParam.mac)
 	offset += autnlen
 	return
 }
@@ -429,8 +431,8 @@ func (ue *UE) decAuthParamRAND(pdu *[]byte, length, orig int) (offset int) {
 	fmt.Printf("Auth Param RAND\n")
 
 	const randlen = 16
-	ue.auth.rand = (*pdu)[offset : offset+randlen]
-	fmt.Printf(" RAND: %02x\n", ue.auth.rand)
+	ue.AuthParam.rand = (*pdu)[offset : offset+randlen]
+	fmt.Printf(" RAND: %02x\n", ue.AuthParam.rand)
 	offset += randlen
 	return
 }
