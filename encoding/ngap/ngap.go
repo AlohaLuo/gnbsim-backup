@@ -76,6 +76,10 @@ type GNB struct {
 	RANUENGAPID     uint32
 	UE              nas.UE
 	ULInfoNR        UserLocationInformationNR
+
+	recv struct {
+		AMFUENGAPID []byte
+	}
 }
 
 func NewNGAP(filename string) (p *GNB) {
@@ -352,8 +356,9 @@ func (gnb *GNB) decProtocolIE(pdu *[]byte) (err error) {
 	offset += 1
 
 	*pdu = (*pdu)[offset:]
-
 	switch id {
+	case idAMFUENGAPID:
+		gnb.decAMFUENGAPID(pdu, length)
 	case idNASPDU:
 		gnb.decNASPDU(pdu, length)
 	default:
@@ -754,6 +759,17 @@ func (gnb *GNB) encRRCEstablishmentCause(cause uint) (v []byte, err error) {
 	length, _, _ := per.EncLengthDeterminant(len(v), 0)
 	head = append(head, length...)
 	v = append(head, v...)
+	return
+}
+
+// 9.3.3.1 AMF UE NGAP ID
+/*
+AMF-UE-NGAP-ID ::= INTEGER (0..1099511627775) // 20^40 -1
+*/
+func (gnb *GNB) decAMFUENGAPID(pdu *[]byte, length int) {
+	// just storing the received value for now.
+	gnb.recv.AMFUENGAPID = (*pdu)[:length]
+	*pdu = (*pdu)[length:]
 	return
 }
 
