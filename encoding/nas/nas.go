@@ -510,7 +510,7 @@ func ComputeRESstar(mcc, mnc int, rand, res, ck, ik []byte) (resstar []byte) {
 
 	s = append(s, res...)
 	l2 := make([]byte, 2)
-	binary.BigEndian.PutUint16(l1, uint16(len(res)))
+	binary.BigEndian.PutUint16(l2, uint16(len(res)))
 	s = append(s, l2...)
 
 	k := append(ck, ik...)
