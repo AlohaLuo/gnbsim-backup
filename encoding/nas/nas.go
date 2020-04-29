@@ -457,7 +457,7 @@ func encUESecurityCapability() (sc UESecurityCapability) {
 
 	// use null encryption at this moment.
 	sc.ea = EA0
-	sc.ia = IA0
+	sc.ia = IA0 | IA2
 
 	return
 }
