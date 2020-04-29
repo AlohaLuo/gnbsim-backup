@@ -9,6 +9,8 @@ package nas
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
@@ -23,8 +25,8 @@ import (
 
 type UE struct {
 	MSIN             string
-	MCC              uint8
-	MNC              uint8
+	MCC              int
+	MNC              int
 	RoutingIndicator uint16
 	ProtectionScheme string
 	AuthParam        AuthParam
@@ -73,114 +75,24 @@ const (
 
 // 9.7 Message type
 const (
-	MessageTypeRegistrationRequest   = 0x41
-	MessageTypeAuthenticationRequest = 0x56
+	MessageTypeRegistrationRequest    = 0x41
+	MessageTypeAuthenticationRequest  = 0x56
+	MessageTypeAuthenticationResponse = 0x57
 )
 
 var msgTypeStr = map[int]string{
-	MessageTypeRegistrationRequest:   "Registration Request",
-	MessageTypeAuthenticationRequest: "Authentication Request",
+	MessageTypeRegistrationRequest:    "Registration Request",
+	MessageTypeAuthenticationRequest:  "Authentication Request",
+	MessageTypeAuthenticationResponse: "Authentication Response",
 }
-
-// 9.11.3.1 5GMM capability
-type FiveGMMCapability struct {
-	iei         uint8
-	length      uint8
-	capability1 uint8
-}
-
-const (
-	FiveGMMCapN3data = 0x20
-)
-
-// 9.11.3.4 5GS mobile identity
-type FiveGSMobileID struct {
-	length                 uint16
-	supiFormatAndTypeID    uint8
-	plmn                   [3]uint8
-	routingIndicator       [2]uint8
-	protectionScheme       uint8
-	homeNetworkPublicKeyID uint8
-	schemeOutput           [5]uint8
-}
-
-const (
-	TypeIDNoIdentity = iota
-	TypeIDSUCI
-)
-
-const (
-	SUPIFormatIMSI = iota
-	SUPIFormatNetworkSpecificID
-)
-
-const (
-	ProtectionSchemeNull = iota
-	ProtectionSchemeProfileA
-	ProtectionSchemeProfileB
-)
-
-// 9.11.3.7 5GS registration type
-const (
-	RegistrationTypeInitialRegistration        = 0x01
-	RegistrationTypeFlagFollowOnRequestPending = 0x08
-)
-
-// 9.11.3.32 NAS key set identifier
-const (
-	KeySetIdentityNoKeyIsAvailable          = 0x07
-	KeySetIdentityFlagMappedSecurityContext = 0x08
-)
-
-// 9.11.3.54 UE security capability
-type UESecurityCapability struct {
-	iei    uint8
-	length uint8
-	ea     uint8
-	ia     uint8
-	eea    uint8
-	eia    uint8
-}
-
-const (
-	EA0 = 0x80
-	EA1 = 0x40
-	EA2 = 0x20
-	IA0 = 0x80
-	IA1 = 0x40
-	IA2 = 0x20
-)
 
 const (
 	iei5GMMCapability       = 0x10
 	ieiAuthParamAUTN        = 0x20
 	ieiAuthParamRAND        = 0x21
+	ieiAuthParamRES         = 0x2d
 	ieiUESecurityCapability = 0x2e
 )
-
-func Str2BCD(str string) (bcd []byte) {
-
-	byteArray := []byte(str)
-	bcdlen := len(byteArray) / 2
-	if len(byteArray)%2 == 1 {
-		bcdlen++
-	}
-	bcd = make([]byte, bcdlen, bcdlen)
-
-	for i, v := range byteArray {
-
-		n, _ := strconv.ParseUint(string(v), 16, 8)
-		j := i / 2
-
-		if i%2 == 0 {
-			bcd[j] = byte(n)
-		} else {
-			bcd[j] |= (byte(n) << 4)
-		}
-	}
-
-	return
-}
 
 func NewNAS(filename string) (p *UE) {
 
@@ -282,9 +194,26 @@ func (ue *UE) decAuthenticationRequest(pdu *[]byte, length, offset int) {
 		// need response for error.
 		return
 	}
-	ue.AuthParam.RES = m.RES
-
 	fmt.Printf("  received and calculated MAC values match.\n")
+
+	ue.AuthParam.RESstar = ComputeRESstar(ue.MCC, ue.MNC, m.RAND, m.RES, m.CK, m.IK)
+	fmt.Printf("   RES*: %x\n", ue.AuthParam.RESstar)
+	return
+}
+
+// 8.2.2 Authentication response
+func (ue *UE) MakeAuthenticationResponse() (pdu []byte) {
+
+	var h NasMessageMM
+	h.ExtendedProtocolDiscriminator = EPD5GSMobilityManagement
+	h.SecurityHeaderType = SecurityHeaderTypePlain
+	h.MessageType = MessageTypeAuthenticationResponse
+
+	data := new(bytes.Buffer)
+	binary.Write(data, binary.BigEndian, h)
+	binary.Write(data, binary.BigEndian, ue.encAuthParamRes())
+	pdu = data.Bytes()
+
 	return
 }
 
@@ -329,7 +258,7 @@ func (p *UE) MakeRegistrationRequest() (pdu []byte) {
 	return
 }
 
-func encPLMN(mcc, mnc uint8) (plmn [3]byte) {
+func encPLMN(mcc, mnc int) (plmn [3]byte) {
 	format := "%d%d"
 	if mnc < 100 {
 		format = "%df%d"
@@ -366,6 +295,16 @@ func encSchemeOutput(msin string) (so [5]byte) {
 }
 
 // 9.11.3.1 5GMM capability
+type FiveGMMCapability struct {
+	iei         uint8
+	length      uint8
+	capability1 uint8
+}
+
+const (
+	FiveGMMCapN3data = 0x20
+)
+
 func enc5GMMCapability() (f FiveGMMCapability) {
 	f.iei = 0x10
 	f.length = 1
@@ -373,6 +312,39 @@ func enc5GMMCapability() (f FiveGMMCapability) {
 
 	return
 }
+
+// 9.11.3.4 5GS mobile identity
+type FiveGSMobileID struct {
+	length                 uint16
+	supiFormatAndTypeID    uint8
+	plmn                   [3]uint8
+	routingIndicator       [2]uint8
+	protectionScheme       uint8
+	homeNetworkPublicKeyID uint8
+	schemeOutput           [5]uint8
+}
+
+const (
+	TypeIDNoIdentity = iota
+	TypeIDSUCI
+)
+
+const (
+	SUPIFormatIMSI = iota
+	SUPIFormatNetworkSpecificID
+)
+
+const (
+	ProtectionSchemeNull = iota
+	ProtectionSchemeProfileA
+	ProtectionSchemeProfileB
+)
+
+// 9.11.3.7 5GS registration type
+const (
+	RegistrationTypeInitialRegistration        = 0x01
+	RegistrationTypeFlagFollowOnRequestPending = 0x08
+)
 
 // 9.11.3.10 ABBA
 func (ue *UE) decABBA(pdu *[]byte, baseOffset int) (offset int) {
@@ -401,7 +373,7 @@ type AuthParam struct {
 	seqxorak []byte
 	amf      []byte
 	mac      []byte
-	RES      []byte
+	RESstar  []byte
 }
 
 func (ue *UE) decAuthParamAUTN(pdu *[]byte, length, orig int) (offset int) {
@@ -437,7 +409,48 @@ func (ue *UE) decAuthParamRAND(pdu *[]byte, length, orig int) (offset int) {
 	return
 }
 
+// 9.11.3.17 Authentication response parameter
+// TS 24.301 9.9.3.4 Authentication response parameter
+type AuthParamRes struct {
+	iei     uint8
+	length  uint8
+	resstar [16]byte
+}
+
+func (ue *UE) encAuthParamRes() (res AuthParamRes) {
+	res.iei = ieiAuthParamRES
+	for i, v := range ue.AuthParam.RESstar {
+		res.resstar[i] = v
+	}
+	res.length = uint8(len(res.resstar))
+	return
+}
+
+// 9.11.3.32 NAS key set identifier
+const (
+	KeySetIdentityNoKeyIsAvailable          = 0x07
+	KeySetIdentityFlagMappedSecurityContext = 0x08
+)
+
 // 9.11.3.54 UE security capability
+type UESecurityCapability struct {
+	iei    uint8
+	length uint8
+	ea     uint8
+	ia     uint8
+	eea    uint8
+	eia    uint8
+}
+
+const (
+	EA0 = 0x80
+	EA1 = 0x40
+	EA2 = 0x20
+	IA0 = 0x80
+	IA1 = 0x40
+	IA2 = 0x20
+)
+
 func encUESecurityCapability() (sc UESecurityCapability) {
 	sc.iei = ieiUESecurityCapability
 	sc.length = 4
@@ -445,6 +458,73 @@ func encUESecurityCapability() (sc UESecurityCapability) {
 	// use null encryption at this moment.
 	sc.ea = EA0
 	sc.ia = IA0
+
+	return
+}
+
+//-----
+func Str2BCD(str string) (bcd []byte) {
+
+	byteArray := []byte(str)
+	bcdlen := len(byteArray) / 2
+	if len(byteArray)%2 == 1 {
+		bcdlen++
+	}
+	bcd = make([]byte, bcdlen, bcdlen)
+
+	for i, v := range byteArray {
+
+		n, _ := strconv.ParseUint(string(v), 16, 8)
+		j := i / 2
+
+		if i%2 == 0 {
+			bcd[j] = byte(n)
+		} else {
+			bcd[j] |= (byte(n) << 4)
+		}
+	}
+
+	return
+}
+
+// TS 33.501
+// A.4 RES* and XRES* derivation function
+func ComputeRESstar(mcc, mnc int, rand, res, ck, ik []byte) (resstar []byte) {
+
+	s := []byte{}
+	fc := []byte{0x6b}
+	s = append(s, fc...)
+
+	p0str := fmt.Sprintf("5G:mnc%03d.mcc%03d.3gppnetwork.org", mnc, mcc)
+	p0 := []byte(p0str)
+	s = append(s, p0...)
+
+	l0 := make([]byte, 2)
+	binary.BigEndian.PutUint16(l0, uint16(len(p0)))
+	s = append(s, l0...)
+
+	s = append(s, rand...)
+	l1 := make([]byte, 2)
+	binary.BigEndian.PutUint16(l1, uint16(len(rand)))
+	s = append(s, l1...)
+
+	s = append(s, res...)
+	l2 := make([]byte, 2)
+	binary.BigEndian.PutUint16(l1, uint16(len(res)))
+	s = append(s, l2...)
+
+	k := append(ck, ik...)
+
+	mac := hmac.New(sha256.New, k)
+	mac.Write(s)
+	resstar = mac.Sum(nil)
+
+	/*
+	 * The (X)RES* is identified with the 128 least significant bits of the output
+	 * of the KDF.
+	 */
+	n := len(resstar)
+	resstar = resstar[n-16:]
 
 	return
 }

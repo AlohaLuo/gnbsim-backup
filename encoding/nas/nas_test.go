@@ -33,6 +33,19 @@ func TestStr2BCD(t *testing.T) {
 	}
 }
 
+func TestMakeAuthenticationResponse(t *testing.T) {
+	ue := NewNAS("nas_test.json")
+	ue.AuthParam.RESstar = []byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+		0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f}
+	v := ue.MakeAuthenticationResponse()
+	//fmt.Printf("MakeRegistrationRequest: %02x\n", v)
+	expect_str := "7e00572d10000102030405060708090a0b0c0d0e0f"
+	expect, _ := hex.DecodeString(expect_str)
+	if compareSlice(expect, v) == false {
+		t.Errorf("AuthenticationResponse\nexpect: %x\nactual: %x", expect, v)
+	}
+}
+
 func TestMakeRegistrationRequest(t *testing.T) {
 	ue := NewNAS("nas_test.json")
 	v := ue.MakeRegistrationRequest()
