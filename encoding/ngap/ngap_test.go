@@ -29,6 +29,20 @@ func TestMakeInitialUEMessage(t *testing.T) {
 	}
 }
 
+func TestMakeUplinkNASTransport(t *testing.T) {
+	gnb := NewNGAP("ngap_test.json")
+	gnb.recv.AMFUENGAPID = []byte{0x00, 0x01}
+	gnb.UE.AuthParam.RESstar = []byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
+		0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff}
+
+	v := gnb.MakeUplinkNASTransport()
+	expect_str := "002e403c000004000a0002000100550002000000260016157e00572d1000112233445566778899aabbccddeeff0079000f4021f354000004001021f354000102"
+	expect, _ := hex.DecodeString(expect_str)
+	if compareSlice(expect, v) == false {
+		t.Errorf("UplinkNASTransport\nexpect: %x\nactual: %x", expect, v)
+	}
+}
+
 func TestMakeNGSetupRequest(t *testing.T) {
 	gnbp := NewNGAP("ngap_test.json")
 	v := gnbp.MakeNGSetupRequest()

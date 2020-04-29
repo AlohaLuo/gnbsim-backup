@@ -43,12 +43,14 @@ const (
 	idDownlinkNASTransport = 4
 	idInitialUEMessage     = 15
 	idNGSetup              = 21
+	idUplinkNASTransport   = 46
 )
 
 var procID = map[int]string{
 	idDownlinkNASTransport: "id-DownlinkNASTransport",
 	idInitialUEMessage:     "id-InitialUEMessage",
 	idNGSetup:              "id-NGSetup",
+	idUplinkNASTransport:   "id-UplinkNASTransport",
 }
 
 const (
@@ -192,6 +194,55 @@ DownlinkNASTransport-IEs NGAP-PROTOCOL-IES ::= {
     ...
 }
 */
+
+// 9.2.5.3 UPLINK NAS TRANSPORT
+/*
+UplinkNASTransport ::= SEQUENCE {
+    protocolIEs     ProtocolIE-Container    { {UplinkNASTransport-IEs} },
+    ...
+}
+
+UplinkNASTransport-IEs NGAP-PROTOCOL-IES ::= {
+    { ID id-AMF-UE-NGAP-ID              CRITICALITY reject  TYPE AMF-UE-NGAP-ID                 PRESENCE mandatory  }|
+    { ID id-RAN-UE-NGAP-ID              CRITICALITY reject  TYPE RAN-UE-NGAP-ID                 PRESENCE mandatory  }|
+    { ID id-NAS-PDU                     CRITICALITY reject  TYPE NAS-PDU                        PRESENCE mandatory  }|
+    { ID id-UserLocationInformation     CRITICALITY ignore  TYPE UserLocationInformation        PRESENCE mandatory  },
+    ...
+}
+*/
+func (gnb *GNB) MakeUplinkNASTransport() (pdu []byte) {
+
+	// Authentiation Response only for now.
+
+	pdu = encNgapPdu(initiatingMessage, idUplinkNASTransport, ignore)
+	fmt.Printf("debug: pdu = %02x\n", pdu)
+
+	v := encProtocolIEContainer(4)
+	fmt.Printf("debug: ie container = %02x\n", v)
+
+	tmp := gnb.encAMFUENGAPID()
+	fmt.Printf("debug: global AMF-UE-NGAP-ID = %02x\n", tmp)
+	v = append(v, tmp...)
+
+	tmp = encRANUENGAPID(gnb.RANUENGAPID)
+	fmt.Printf("debug: global RAN-UE-NGAP-ID = %02x\n", tmp)
+	v = append(v, tmp...)
+
+	tmp = encNASPDU(gnb.UE.MakeAuthenticationResponse())
+	fmt.Printf("debug: 5G NAS PDU = %02x\n", tmp)
+	v = append(v, tmp...)
+
+	tmp, _ = gnb.encUserLocationInformation()
+	fmt.Printf("debug: User Location Information = %02x\n", tmp)
+	v = append(v, tmp...)
+
+	length, _, _ := per.EncLengthDeterminant(len(v), 0)
+
+	pdu = append(pdu, length...)
+	pdu = append(pdu, v...)
+
+	return
+}
 
 // 9.2.6.1 NG SETUP REQUEST
 /*
@@ -766,6 +817,15 @@ func (gnb *GNB) encRRCEstablishmentCause(cause uint) (v []byte, err error) {
 /*
 AMF-UE-NGAP-ID ::= INTEGER (0..1099511627775) // 20^40 -1
 */
+func (gnb *GNB) encAMFUENGAPID() (v []byte) {
+	head, _ := encProtocolIE(idAMFUENGAPID, reject)
+	v = gnb.recv.AMFUENGAPID
+
+	length, _, _ := per.EncLengthDeterminant(len(v), 0)
+	head = append(head, length...)
+	v = append(head, v...)
+	return
+}
 func (gnb *GNB) decAMFUENGAPID(pdu *[]byte, length int) {
 	// just storing the received value for now.
 	gnb.recv.AMFUENGAPID = (*pdu)[:length]
@@ -811,7 +871,7 @@ func (gnb *GNB) decNASPDU(pdu *[]byte, length int) (err error) {
 	*pdu = (*pdu)[1:]
 
 	gnb.UE.Decode(pdu, octlen)
-	fmt.Printf("RES = %x\n", gnb.UE.AuthParam.RES)
+	fmt.Printf("RES* = %x\n", gnb.UE.AuthParam.RESstar)
 
 	*pdu = (*pdu)[octlen:]
 	return
