@@ -873,7 +873,6 @@ func (gnb *GNB) decNASPDU(pdu *[]byte, length int) (err error) {
 	gnb.UE.Decode(pdu, octlen)
 	fmt.Printf("RES* = %x\n", gnb.UE.AuthParam.RESstar)
 
-	*pdu = (*pdu)[octlen:]
 	return
 }
 
