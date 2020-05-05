@@ -22,7 +22,7 @@ func compareSlice(actual, expect []byte) bool {
 func TestMakeInitialUEMessage(t *testing.T) {
 	gnbp := NewNGAP("ngap_test.json")
 	v := gnbp.MakeInitialUEMessage()
-	expect_str := "000f40470000040055000200000026001d1c7e004179000d0121f3542143000010325476981001202e04808000000079000f4021f354000004001021f354000102005a4001180070400100"
+	expect_str := "000f40470000040055000200000026001d1c7e004179000d0121f3542143000010325476981001202e0480a000000079000f4021f354000004001021f354000102005a4001180070400100"
 	expect, _ := hex.DecodeString(expect_str)
 	if compareSlice(expect, v) == false {
 		t.Errorf("InitialUEMessage\nexpect: %x\nactual: %x", expect, v)
