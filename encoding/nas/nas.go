@@ -109,22 +109,21 @@ func NewNAS(filename string) (p *UE) {
 }
 
 func (ue *UE) Decode(pdu *[]byte, length int) (msgType int) {
-	offset := 0
-	epd := int((*pdu)[offset])
+	epd := int((*pdu)[0])
 	fmt.Printf("EPD: %s (0x%x)\n", epdStr[epd], epd)
-	offset++
+	*pdu = (*pdu)[1:]
 
-	secHeader := int((*pdu)[offset])
+	secHeader := int((*pdu)[0])
 	fmt.Printf("Security Header: 0x%x\n", secHeader)
-	offset++
+	*pdu = (*pdu)[1:]
 
-	msgType = int((*pdu)[offset])
+	msgType = int((*pdu)[0])
 	fmt.Printf("Message Type: %s (0x%x)\n", msgTypeStr[msgType], msgType)
-	offset++
+	*pdu = (*pdu)[1:]
 
 	switch msgType {
 	case MessageTypeAuthenticationRequest:
-		ue.decAuthenticationRequest(pdu, length, offset)
+		ue.decAuthenticationRequest(pdu)
 		break
 	default:
 		break
@@ -132,38 +131,38 @@ func (ue *UE) Decode(pdu *[]byte, length int) (msgType int) {
 	return
 }
 
-func (ue *UE) decInformationElement(pdu *[]byte, length, offset int) {
+func (ue *UE) decInformationElement(pdu *[]byte) {
 
-	for offset < length {
-		iei := int((*pdu)[offset])
-		offset++
+	for len(*pdu) > 0 {
+		iei := int((*pdu)[0])
+		*pdu = (*pdu)[1:]
 
 		switch iei {
 		case ieiAuthParamAUTN:
-			offset = ue.decAuthParamAUTN(pdu, length, offset)
+			ue.decAuthParamAUTN(pdu)
 			break
 		case ieiAuthParamRAND:
-			offset = ue.decAuthParamRAND(pdu, length, offset)
+			ue.decAuthParamRAND(pdu)
 			break
 		default:
 			fmt.Printf("unsupported IE\n")
-			offset = length
+			*pdu = []byte{}
 			break
 		}
 	}
 }
 
 // 8.2.1 Authentication request
-func (ue *UE) decAuthenticationRequest(pdu *[]byte, length, offset int) {
+func (ue *UE) decAuthenticationRequest(pdu *[]byte) {
 	fmt.Printf("decAuthenticationRequest\n")
 
-	ksi := int((*pdu)[offset])
+	ksi := int((*pdu)[0])
 	fmt.Printf("ngKSI: 0x%x\n", ksi)
-	offset++
+	*pdu = (*pdu)[1:]
 
-	offset = ue.decABBA(pdu, offset)
+	ue.decABBA(pdu)
 
-	ue.decInformationElement(pdu, length, offset)
+	ue.decInformationElement(pdu)
 
 	k, _ := hex.DecodeString(ue.AuthParam.K)
 	opc, _ := hex.DecodeString(ue.AuthParam.OPc)
@@ -347,14 +346,13 @@ const (
 )
 
 // 9.11.3.10 ABBA
-func (ue *UE) decABBA(pdu *[]byte, baseOffset int) (offset int) {
+func (ue *UE) decABBA(pdu *[]byte) {
 
-	offset = baseOffset
+	length := int((*pdu)[0])
+	*pdu = (*pdu)[1:]
 
-	length := int((*pdu)[offset])
-	offset++
-	abba := (*pdu)[offset : offset+length]
-	offset += length
+	abba := (*pdu)[:length]
+	*pdu = (*pdu)[length:]
 
 	fmt.Printf("ABBA\n")
 	fmt.Printf(" Length: %d\n", length)
@@ -376,14 +374,15 @@ type AuthParam struct {
 	RESstar  []byte
 }
 
-func (ue *UE) decAuthParamAUTN(pdu *[]byte, length, orig int) (offset int) {
+func (ue *UE) decAuthParamAUTN(pdu *[]byte) {
 
-	offset = orig
 	fmt.Printf("Auth Param AUTN\n")
 
-	autnlen := int((*pdu)[offset])
-	offset++
-	ue.AuthParam.autn = (*pdu)[offset : offset+autnlen]
+	autnlen := int((*pdu)[0])
+	*pdu = (*pdu)[1:]
+
+	ue.AuthParam.autn = (*pdu)[:autnlen]
+	*pdu = (*pdu)[autnlen:]
 	fmt.Printf(" AUTN: %02x\n", ue.AuthParam.autn)
 	ue.AuthParam.seqxorak = ue.AuthParam.autn[:6]
 	ue.AuthParam.amf = ue.AuthParam.autn[6:8]
@@ -391,21 +390,20 @@ func (ue *UE) decAuthParamAUTN(pdu *[]byte, length, orig int) (offset int) {
 	fmt.Printf("  SEQ xor AK: %02x\n", ue.AuthParam.seqxorak)
 	fmt.Printf("  AMF: %02x\n", ue.AuthParam.amf)
 	fmt.Printf("  MAC: %02x\n", ue.AuthParam.mac)
-	offset += autnlen
+
 	return
 }
 
 // 9.11.3.16 Authentication parameter RAND
 // TS 24.008 10.5.3.1 Authentication parameter RAND
-func (ue *UE) decAuthParamRAND(pdu *[]byte, length, orig int) (offset int) {
+func (ue *UE) decAuthParamRAND(pdu *[]byte) {
 
-	offset = orig
 	fmt.Printf("Auth Param RAND\n")
 
 	const randlen = 16
-	ue.AuthParam.rand = (*pdu)[offset : offset+randlen]
+	ue.AuthParam.rand = (*pdu)[:randlen]
+	*pdu = (*pdu)[randlen:]
 	fmt.Printf(" RAND: %02x\n", ue.AuthParam.rand)
-	offset += randlen
 	return
 }
 
