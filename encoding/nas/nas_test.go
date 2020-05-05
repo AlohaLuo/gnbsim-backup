@@ -50,7 +50,7 @@ func TestMakeRegistrationRequest(t *testing.T) {
 	ue := NewNAS("nas_test.json")
 	v := ue.MakeRegistrationRequest()
 	//fmt.Printf("MakeRegistrationRequest: %02x\n", v)
-	expect_str := "7e004179000d0121f3542143000010325476981001202e0480800000"
+	expect_str := "7e004179000d0121f3542143000010325476981001202e0480a00000"
 	expect, _ := hex.DecodeString(expect_str)
 	if compareSlice(expect, v) == false {
 		t.Errorf("RegistrationRequest\nexpect: %x\nactual: %x", expect, v)
@@ -60,14 +60,17 @@ func TestMakeRegistrationRequest(t *testing.T) {
 func TestDecode(t *testing.T) {
 	ue := NewNAS("nas_test.json")
 
-	in_str := "7e0056070200002123e87a6d2b0cde95ca763ded3a017c3020102b3e6160baed8000b77ab234553870f1"
-	in, _ := hex.DecodeString(in_str)
-	length := len(in)
-	ue.Decode(&in, length)
+	pattern := []struct {
+		in_str string
+	}{
+		{"7e0056070200002123e87a6d2b0cde95ca763ded3a017c3020102b3e6160baed8000b77ab234553870f1"},
+		{"7e03126a91a1007e035d02070480a00000e1360103"},
+	}
 
-	expect_str := "7e0056070200002123e87a6d2b0cde95ca763ded3a017c3020102b3e6160baed8000b77ab234553870f1"
-	expect, _ := hex.DecodeString(expect_str)
-	if compareSlice(expect, in) == false {
-		t.Errorf("Decode\nexpect: %x\nactual: %x", expect, in)
+	for _, p := range pattern {
+		fmt.Printf("----------\n")
+		in, _ := hex.DecodeString(p.in_str)
+		length := len(in)
+		ue.Decode(&in, length)
 	}
 }
