@@ -30,6 +30,10 @@ type UE struct {
 	RoutingIndicator uint16
 	ProtectionScheme string
 	AuthParam        AuthParam
+
+	state struct {
+		securityHeaderParsed bool
+	}
 }
 
 // 9.1.1 NAS message format
@@ -78,12 +82,14 @@ const (
 	MessageTypeRegistrationRequest    = 0x41
 	MessageTypeAuthenticationRequest  = 0x56
 	MessageTypeAuthenticationResponse = 0x57
+	MessageTypeSecurityModeCommand    = 0x5d
 )
 
 var msgTypeStr = map[int]string{
 	MessageTypeRegistrationRequest:    "Registration Request",
 	MessageTypeAuthenticationRequest:  "Authentication Request",
 	MessageTypeAuthenticationResponse: "Authentication Response",
+	MessageTypeSecurityModeCommand:    "Security Mode Command",
 }
 
 const (
@@ -112,10 +118,29 @@ func (ue *UE) Decode(pdu *[]byte, length int) (msgType int) {
 	epd := int((*pdu)[0])
 	fmt.Printf("EPD: %s (0x%x)\n", epdStr[epd], epd)
 	*pdu = (*pdu)[1:]
+	length--
 
 	secHeader := int((*pdu)[0])
 	fmt.Printf("Security Header: 0x%x\n", secHeader)
 	*pdu = (*pdu)[1:]
+	length--
+	fmt.Printf("security header parse = %v\n", ue.state.securityHeaderParsed)
+
+	if secHeader != 0x00 && ue.state.securityHeaderParsed == false {
+		mac := (*pdu)[:4]
+		seq := int((*pdu)[4])
+		fmt.Printf("mac: %x, seq = %d\n", mac, seq)
+		*pdu = (*pdu)[5:]
+		length -= 5
+		ue.state.securityHeaderParsed = true
+		msgType = ue.Decode(pdu, length)
+		return
+	}
+
+	if secHeader != 0x00 {
+		fmt.Printf(
+			"# Well..., free5gc seems to set the security header != 0 for the plain NAS message. My workaround is invoked.\n")
+	}
 
 	msgType = int((*pdu)[0])
 	fmt.Printf("Message Type: %s (0x%x)\n", msgTypeStr[msgType], msgType)
@@ -128,6 +153,7 @@ func (ue *UE) Decode(pdu *[]byte, length int) (msgType int) {
 	default:
 		break
 	}
+	ue.state.securityHeaderParsed = false
 	return
 }
 
