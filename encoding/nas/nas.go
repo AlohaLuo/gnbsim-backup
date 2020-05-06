@@ -19,6 +19,7 @@ import (
 	"log"
 	"reflect"
 	"strconv"
+	"strings"
 
 	"github.com/wmnsk/milenage"
 )
@@ -34,6 +35,8 @@ type UE struct {
 	state struct {
 		securityHeaderParsed bool
 	}
+
+	indent int // indent for debug print.
 }
 
 // 9.1.1 NAS message format
@@ -111,20 +114,20 @@ func NewNAS(filename string) (p *UE) {
 
 func (ue *UE) Decode(pdu *[]byte, length int) (msgType int) {
 	epd := int((*pdu)[0])
-	fmt.Printf("EPD: %s (0x%x)\n", epdStr[epd], epd)
+	ue.dprint("EPD: %s (0x%x)", epdStr[epd], epd)
 	*pdu = (*pdu)[1:]
 	length--
 
 	secHeader := int((*pdu)[0])
-	fmt.Printf("Security Header: 0x%x\n", secHeader)
+	ue.dprint("Security Header: 0x%x", secHeader)
 	*pdu = (*pdu)[1:]
 	length--
-	fmt.Printf("security header parse = %v\n", ue.state.securityHeaderParsed)
 
 	if secHeader != 0x00 && ue.state.securityHeaderParsed == false {
 		mac := (*pdu)[:4]
 		seq := int((*pdu)[4])
-		fmt.Printf("mac: %x, seq = %d\n", mac, seq)
+		ue.dprinti("mac: %x", mac)
+		ue.dprinti("seq: %d", seq)
 		*pdu = (*pdu)[5:]
 		length -= 5
 		ue.state.securityHeaderParsed = true
@@ -133,14 +136,15 @@ func (ue *UE) Decode(pdu *[]byte, length int) (msgType int) {
 	}
 
 	if secHeader != 0x00 {
-		fmt.Printf("# Well..., free5gc seems to set the security header != 0" +
-			" for the plain NAS message. My workaround is invoked.\n")
+		ue.dprinti("# Well..., free5gc seems to set the security header != 0" +
+			" for the plain NAS message. My workaround is invoked.")
 	}
 
 	msgType = int((*pdu)[0])
-	fmt.Printf("Message Type: %s (0x%x)\n", msgTypeStr[msgType], msgType)
+	ue.dprint("Message Type: %s (0x%x)", msgTypeStr[msgType], msgType)
 	*pdu = (*pdu)[1:]
 
+	ue.indent++
 	switch msgType {
 	case MessageTypeAuthenticationRequest:
 		ue.decAuthenticationRequest(pdu)
@@ -151,6 +155,7 @@ func (ue *UE) Decode(pdu *[]byte, length int) (msgType int) {
 	default:
 		break
 	}
+	ue.indent--
 
 	ue.state.securityHeaderParsed = false
 	return
@@ -168,13 +173,13 @@ func (ue *UE) decInformationElement(pdu *[]byte) {
 		case ieiAuthParamRAND:
 			ue.decAuthParamRAND(pdu)
 		case ieiAdditional5GSecurityInformation:
-			fmt.Printf("Additional 5G Security Information\n")
+			ue.dprint("Additional 5G Security Information")
 		default:
 			switch iei & 0xf0 {
 			case ieiIMEISVRequest:
-				fmt.Printf("IMEISV Request\n")
+				ue.dprint("IMEISV Request")
 			default:
-				fmt.Printf("unsupported IE\n")
+				ue.dprint("unsupported IE")
 				*pdu = []byte{}
 			}
 		}
@@ -183,11 +188,14 @@ func (ue *UE) decInformationElement(pdu *[]byte) {
 
 // 8.2.1 Authentication request
 func (ue *UE) decAuthenticationRequest(pdu *[]byte) {
-	fmt.Printf("decAuthenticationRequest\n")
+	ue.dprint("Authentication Request")
 
+	orig := ue.indent
+	ue.indent++
 	ue.decngKSI(pdu)
 	ue.decABBA(pdu)
 	ue.decInformationElement(pdu)
+	ue.indent--
 
 	k, _ := hex.DecodeString(ue.AuthParam.K)
 	opc, _ := hex.DecodeString(ue.AuthParam.OPc)
@@ -200,28 +208,31 @@ func (ue *UE) decAuthenticationRequest(pdu *[]byte) {
 	}
 	m.F1()
 
-	fmt.Printf("   K: %x\n", m.K)
-	fmt.Printf("   OP: %x\n", m.OP)
-	fmt.Printf("   OPc: %x\n", m.OPc)
-	fmt.Printf("   AMF: %x\n", m.AMF)
-	fmt.Printf("   SQN(%d): %x\n", len(m.SQN), m.SQN)
-	fmt.Printf("   CK: %x\n", m.CK)
-	fmt.Printf("   IK: %x\n", m.IK)
-	fmt.Printf("   AK(%d): %x\n", len(m.AK), m.AK)
-	fmt.Printf("   MACA: %x\n", m.MACA)
-	fmt.Printf("   MACS: %x\n", m.MACS)
-	fmt.Printf("   RAND: %x\n", m.RAND)
-	fmt.Printf("   RES: %x\n", m.RES)
+	ue.indent++
+	ue.dprint("K   : %x", m.K)
+	ue.dprint("OP  : %x", m.OP)
+	ue.dprint("OPc : %x", m.OPc)
+	ue.dprint("AMF : %x", m.AMF)
+	ue.dprint("SQN : %x", m.SQN)
+	ue.dprint("CK  : %x", m.CK)
+	ue.dprint("IK  : %x", m.IK)
+	ue.dprint("AK  : %x", m.AK)
+	ue.dprint("MACA: %x", m.MACA)
+	ue.dprint("MACS: %x", m.MACS)
+	ue.dprint("RAND: %x", m.RAND)
+	ue.dprint("RES : %x", m.RES)
 
 	if reflect.DeepEqual(ue.AuthParam.mac, m.MACA) == false {
-		fmt.Printf("  received and calculated MAC values do not match.\n")
+		ue.dprinti("received and calculated MAC values do not match.\n")
+		ue.indent = orig
 		// need response for error.
 		return
 	}
-	fmt.Printf("  received and calculated MAC values match.\n")
 
 	ue.AuthParam.RESstar = ComputeRESstar(ue.MCC, ue.MNC, m.RAND, m.RES, m.CK, m.IK)
-	fmt.Printf("   RES*: %x\n", ue.AuthParam.RESstar)
+	ue.dprint("RES*: %x", ue.AuthParam.RESstar)
+	ue.dprint("received and calculated MAC values match.")
+	ue.indent = orig
 	return
 }
 
@@ -291,11 +302,14 @@ func (p *UE) MakeRegistrationRequest() (pdu []byte) {
 // 8.2.25 Security mode command
 func (ue *UE) decSecurityModeCommand(pdu *[]byte) {
 
+	ue.dprint("Security Mode Command")
+
+	ue.indent++
 	ue.decNASSecurityAlgorithms(pdu)
 	ue.decngKSI(pdu)
 	ue.decUESecurityCapability(pdu)
-
 	ue.decInformationElement(pdu)
+	ue.indent--
 
 	return
 }
@@ -397,9 +411,9 @@ func (ue *UE) decABBA(pdu *[]byte) {
 	abba := (*pdu)[:length]
 	*pdu = (*pdu)[length:]
 
-	fmt.Printf("ABBA\n")
-	fmt.Printf(" Length: %d\n", length)
-	fmt.Printf(" Value: %02x\n", abba)
+	ue.dprint("ABBA")
+	ue.dprinti("Length: %d", length)
+	ue.dprinti("Value: 0x%02x", abba)
 
 	return
 }
@@ -419,20 +433,20 @@ type AuthParam struct {
 
 func (ue *UE) decAuthParamAUTN(pdu *[]byte) {
 
-	fmt.Printf("Auth Param AUTN\n")
+	ue.dprint("Auth Param AUTN")
 
 	autnlen := int((*pdu)[0])
 	*pdu = (*pdu)[1:]
 
 	ue.AuthParam.autn = (*pdu)[:autnlen]
 	*pdu = (*pdu)[autnlen:]
-	fmt.Printf(" AUTN: %02x\n", ue.AuthParam.autn)
+	ue.dprinti("AUTN: %02x", ue.AuthParam.autn)
 	ue.AuthParam.seqxorak = ue.AuthParam.autn[:6]
 	ue.AuthParam.amf = ue.AuthParam.autn[6:8]
 	ue.AuthParam.mac = ue.AuthParam.autn[8:16]
-	fmt.Printf("  SEQ xor AK: %02x\n", ue.AuthParam.seqxorak)
-	fmt.Printf("  AMF: %02x\n", ue.AuthParam.amf)
-	fmt.Printf("  MAC: %02x\n", ue.AuthParam.mac)
+	ue.dprinti("SEQ xor AK: %02x", ue.AuthParam.seqxorak)
+	ue.dprinti("AMF: %02x", ue.AuthParam.amf)
+	ue.dprinti("MAC: %02x", ue.AuthParam.mac)
 
 	return
 }
@@ -441,12 +455,12 @@ func (ue *UE) decAuthParamAUTN(pdu *[]byte) {
 // TS 24.008 10.5.3.1 Authentication parameter RAND
 func (ue *UE) decAuthParamRAND(pdu *[]byte) {
 
-	fmt.Printf("Auth Param RAND\n")
+	ue.dprint("Auth Param RAND")
 
 	const randlen = 16
 	ue.AuthParam.rand = (*pdu)[:randlen]
 	*pdu = (*pdu)[randlen:]
-	fmt.Printf(" RAND: %02x\n", ue.AuthParam.rand)
+	ue.dprinti(" RAND: 0x%02x", ue.AuthParam.rand)
 	return
 }
 
@@ -476,7 +490,7 @@ const (
 func (ue *UE) decngKSI(pdu *[]byte) {
 
 	ksi := int((*pdu)[0])
-	fmt.Printf("ngKSI: 0x%x\n", ksi)
+	ue.dprint("ngKSI: 0x%x", ksi)
 	*pdu = (*pdu)[1:]
 
 	return
@@ -485,9 +499,9 @@ func (ue *UE) decngKSI(pdu *[]byte) {
 // 9.11.3.34 NAS security algorithms
 func (ue *UE) decNASSecurityAlgorithms(pdu *[]byte) {
 
-	fmt.Printf("NAS Security Algorithms\n")
+	ue.dprint("NAS Security Algorithms")
 	alg := (*pdu)[:1]
-	fmt.Printf(" NAS Security Algorithms: 0x%02x\n", alg)
+	ue.dprinti(" NAS Security Algorithms: 0x%02x", alg)
 	*pdu = (*pdu)[1:]
 
 	return
@@ -525,11 +539,12 @@ func encUESecurityCapability() (sc UESecurityCapability) {
 
 func (ue *UE) decUESecurityCapability(pdu *[]byte) {
 
+	ue.dprint("Replayed UE Security Capability")
 	length := int((*pdu)[0])
 	*pdu = (*pdu)[1:]
 
 	cap := (*pdu)[:length]
-	fmt.Printf(" Replayed UE Security Capability: %02x\n", cap)
+	ue.dprinti("Capability: 0x%02x", cap)
 	*pdu = (*pdu)[length:]
 
 	return
@@ -556,7 +571,6 @@ func Str2BCD(str string) (bcd []byte) {
 			bcd[j] |= (byte(n) << 4)
 		}
 	}
-
 	return
 }
 
@@ -593,11 +607,24 @@ func ComputeRESstar(mcc, mnc int, rand, res, ck, ik []byte) (resstar []byte) {
 	resstar = mac.Sum(nil)
 
 	/*
-	 * The (X)RES* is identified with the 128 least significant bits of the output
-	 * of the KDF.
+	 * The (X)RES* is identified with the 128 least significant bits of the
+	 * output of the KDF.
 	 */
 	n := len(resstar)
 	resstar = resstar[n-16:]
 
 	return
+}
+
+//-----
+func (ue *UE) dprint(format string, v ...interface{}) {
+	indent := strings.Repeat("  ", ue.indent)
+	fmt.Printf(indent+format+"\n", v...)
+	return
+}
+
+func (ue *UE) dprinti(format string, v ...interface{}) {
+	ue.indent++
+	ue.dprint(format, v...)
+	ue.indent--
 }
