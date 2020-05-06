@@ -43,13 +43,6 @@ type NasMessageMM struct {
 	MessageType                   uint8
 }
 
-// 8.2.6 Registration request
-type RegistrationRequest struct {
-	head                     NasMessageMM
-	registrationTypeAndngKSI uint8
-	fiveGSMobileID           FiveGSMobileID
-}
-
 // TS 24.007 11.2.3.1.1A Extended protocol discriminator (EPD)
 const (
 	EPD5GSSessionManagement  = 0x2e
@@ -93,11 +86,13 @@ var msgTypeStr = map[int]string{
 }
 
 const (
-	iei5GMMCapability       = 0x10
-	ieiAuthParamAUTN        = 0x20
-	ieiAuthParamRAND        = 0x21
-	ieiAuthParamRES         = 0x2d
-	ieiUESecurityCapability = 0x2e
+	ieiIMEISVRequest                   = 0xe0
+	iei5GMMCapability                  = 0x10
+	ieiAuthParamAUTN                   = 0x20
+	ieiAuthParamRAND                   = 0x21
+	ieiAuthParamRES                    = 0x2d
+	ieiUESecurityCapability            = 0x2e
+	ieiAdditional5GSecurityInformation = 0x36
 )
 
 func NewNAS(filename string) (p *UE) {
@@ -138,8 +133,8 @@ func (ue *UE) Decode(pdu *[]byte, length int) (msgType int) {
 	}
 
 	if secHeader != 0x00 {
-		fmt.Printf(
-			"# Well..., free5gc seems to set the security header != 0 for the plain NAS message. My workaround is invoked.\n")
+		fmt.Printf("# Well..., free5gc seems to set the security header != 0" +
+			" for the plain NAS message. My workaround is invoked.\n")
 	}
 
 	msgType = int((*pdu)[0])
@@ -150,9 +145,13 @@ func (ue *UE) Decode(pdu *[]byte, length int) (msgType int) {
 	case MessageTypeAuthenticationRequest:
 		ue.decAuthenticationRequest(pdu)
 		break
+	case MessageTypeSecurityModeCommand:
+		ue.decSecurityModeCommand(pdu)
+		break
 	default:
 		break
 	}
+
 	ue.state.securityHeaderParsed = false
 	return
 }
@@ -166,14 +165,18 @@ func (ue *UE) decInformationElement(pdu *[]byte) {
 		switch iei {
 		case ieiAuthParamAUTN:
 			ue.decAuthParamAUTN(pdu)
-			break
 		case ieiAuthParamRAND:
 			ue.decAuthParamRAND(pdu)
-			break
+		case ieiAdditional5GSecurityInformation:
+			fmt.Printf("Additional 5G Security Information\n")
 		default:
-			fmt.Printf("unsupported IE\n")
-			*pdu = []byte{}
-			break
+			switch iei & 0xf0 {
+			case ieiIMEISVRequest:
+				fmt.Printf("IMEISV Request\n")
+			default:
+				fmt.Printf("unsupported IE\n")
+				*pdu = []byte{}
+			}
 		}
 	}
 }
@@ -182,12 +185,8 @@ func (ue *UE) decInformationElement(pdu *[]byte) {
 func (ue *UE) decAuthenticationRequest(pdu *[]byte) {
 	fmt.Printf("decAuthenticationRequest\n")
 
-	ksi := int((*pdu)[0])
-	fmt.Printf("ngKSI: 0x%x\n", ksi)
-	*pdu = (*pdu)[1:]
-
+	ue.decngKSI(pdu)
 	ue.decABBA(pdu)
-
 	ue.decInformationElement(pdu)
 
 	k, _ := hex.DecodeString(ue.AuthParam.K)
@@ -244,6 +243,12 @@ func (ue *UE) MakeAuthenticationResponse() (pdu []byte) {
 
 // 8.2.6 Registration request
 // 5.5.1.2 Registration procedure for initial registration
+type RegistrationRequest struct {
+	head                     NasMessageMM
+	registrationTypeAndngKSI uint8
+	fiveGSMobileID           FiveGSMobileID
+}
+
 func (p *UE) MakeRegistrationRequest() (pdu []byte) {
 
 	var req RegistrationRequest
@@ -279,6 +284,18 @@ func (p *UE) MakeRegistrationRequest() (pdu []byte) {
 	binary.Write(data, binary.BigEndian, enc5GMMCapability())
 	binary.Write(data, binary.BigEndian, encUESecurityCapability())
 	pdu = data.Bytes()
+
+	return
+}
+
+// 8.2.25 Security mode command
+func (ue *UE) decSecurityModeCommand(pdu *[]byte) {
+
+	ue.decNASSecurityAlgorithms(pdu)
+	ue.decngKSI(pdu)
+	ue.decUESecurityCapability(pdu)
+
+	ue.decInformationElement(pdu)
 
 	return
 }
@@ -456,6 +473,26 @@ const (
 	KeySetIdentityFlagMappedSecurityContext = 0x08
 )
 
+func (ue *UE) decngKSI(pdu *[]byte) {
+
+	ksi := int((*pdu)[0])
+	fmt.Printf("ngKSI: 0x%x\n", ksi)
+	*pdu = (*pdu)[1:]
+
+	return
+}
+
+// 9.11.3.34 NAS security algorithms
+func (ue *UE) decNASSecurityAlgorithms(pdu *[]byte) {
+
+	fmt.Printf("NAS Security Algorithms\n")
+	alg := (*pdu)[:1]
+	fmt.Printf(" NAS Security Algorithms: 0x%02x\n", alg)
+	*pdu = (*pdu)[1:]
+
+	return
+}
+
 // 9.11.3.54 UE security capability
 type UESecurityCapability struct {
 	iei    uint8
@@ -482,6 +519,18 @@ func encUESecurityCapability() (sc UESecurityCapability) {
 	// use null encryption at this moment.
 	sc.ea = EA0
 	sc.ia = IA0 | IA2
+
+	return
+}
+
+func (ue *UE) decUESecurityCapability(pdu *[]byte) {
+
+	length := int((*pdu)[0])
+	*pdu = (*pdu)[1:]
+
+	cap := (*pdu)[:length]
+	fmt.Printf(" Replayed UE Security Capability: %02x\n", cap)
+	*pdu = (*pdu)[length:]
 
 	return
 }
