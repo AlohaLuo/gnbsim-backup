@@ -89,25 +89,25 @@ var msgTypeStr = map[int]string{
 }
 
 const (
-	ieiIMEISVRequest                   = 0xe
-	iei5GMMCapability                  = 0x10
-	ieiAuthParamAUTN                   = 0x20
-	ieiAuthParamRAND                   = 0x21
-	ieiAuthParamRES                    = 0x2d
-	ieiUESecurityCapability            = 0x2e
-	ieiAdditional5GSecurityInformation = 0x36
-	ieiNonSupported                    = 0xff
+	ieiIMEISVRequest        = 0xe
+	iei5GMMCapability       = 0x10
+	ieiAuthParamAUTN        = 0x20
+	ieiAuthParamRAND        = 0x21
+	ieiAuthParamRES         = 0x2d
+	ieiUESecurityCapability = 0x2e
+	ieiAdditional5GSecInfo  = 0x36
+	ieiNonSupported         = 0xff
 )
 
 var ieStr = map[int]string{
-	ieiIMEISVRequest:                   "IMEISV Request IE",
-	iei5GMMCapability:                  "5G MM Capability IE",
-	ieiAuthParamAUTN:                   "Authentication Parameter AUTN IE",
-	ieiAuthParamRAND:                   "Authentication Parameter RAND IE",
-	ieiAuthParamRES:                    "Authentication response parameter IE",
-	ieiUESecurityCapability:            "UE Security Capability IE",
-	ieiAdditional5GSecurityInformation: "Additional 5G Security Information IE",
-	ieiNonSupported:                    "Non Supported IE",
+	ieiIMEISVRequest:        "IMEISV Request IE",
+	iei5GMMCapability:       "5G MM Capability IE",
+	ieiAuthParamAUTN:        "Authentication Parameter AUTN IE",
+	ieiAuthParamRAND:        "Authentication Parameter RAND IE",
+	ieiAuthParamRES:         "Authentication response parameter IE",
+	ieiUESecurityCapability: "UE Security Capability IE",
+	ieiAdditional5GSecInfo:  "Additional 5G Security Information IE",
+	ieiNonSupported:         "Non Supported IE",
 }
 
 func NewNAS(filename string) (p *UE) {
@@ -179,7 +179,7 @@ func (ue *UE) decInformationElement(pdu *[]byte) {
 		iei := int((*pdu)[0])
 
 		// see Annex K.1 Common information elements.
-		if iei&0x80 == 0x80 {
+		if iei&0x80 != 0 {
 			iei >>= 4
 			(*pdu)[0] &= 0x0f
 		} else {
@@ -198,7 +198,8 @@ func (ue *UE) decInformationElement(pdu *[]byte) {
 			ue.decAuthParamAUTN(pdu)
 		case ieiAuthParamRAND:
 			ue.decAuthParamRAND(pdu)
-		case ieiAdditional5GSecurityInformation:
+		case ieiAdditional5GSecInfo:
+			ue.decAdditional5GSecInfo(pdu)
 			break
 		default:
 			*pdu = []byte{}
@@ -435,6 +436,39 @@ func (ue *UE) decABBA(pdu *[]byte) {
 	ue.dprinti("Length: %d", length)
 	ue.dprinti("Value: 0x%02x", abba)
 
+	return
+}
+
+// 9.11.3.12 Additional 5G security information
+func (ue *UE) decAdditional5GSecInfo(pdu *[]byte) {
+
+	length := int((*pdu)[0])
+	*pdu = (*pdu)[1:]
+
+	if length != 1 {
+		ue.dprinti("unexpected length: %d", length)
+		*pdu = (*pdu)[length:]
+		return
+	}
+
+	ue.indent++
+	val := int((*pdu)[0])
+	ue.dprint("value: 0x%x", val)
+
+	not := ""
+	if val&0x01 == 0x00 {
+		not = "not "
+	}
+	ue.dprinti("KAMF derivation is %srequired", not)
+
+	not = ""
+	if val&0x02 == 0x00 {
+		not = "not "
+	}
+	ue.dprinti("Retransmission of the initial NAS message %srequested", not)
+
+	ue.indent--
+	*pdu = (*pdu)[length:]
 	return
 }
 
