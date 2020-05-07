@@ -89,14 +89,26 @@ var msgTypeStr = map[int]string{
 }
 
 const (
-	ieiIMEISVRequest                   = 0xe0
+	ieiIMEISVRequest                   = 0xe
 	iei5GMMCapability                  = 0x10
 	ieiAuthParamAUTN                   = 0x20
 	ieiAuthParamRAND                   = 0x21
 	ieiAuthParamRES                    = 0x2d
 	ieiUESecurityCapability            = 0x2e
 	ieiAdditional5GSecurityInformation = 0x36
+	ieiNonSupported                    = 0xff
 )
+
+var ieStr = map[int]string{
+	ieiIMEISVRequest:                   "IMEISV Request IE",
+	iei5GMMCapability:                  "5G MM Capability IE",
+	ieiAuthParamAUTN:                   "Authentication Parameter AUTN IE",
+	ieiAuthParamRAND:                   "Authentication Parameter RAND IE",
+	ieiAuthParamRES:                    "Authentication response parameter IE",
+	ieiUESecurityCapability:            "UE Security Capability IE",
+	ieiAdditional5GSecurityInformation: "Additional 5G Security Information IE",
+	ieiNonSupported:                    "Non Supported IE",
+}
 
 func NewNAS(filename string) (p *UE) {
 
@@ -165,23 +177,31 @@ func (ue *UE) decInformationElement(pdu *[]byte) {
 
 	for len(*pdu) > 0 {
 		iei := int((*pdu)[0])
-		*pdu = (*pdu)[1:]
+
+		// see Annex K.1 Common information elements.
+		if iei&0x80 == 0x80 {
+			iei >>= 4
+			(*pdu)[0] &= 0x0f
+		} else {
+			*pdu = (*pdu)[1:]
+		}
+
+		if ieStr[iei] == "" {
+			iei = 0xff
+		}
+		ue.dprint(ieStr[iei])
 
 		switch iei {
+		case ieiIMEISVRequest:
+			ue.decIMEISVRequest(pdu)
 		case ieiAuthParamAUTN:
 			ue.decAuthParamAUTN(pdu)
 		case ieiAuthParamRAND:
 			ue.decAuthParamRAND(pdu)
 		case ieiAdditional5GSecurityInformation:
-			ue.dprint("Additional 5G Security Information")
+			break
 		default:
-			switch iei & 0xf0 {
-			case ieiIMEISVRequest:
-				ue.dprint("IMEISV Request")
-			default:
-				ue.dprint("unsupported IE")
-				*pdu = []byte{}
-			}
+			*pdu = []byte{}
 		}
 	}
 }
@@ -433,8 +453,6 @@ type AuthParam struct {
 
 func (ue *UE) decAuthParamAUTN(pdu *[]byte) {
 
-	ue.dprint("Auth Param AUTN")
-
 	autnlen := int((*pdu)[0])
 	*pdu = (*pdu)[1:]
 
@@ -445,8 +463,8 @@ func (ue *UE) decAuthParamAUTN(pdu *[]byte) {
 	ue.AuthParam.amf = ue.AuthParam.autn[6:8]
 	ue.AuthParam.mac = ue.AuthParam.autn[8:16]
 	ue.dprinti("SEQ xor AK: %02x", ue.AuthParam.seqxorak)
-	ue.dprinti("AMF: %02x", ue.AuthParam.amf)
-	ue.dprinti("MAC: %02x", ue.AuthParam.mac)
+	ue.dprinti("AMF       : %02x", ue.AuthParam.amf)
+	ue.dprinti("MAC       : %02x", ue.AuthParam.mac)
 
 	return
 }
@@ -455,12 +473,10 @@ func (ue *UE) decAuthParamAUTN(pdu *[]byte) {
 // TS 24.008 10.5.3.1 Authentication parameter RAND
 func (ue *UE) decAuthParamRAND(pdu *[]byte) {
 
-	ue.dprint("Auth Param RAND")
-
 	const randlen = 16
 	ue.AuthParam.rand = (*pdu)[:randlen]
 	*pdu = (*pdu)[randlen:]
-	ue.dprinti(" RAND: 0x%02x", ue.AuthParam.rand)
+	ue.dprinti("RAND: 0x%02x", ue.AuthParam.rand)
 	return
 }
 
@@ -478,6 +494,16 @@ func (ue *UE) encAuthParamRes() (res AuthParamRes) {
 		res.resstar[i] = v
 	}
 	res.length = uint8(len(res.resstar))
+	return
+}
+
+// 9.11.3.28 IMEISV request
+// TS 24.008 9.11.3.28 IMEISV request
+func (ue *UE) decIMEISVRequest(pdu *[]byte) {
+
+	val := int((*pdu)[0])
+	ue.dprinti("value: 0x%x", val)
+	*pdu = (*pdu)[1:]
 	return
 }
 
