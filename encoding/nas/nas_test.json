@@ -1,7 +1,7 @@
 {
 	"MSIN": "0123456789",
-	"MCC": 123,
-	"MNC": 45,
+	"MCC": 208,
+	"MNC": 93,
 	"RoutingIndicator": 1234,
 	"ProtectionScheme": "null",
 	"AuthParam": {

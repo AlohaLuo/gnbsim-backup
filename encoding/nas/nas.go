@@ -9,6 +9,7 @@ package nas
 
 import (
 	"bytes"
+	"crypto/aes"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/binary"
@@ -21,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/aead/cmac"
 	"github.com/wmnsk/milenage"
 )
 
@@ -36,7 +38,9 @@ type UE struct {
 		securityHeaderParsed bool
 	}
 
-	indent int // indent for debug print.
+	DLCount uint32
+	ULCount uint32
+	indent  int // indent for debug print.
 }
 
 // 9.1.1 NAS message format
@@ -137,11 +141,26 @@ func (ue *UE) Decode(pdu *[]byte, length int) (msgType int) {
 
 	if secHeader != 0x00 && ue.state.securityHeaderParsed == false {
 		mac := (*pdu)[:4]
-		seq := int((*pdu)[4])
 		ue.dprinti("mac: %x", mac)
+		*pdu = (*pdu)[4:]
+		length -= 4
+
+		seq := uint8((*pdu)[0])
 		ue.dprinti("seq: %d", seq)
-		*pdu = (*pdu)[5:]
-		length -= 5
+
+		macCalc := ue.ComputeMAC(0, 1, pdu)
+		if reflect.DeepEqual(mac, macCalc) == false {
+			ue.dprint("***** Integrity check failed...")
+			ue.dprint("Received  : %x", mac)
+			ue.dprint("Calculated: %x", macCalc)
+			*pdu = []byte{}
+			return
+		}
+		ue.dprint("***** Integrity check passed")
+
+		*pdu = (*pdu)[1:]
+		length--
+
 		ue.state.securityHeaderParsed = true
 		msgType = ue.Decode(pdu, length)
 		return
@@ -250,8 +269,19 @@ func (ue *UE) decAuthenticationRequest(pdu *[]byte) {
 		return
 	}
 
-	ue.AuthParam.RESstar = ComputeRESstar(ue.MCC, ue.MNC, m.RAND, m.RES, m.CK, m.IK)
-	ue.dprint("RES*: %x", ue.AuthParam.RESstar)
+	ue.ComputeKausf(m.CK, m.IK)
+	ue.ComputeKseaf()
+	ue.ComputeKamf()
+	ue.ComputeAlgKey()
+
+	ue.ComputeRESstar(m.RAND, m.RES, m.CK, m.IK)
+
+	ue.dprint("Kausf: %x", ue.AuthParam.Kausf)
+	ue.dprint("Kseaf: %x", ue.AuthParam.Kseaf)
+	ue.dprint("Kamf : %x", ue.AuthParam.Kamf)
+	ue.dprint("Kenc : %x", ue.AuthParam.Kenc)
+	ue.dprint("Kint : %x", ue.AuthParam.Kint)
+	ue.dprint("RES* : %x", ue.AuthParam.RESstar)
 	ue.dprint("received and calculated MAC values match.")
 	ue.indent = orig
 	return
@@ -429,12 +459,12 @@ func (ue *UE) decABBA(pdu *[]byte) {
 	length := int((*pdu)[0])
 	*pdu = (*pdu)[1:]
 
-	abba := (*pdu)[:length]
+	ue.AuthParam.abba = (*pdu)[:length]
 	*pdu = (*pdu)[length:]
 
 	ue.dprint("ABBA")
 	ue.dprinti("Length: %d", length)
-	ue.dprinti("Value: 0x%02x", abba)
+	ue.dprinti("Value: 0x%02x", ue.AuthParam.abba)
 
 	return
 }
@@ -482,7 +512,13 @@ type AuthParam struct {
 	seqxorak []byte
 	amf      []byte
 	mac      []byte
+	abba     []byte
 	RESstar  []byte
+	Kausf    []byte
+	Kseaf    []byte
+	Kamf     []byte
+	Kenc     []byte
+	Kint     []byte
 }
 
 func (ue *UE) decAuthParamAUTN(pdu *[]byte) {
@@ -634,15 +670,108 @@ func Str2BCD(str string) (bcd []byte) {
 	return
 }
 
+// TS 33.401
+// A.2 KASME derivation function
+/*
+func (ue *UE) ComputeKasme(ck, ik []byte) {
+
+	s := []byte{}
+	fc := []byte{0x10}
+	s = append(s, fc...)
+
+	p0 := encPLMN(ue.MCC, ue.MNC)
+	s = append(s, p0[:]...)
+	ue.dprint("ComputeKasme: P0:%x", p0)
+
+	l0 := []byte{0x00, 0x03}
+	s = append(s, l0...)
+
+	p1 := ue.AuthParam.seqxorak
+	s = append(s, p1...)
+	ue.dprint("ComputeKasme: P1:%x", p1)
+
+	l1 := []byte{0x00, 0x06}
+	s = append(s, l1...)
+
+	k := append(ck, ik...)
+
+	mac := hmac.New(sha256.New, k)
+	mac.Write(s)
+	ue.AuthParam.Kasme = mac.Sum(nil)
+
+	return
+}
+
+// TS 33.401
+// A.7 Algorithm key derivation functions
+func (ue *UE) ComputeEPCAlgKey() {
+
+	var cipher byte = 0x00
+	Senc := []byte{0x15, 0x01, 0x00, 0x01, cipher, 0x00, 0x01}
+	Menc := hmac.New(sha256.New, ue.AuthParam.Kasme)
+	Menc.Write(Senc)
+	ue.AuthParam.KencEPC = Menc.Sum(nil)
+
+	var integrity byte = 0x02 // 128-EIA2 see TS 33.401 5.1.4.2
+	Sint := []byte{0x15, 0x02, 0x00, 0x01, integrity, 0x00, 0x01}
+	Mint := hmac.New(sha256.New, ue.AuthParam.Kasme)
+	Mint.Write(Sint)
+	ue.AuthParam.KintEPC = Mint.Sum(nil)
+
+	// For an algorithm key of length n bits, where n is less or equal to 256,
+ 	// the n least significant bits of the 256 bits of the KDF output shall be
+	// used as the algorithm key.
+
+	n := len(ue.AuthParam.Kenc)
+	ue.AuthParam.KencEPC = ue.AuthParam.KencEPC[n-16:]
+	ue.AuthParam.KintEPC = ue.AuthParam.KintEPC[n-16:]
+	return
+}
+*/
+
+// TS 33.501
+// A.2 KAUSF derivation function
+func (ue *UE) ComputeKausf(ck, ik []byte) {
+
+	s := []byte{}
+	fc := []byte{0x6a}
+	s = append(s, fc...)
+
+	p0str := fmt.Sprintf("5G:mnc%03d.mcc%03d.3gppnetwork.org", ue.MNC, ue.MCC)
+	p0 := []byte(p0str)
+	s = append(s, p0...)
+
+	l0 := make([]byte, 2)
+	binary.BigEndian.PutUint16(l0, uint16(len(p0)))
+	s = append(s, l0...)
+	ue.dprint("ComputeKausf: serving network(%d): %s", len(p0), p0str)
+
+	p1 := ue.AuthParam.seqxorak
+	s = append(s, p1...)
+
+	l1 := make([]byte, 2)
+	binary.BigEndian.PutUint16(l1, uint16(len(p1)))
+	s = append(s, l1...)
+	ue.dprint("ComputeKausf: SEQ xor AK(%d): %x", len(p1), p1)
+
+	k := append(ck, ik...)
+
+	mac := hmac.New(sha256.New, k)
+	mac.Write(s)
+	ue.AuthParam.Kausf = mac.Sum(nil)
+
+	return
+}
+
 // TS 33.501
 // A.4 RES* and XRES* derivation function
-func ComputeRESstar(mcc, mnc int, rand, res, ck, ik []byte) (resstar []byte) {
+func (ue *UE) ComputeRESstar(rand, res, ck, ik []byte) {
 
 	s := []byte{}
 	fc := []byte{0x6b}
 	s = append(s, fc...)
 
-	p0str := fmt.Sprintf("5G:mnc%03d.mcc%03d.3gppnetwork.org", mnc, mcc)
+	p0str := fmt.Sprintf("5G:mnc%03d.mcc%03d.3gppnetwork.org", ue.MNC, ue.MCC)
 	p0 := []byte(p0str)
 	s = append(s, p0...)
 
@@ -664,14 +793,124 @@ func ComputeRESstar(mcc, mnc int, rand, res, ck, ik []byte) (resstar []byte) {
 
 	mac := hmac.New(sha256.New, k)
 	mac.Write(s)
-	resstar = mac.Sum(nil)
+	resstar := mac.Sum(nil)
 
 	/*
 	 * The (X)RES* is identified with the 128 least significant bits of the
 	 * output of the KDF.
 	 */
 	n := len(resstar)
-	resstar = resstar[n-16:]
+	ue.AuthParam.RESstar = resstar[n-16:]
+
+	return
+}
+
+// TS 33.501
+// A.6 KSEAF derivation function
+func (ue *UE) ComputeKseaf() {
+
+	s := []byte{}
+	fc := []byte{0x6c}
+	s = append(s, fc...)
+
+	p0str := fmt.Sprintf("5G:mnc%03d.mcc%03d.3gppnetwork.org", ue.MNC, ue.MCC)
+	p0 := []byte(p0str)
+	s = append(s, p0...)
+
+	l0 := make([]byte, 2)
+	binary.BigEndian.PutUint16(l0, uint16(len(p0)))
+	s = append(s, l0...)
+	ue.dprint("ComputeKseaf: serving network(%d): %s", len(p0), p0str)
+
+	mac := hmac.New(sha256.New, ue.AuthParam.Kausf)
+	mac.Write(s)
+	ue.AuthParam.Kseaf = mac.Sum(nil)
+
+	return
+}
+
+// TS 33.501
+// A.7 KAMF derivation function
+func (ue *UE) ComputeKamf() {
+
+	s := []byte{}
+	fc := []byte{0x6d}
+	s = append(s, fc...)
+
+	supi := fmt.Sprintf("imsi-%d%d%s", ue.MCC, ue.MNC, ue.MSIN)
+	p0 := []byte(supi)
+	s = append(s, p0...)
+
+	l0 := make([]byte, 2)
+	binary.BigEndian.PutUint16(l0, uint16(len(p0)))
+	s = append(s, l0...)
+	ue.dprint("ComputeKamf: supi(%d): %s", len(p0), supi)
+
+	p1 := ue.AuthParam.abba
+	s = append(s, p1...)
+
+	l1 := make([]byte, 2)
+	binary.BigEndian.PutUint16(l1, uint16(len(p1)))
+	s = append(s, l1...)
+	ue.dprint("ComputeKamf: abba(%d): %x", len(p1), p1)
+
+	ue.dprint("ComputeKamf: S: %x", s)
+	ue.dprint("ComputeKamf: Kseaf: %x", ue.AuthParam.Kseaf)
+
+	mac := hmac.New(sha256.New, ue.AuthParam.Kseaf)
+	mac.Write(s)
+	ue.AuthParam.Kamf = mac.Sum(nil)
+
+	// ue.AuthParam.Kamf, _ = hex.DecodeString("2836b8c08e73027fd28135ac1a9640203f98eb7a5613f8f303c5b559d4601ec3")
+
+	return
+}
+
+// TS 33.501
+// A.8 Algorithm key derivation functions
+func (ue *UE) ComputeAlgKey() {
+
+	var cipher byte = 0x00
+	Senc := []byte{0x69, 0x01, 0x00, 0x01, cipher, 0x00, 0x01}
+	Menc := hmac.New(sha256.New, ue.AuthParam.Kamf)
+	Menc.Write(Senc)
+	ue.AuthParam.Kenc = Menc.Sum(nil)
+
+	var integrity byte = 0x02 // 128-EIA2 see TS 33.401 5.1.4.2
+	Sint := []byte{0x69, 0x02, 0x00, 0x01, integrity, 0x00, 0x01}
+	Mint := hmac.New(sha256.New, ue.AuthParam.Kamf)
+	Mint.Write(Sint)
+	ue.AuthParam.Kint = Mint.Sum(nil)
+
+	/*
+		 * For an algorithm key of length n bits, where n is less or equal to 256,
+	 	 * the n least significant bits of the 256 bits of the KDF output shall be
+		 * used as the algorithm key.
+	*/
+	n := len(ue.AuthParam.Kenc)
+	ue.AuthParam.Kenc = ue.AuthParam.Kenc[n-16:]
+	ue.AuthParam.Kint = ue.AuthParam.Kint[n-16:]
+	return
+}
+
+func (ue *UE) ComputeMAC(bearer uint8, dir uint8, pdu *[]byte) (mac []byte) {
+
+	m := []byte{}
+
+	tmp := make([]byte, 4)
+	ue.DLCount = uint32((*pdu)[0])
+	binary.BigEndian.PutUint32(tmp, ue.DLCount)
+	m = append(m, tmp...)
+
+	tmp = make([]byte, 1)
+	tmp[0] = (bearer << 3) | (dir << 2) // bearer is 5 bit field.
+	m = append(m, tmp...)
+	m = append(m, []byte{0, 0, 0}...) // 24 bit padding
+	m = append(m, *pdu...)
+
+	block, _ := aes.NewCipher(ue.AuthParam.Kint)
+	mac, _ = cmac.Sum(m, block, 16)
+	mac = mac[:4]
 
 	return
 }
