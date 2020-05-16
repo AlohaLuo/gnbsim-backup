@@ -141,29 +141,29 @@ InitialUEMessage-IEs NGAP-PROTOCOL-IES ::= {
 func (gnb *GNB) MakeInitialUEMessage() (pdu []byte) {
 
 	pdu = encNgapPdu(initiatingMessage, idInitialUEMessage, ignore)
-	fmt.Printf("debug: pdu = %02x\n", pdu)
+	//fmt.Printf("debug: pdu = %02x\n", pdu)
 
 	v := encProtocolIEContainer(4)
-	fmt.Printf("debug: ie container = %02x\n", v)
+	//fmt.Printf("debug: ie container = %02x\n", v)
 
 	tmp := encRANUENGAPID(gnb.RANUENGAPID)
-	fmt.Printf("debug: global RAN-UE-NGAP-ID = %02x\n", tmp)
+	//fmt.Printf("debug: global RAN-UE-NGAP-ID = %02x\n", tmp)
 	v = append(v, tmp...)
 
 	tmp = encNASPDU(gnb.UE.MakeRegistrationRequest())
-	fmt.Printf("debug: 5G NAS PDU = %02x\n", tmp)
+	//fmt.Printf("debug: 5G NAS PDU = %02x\n", tmp)
 	v = append(v, tmp...)
 
 	tmp, _ = gnb.encUserLocationInformation()
-	fmt.Printf("debug: User Location Information = %02x\n", tmp)
+	//fmt.Printf("debug: User Location Information = %02x\n", tmp)
 	v = append(v, tmp...)
 
 	tmp, _ = gnb.encRRCEstablishmentCause(rrcMoSignalling)
-	fmt.Printf("debug: RRC Establishment Cause = %02x\n", tmp)
+	//fmt.Printf("debug: RRC Establishment Cause = %02x\n", tmp)
 	v = append(v, tmp...)
 
 	tmp, _ = gnb.encUEContextRequest()
-	fmt.Printf("debug: UE Context Request = %02x\n", tmp)
+	//fmt.Printf("debug: UE Context Request = %02x\n", tmp)
 	v = append(v, tmp...)
 
 	length, _, _ := per.EncLengthDeterminant(len(v), 0)
@@ -215,25 +215,25 @@ func (gnb *GNB) MakeUplinkNASTransport() (pdu []byte) {
 	// Authentiation Response only for now.
 
 	pdu = encNgapPdu(initiatingMessage, idUplinkNASTransport, ignore)
-	fmt.Printf("debug: pdu = %02x\n", pdu)
+	//fmt.Printf("debug: pdu = %02x\n", pdu)
 
 	v := encProtocolIEContainer(4)
-	fmt.Printf("debug: ie container = %02x\n", v)
+	//fmt.Printf("debug: ie container = %02x\n", v)
 
 	tmp := gnb.encAMFUENGAPID()
-	fmt.Printf("debug: global AMF-UE-NGAP-ID = %02x\n", tmp)
+	//fmt.Printf("debug: global AMF-UE-NGAP-ID = %02x\n", tmp)
 	v = append(v, tmp...)
 
 	tmp = encRANUENGAPID(gnb.RANUENGAPID)
-	fmt.Printf("debug: global RAN-UE-NGAP-ID = %02x\n", tmp)
+	//fmt.Printf("debug: global RAN-UE-NGAP-ID = %02x\n", tmp)
 	v = append(v, tmp...)
 
 	tmp = encNASPDU(gnb.UE.MakeAuthenticationResponse())
-	fmt.Printf("debug: 5G NAS PDU = %02x\n", tmp)
+	//fmt.Printf("debug: 5G NAS PDU = %02x\n", tmp)
 	v = append(v, tmp...)
 
 	tmp, _ = gnb.encUserLocationInformation()
-	fmt.Printf("debug: User Location Information = %02x\n", tmp)
+	//fmt.Printf("debug: User Location Information = %02x\n", tmp)
 	v = append(v, tmp...)
 
 	length, _, _ := per.EncLengthDeterminant(len(v), 0)
@@ -263,21 +263,21 @@ NGSetupRequestIEs NGAP-PROTOCOL-IES ::= {
 func (gnb *GNB) MakeNGSetupRequest() (pdu []byte) {
 
 	pdu = encNgapPdu(initiatingMessage, idNGSetup, reject)
-	fmt.Printf("debug: pdu = %02x\n", pdu)
+	//fmt.Printf("debug: pdu = %02x\n", pdu)
 
 	v := encProtocolIEContainer(3)
-	fmt.Printf("debug: ie container = %02x\n", v)
+	//fmt.Printf("debug: ie container = %02x\n", v)
 
 	tmp, _ := gnb.encGlobalRANNodeID(&gnb.GlobalGNBID)
-	fmt.Printf("debug: global RAN Node ID = %02x\n", tmp)
+	//fmt.Printf("debug: global RAN Node ID = %02x\n", tmp)
 	v = append(v, tmp...)
 
 	tmp, _ = gnb.encSupportedTAList(&gnb.SupportedTAList)
-	fmt.Printf("debug: Supported TA List = %02x\n", tmp)
+	//fmt.Printf("debug: Supported TA List = %02x\n", tmp)
 	v = append(v, tmp...)
 
 	tmp, _ = encPagingDRX(gnb.PagingDRX)
-	fmt.Printf("debug: PagingDRX = %02x\n", tmp)
+	//fmt.Printf("debug: PagingDRX = %02x\n", tmp)
 	v = append(v, tmp...)
 
 	length, _, _ := per.EncLengthDeterminant(len(v), 0)
@@ -871,7 +871,6 @@ func (gnb *GNB) decNASPDU(pdu *[]byte, length int) (err error) {
 	*pdu = (*pdu)[1:]
 
 	gnb.UE.Decode(pdu, octlen)
-	fmt.Printf("RES* = %x\n", gnb.UE.AuthParam.RESstar)
 
 	return
 }
