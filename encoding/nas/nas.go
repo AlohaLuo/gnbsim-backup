@@ -30,6 +30,7 @@ type UE struct {
 	MSIN             string
 	MCC              int
 	MNC              int
+	IMEISV           string
 	RoutingIndicator uint16
 	ProtectionScheme string
 	AuthParam        AuthParam
@@ -41,13 +42,6 @@ type UE struct {
 	DLCount uint32
 	ULCount uint32
 	indent  int // indent for debug print.
-}
-
-// 9.1.1 NAS message format
-type NasMessageMM struct {
-	ExtendedProtocolDiscriminator uint8
-	SecurityHeaderType            uint8
-	MessageType                   uint8
 }
 
 // TS 24.007 11.2.3.1.1A Extended protocol discriminator (EPD)
@@ -75,6 +69,8 @@ const (
 	SecurityHeaderTypePlain = iota
 	SecurityHeaderTypeIntegrityProtected
 	SecurityHeaderTypeIntegrityProtectedAndCiphered
+	SecurityHeaderTypeIntegrityProtectedWithNewContext
+	SecurityHeaderTypeIntegrityProtectedAndCipheredWithNewContext
 )
 
 // 9.7 Message type
@@ -83,6 +79,7 @@ const (
 	MessageTypeAuthenticationRequest  = 0x56
 	MessageTypeAuthenticationResponse = 0x57
 	MessageTypeSecurityModeCommand    = 0x5d
+	MessageTypeSecurityModeComplete    = 0x5e
 )
 
 var msgTypeStr = map[int]string{
@@ -90,6 +87,7 @@ var msgTypeStr = map[int]string{
 	MessageTypeAuthenticationRequest:  "Authentication Request",
 	MessageTypeAuthenticationResponse: "Authentication Response",
 	MessageTypeSecurityModeCommand:    "Security Mode Command",
+	MessageTypeSecurityModeComplete:    "Security Mode Complete",
 }
 
 const (
@@ -100,6 +98,7 @@ const (
 	ieiAuthParamRES         = 0x2d
 	ieiUESecurityCapability = 0x2e
 	ieiAdditional5GSecInfo  = 0x36
+	iei5GSMobileIdentity    = 0x77
 	ieiNonSupported         = 0xff
 )
 
@@ -111,6 +110,7 @@ var ieStr = map[int]string{
 	ieiAuthParamRES:         "Authentication response parameter IE",
 	ieiUESecurityCapability: "UE Security Capability IE",
 	ieiAdditional5GSecInfo:  "Additional 5G Security Information IE",
+	iei5GSMobileIdentity:    "5GS Mobile Identity",
 	ieiNonSupported:         "Non Supported IE",
 }
 
@@ -290,42 +290,32 @@ func (ue *UE) decAuthenticationRequest(pdu *[]byte) {
 // 8.2.2 Authentication response
 func (ue *UE) MakeAuthenticationResponse() (pdu []byte) {
 
-	var h NasMessageMM
-	h.ExtendedProtocolDiscriminator = EPD5GSMobilityManagement
-	h.SecurityHeaderType = SecurityHeaderTypePlain
-	h.MessageType = MessageTypeAuthenticationResponse
+	pdu = ue.enc5GSMMMessageHeader(SecurityHeaderTypePlain,
+	    MessageTypeAuthenticationResponse)
 
 	data := new(bytes.Buffer)
-	binary.Write(data, binary.BigEndian, h)
 	binary.Write(data, binary.BigEndian, ue.encAuthParamRes())
-	pdu = data.Bytes()
+	pdu = append(pdu, data.Bytes()...)
 
 	return
 }
 
 // 8.2.6 Registration request
 // 5.5.1.2 Registration procedure for initial registration
-type RegistrationRequest struct {
-	head                     NasMessageMM
-	registrationTypeAndngKSI uint8
-	fiveGSMobileID           FiveGSMobileID
-}
+func (ue *UE) MakeRegistrationRequest() (pdu []byte) {
 
-func (p *UE) MakeRegistrationRequest() (pdu []byte) {
+	pdu = ue.enc5GSMMMessageHeader(SecurityHeaderTypePlain,
+	    MessageTypeRegistrationRequest)
 
-	var req RegistrationRequest
-	var h *NasMessageMM = &req.head
-	h.ExtendedProtocolDiscriminator = EPD5GSMobilityManagement
-	h.SecurityHeaderType = SecurityHeaderTypePlain
-	h.MessageType = MessageTypeRegistrationRequest
-
-	var regType uint8 = RegistrationTypeInitialRegistration |
+	regType := RegistrationTypeInitialRegistration |
 		RegistrationTypeFlagFollowOnRequestPending
-	var ngKSI uint8 = KeySetIdentityNoKeyIsAvailable
+	ngKSI := KeySetIdentityNoKeyIsAvailable
 
-	req.registrationTypeAndngKSI = regType | (ngKSI << 4)
+	registrationTypeAndngKSI := byte(regType | (ngKSI <<4))
 
-	var f *FiveGSMobileID = &req.fiveGSMobileID
+	pdu = append(pdu, []byte{registrationTypeAndngKSI}...)
+
+	var f FiveGSMobileID
 	var typeID uint8 = TypeIDSUCI
 	var supiFormat uint8 = SUPIFormatIMSI
 
@@ -335,17 +325,17 @@ func (p *UE) MakeRegistrationRequest() (pdu []byte) {
 	 */
 	f.length = 13
 	f.supiFormatAndTypeID = typeID | (supiFormat << 4)
-	f.plmn = encPLMN(p.MCC, p.MNC)
-	f.routingIndicator = encRoutingIndicator(p.RoutingIndicator)
-	f.protectionScheme = encProtectionScheme(p.ProtectionScheme)
+	f.plmn = encPLMN(ue.MCC, ue.MNC)
+	f.routingIndicator = encRoutingIndicator(ue.RoutingIndicator)
+	f.protectionScheme = encProtectionScheme(ue.ProtectionScheme)
 	f.homeNetworkPublicKeyID = 0
-	f.schemeOutput = encSchemeOutput(p.MSIN)
+	f.schemeOutput = encSchemeOutput(ue.MSIN)
 
 	data := new(bytes.Buffer)
-	binary.Write(data, binary.BigEndian, req)
+	binary.Write(data, binary.BigEndian, f)
 	binary.Write(data, binary.BigEndian, enc5GMMCapability())
 	binary.Write(data, binary.BigEndian, encUESecurityCapability())
-	pdu = data.Bytes()
+	pdu = append(pdu, data.Bytes()...)
 
 	return
 }
@@ -361,6 +351,32 @@ func (ue *UE) decSecurityModeCommand(pdu *[]byte) {
 	ue.decUESecurityCapability(pdu)
 	ue.decInformationElement(pdu)
 	ue.indent--
+
+	return
+}
+
+// 8.2.26 Security mode complete
+func (ue *UE) MakeSecurityModeComplete() (pdu []byte) {
+
+	ue.enc5GSMMMessageHeader(SecurityHeaderTypePlain,
+	    MessageTypeSecurityModeComplete)
+
+	return
+}
+
+// 9.1.1 NAS message format
+type NasMessageMM struct {
+	ExtendedProtocolDiscriminator uint8
+	SecurityHeaderType            uint8
+	MessageType                   uint8
+}
+
+func (ue *UE) enc5GSMMMessageHeader(
+    headType uint8, msgType uint8) (pdu []byte) {
+
+	pdu = append(pdu, []byte{EPD5GSMobilityManagement}...)
+	pdu = append(pdu, []byte{headType}...)
+	pdu = append(pdu, []byte{msgType}...)
 
 	return
 }
@@ -421,6 +437,7 @@ func enc5GMMCapability() (f FiveGMMCapability) {
 }
 
 // 9.11.3.4 5GS mobile identity
+// I need C 'union' for golang...
 type FiveGSMobileID struct {
 	length                 uint16
 	supiFormatAndTypeID    uint8
@@ -434,6 +451,10 @@ type FiveGSMobileID struct {
 const (
 	TypeIDNoIdentity = iota
 	TypeIDSUCI
+	TypeID5GGUTI
+	TypeIDIMEI
+	TypeID5GSTMSI
+	TypeIDIMEISV
 )
 
 const (
@@ -446,6 +467,39 @@ const (
 	ProtectionSchemeProfileA
 	ProtectionSchemeProfileB
 )
+
+type FiveGSMobileIDIMEISV struct {
+	length uint16
+	typeID uint8
+	imeisv [8]byte
+}
+
+func (ue *UE) enc5GSMobileID(typeID int, iei bool) (id []byte) {
+
+	if iei == true {
+		id = append(id, []byte{iei5GSMobileIdentity}...)
+	}
+
+	switch typeID {
+	//case TypeIDNoIdentity:
+	case TypeIDSUCI:
+		ue.enc5GSMobileIDTypeSUCI()
+	//case TypeID5GGUTI:
+	//case TypeIDIMEI:
+	//case TypeID5GSTMSI:
+	case TypeIDIMEISV:
+		ue.enc5GSMobileIDTypeIMEISV()
+	}
+	return
+}
+
+func (ue *UE) enc5GSMobileIDTypeSUCI() (id []byte) {
+	return
+}
+
+func (ue *UE) enc5GSMobileIDTypeIMEISV() (id []byte) {
+	return
+}
 
 // 9.11.3.7 5GS registration type
 const (
@@ -564,6 +618,11 @@ func (ue *UE) encAuthParamRes() (res AuthParamRes) {
 		res.resstar[i] = v
 	}
 	res.length = uint8(len(res.resstar))
+
+//	data := new(bytes.Buffer)
+//	binary.Write(data, binary.BigEndian, ue.encAuthParamRes())
+//	pdu = append(pdu, data.Bytes()...)
+
 	return
 }
 
@@ -882,11 +941,9 @@ func (ue *UE) ComputeAlgKey() {
 	Mint.Write(Sint)
 	ue.AuthParam.Kint = Mint.Sum(nil)
 
-	/*
-		 * For an algorithm key of length n bits, where n is less or equal to 256,
-	 	 * the n least significant bits of the 256 bits of the KDF output shall be
-		 * used as the algorithm key.
-	*/
+	// For an algorithm key of length n bits, where n is less or equal to 256,
+	// the n least significant bits of the 256 bits of the KDF output shall be
+	// used as the algorithm key.
 	n := len(ue.AuthParam.Kenc)
 	ue.AuthParam.Kenc = ue.AuthParam.Kenc[n-16:]
 	ue.AuthParam.Kint = ue.AuthParam.Kint[n-16:]
