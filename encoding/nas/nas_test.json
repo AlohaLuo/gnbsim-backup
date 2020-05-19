@@ -2,6 +2,7 @@
 	"MSIN": "0123456789",
 	"MCC": 208,
 	"MNC": 93,
+	"IMEISV": "0000000100000101",
 	"RoutingIndicator": 1234,
 	"ProtectionScheme": "null",
 	"AuthParam": {

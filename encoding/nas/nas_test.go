@@ -57,6 +57,19 @@ func TestMakeRegistrationRequest(t *testing.T) {
 	}
 }
 
+func TestMakeSecurityModeComplete(t *testing.T) {
+	ue := NewNAS("nas_test.json")
+	v := ue.MakeSecurityModeComplete()
+	fmt.Printf("MakeSecurityModeCoplete: %02x\n", v)
+/*
+	expect_str := "7e004179000d0102f8392143000010325476981001202e0480a00000"
+	expect, _ := hex.DecodeString(expect_str)
+	if compareSlice(expect, v) == false {
+		t.Errorf("RegistrationRequest\nexpect: %x\nactual: %x", expect, v)
+	}
+*/
+}
+
 func TestDecode(t *testing.T) {
 	ue := NewNAS("nas_test.json")
 

@@ -314,25 +314,9 @@ func (ue *UE) MakeRegistrationRequest() (pdu []byte) {
 	registrationTypeAndngKSI := byte(regType | (ngKSI <<4))
 
 	pdu = append(pdu, []byte{registrationTypeAndngKSI}...)
-
-	var f FiveGSMobileID
-	var typeID uint8 = TypeIDSUCI
-	var supiFormat uint8 = SUPIFormatIMSI
-
-	/*
-	 * it doesn't work with "f.length = uint16(unsafe.Sizeof(*f) - 2)"
-	 * because of the octet alignment.
-	 */
-	f.length = 13
-	f.supiFormatAndTypeID = typeID | (supiFormat << 4)
-	f.plmn = encPLMN(ue.MCC, ue.MNC)
-	f.routingIndicator = encRoutingIndicator(ue.RoutingIndicator)
-	f.protectionScheme = encProtectionScheme(ue.ProtectionScheme)
-	f.homeNetworkPublicKeyID = 0
-	f.schemeOutput = encSchemeOutput(ue.MSIN)
+	pdu = append(pdu, ue.enc5GSMobileID(TypeIDSUCI, false)...)
 
 	data := new(bytes.Buffer)
-	binary.Write(data, binary.BigEndian, f)
 	binary.Write(data, binary.BigEndian, enc5GMMCapability())
 	binary.Write(data, binary.BigEndian, encUESecurityCapability())
 	pdu = append(pdu, data.Bytes()...)
@@ -358,8 +342,12 @@ func (ue *UE) decSecurityModeCommand(pdu *[]byte) {
 // 8.2.26 Security mode complete
 func (ue *UE) MakeSecurityModeComplete() (pdu []byte) {
 
-	ue.enc5GSMMMessageHeader(SecurityHeaderTypePlain,
+	pdu = ue.enc5GSMMMessageHeader(SecurityHeaderTypePlain,
 	    MessageTypeSecurityModeComplete)
+
+	pdu = append(pdu, ue.enc5GSMobileID(TypeIDIMEISV, true)...)
+
+	ue.dprint("pdu = %x", pdu)
 
 	return
 }
@@ -377,6 +365,135 @@ func (ue *UE) enc5GSMMMessageHeader(
 	pdu = append(pdu, []byte{EPD5GSMobilityManagement}...)
 	pdu = append(pdu, []byte{headType}...)
 	pdu = append(pdu, []byte{msgType}...)
+
+	return
+}
+
+// 9.11.3.1 5GMM capability
+type FiveGMMCapability struct {
+	iei         uint8
+	length      uint8
+	capability1 uint8
+}
+
+const (
+	FiveGMMCapN3data = 0x20
+)
+
+func enc5GMMCapability() (pdu []byte) {
+
+	var f FiveGMMCapability
+
+	f.iei = 0x10
+	f.length = 1
+	f.capability1 = FiveGMMCapN3data
+
+	data := new(bytes.Buffer)
+	binary.Write(data, binary.BigEndian, f)
+	pdu = data.Bytes()
+
+	return
+}
+
+// 9.11.3.4 5GS mobile identity
+// I need C 'union' for golang...
+const (
+	TypeIDNoIdentity = iota
+	TypeIDSUCI
+	TypeID5GGUTI
+	TypeIDIMEI
+	TypeID5GSTMSI
+	TypeIDIMEISV
+)
+
+const (
+	SUPIFormatIMSI = iota
+	SUPIFormatNetworkSpecificID
+)
+
+const (
+	ProtectionSchemeNull = iota
+	ProtectionSchemeProfileA
+	ProtectionSchemeProfileB
+)
+
+func (ue *UE) enc5GSMobileID(typeID int, iei bool) (pdu []byte) {
+
+	if iei == true {
+		pdu = append(pdu, []byte{iei5GSMobileIdentity}...)
+	}
+
+	switch typeID {
+	//case TypeIDNoIdentity:
+	case TypeIDSUCI:
+		pdu = append(pdu, ue.enc5GSMobileIDTypeSUCI()...)
+	//case TypeID5GGUTI:
+	//case TypeIDIMEI:
+	//case TypeID5GSTMSI:
+	case TypeIDIMEISV:
+		pdu = append(pdu, ue.enc5GSMobileIDTypeIMEISV()...)
+	}
+	return
+}
+
+type FiveGSMobileIDSUCI struct {
+	length                 uint16
+	supiFormatAndTypeID    uint8
+	plmn                   [3]uint8
+	routingIndicator       [2]uint8
+	protectionScheme       uint8
+	homeNetworkPublicKeyID uint8
+	schemeOutput           [5]uint8
+}
+
+func (ue *UE) enc5GSMobileIDTypeSUCI() (pdu []byte) {
+
+	var f FiveGSMobileIDSUCI
+	var typeID uint8 = TypeIDSUCI
+	var supiFormat uint8 = SUPIFormatIMSI
+
+	/*
+	 * it doesn't work with "f.length = uint16(unsafe.Sizeof(*f) - 2)"
+	 * because of the octet alignment.
+	 */
+	f.length = 13
+	f.supiFormatAndTypeID = typeID | (supiFormat << 4)
+	f.plmn = encPLMN(ue.MCC, ue.MNC)
+	f.routingIndicator = encRoutingIndicator(ue.RoutingIndicator)
+	f.protectionScheme = encProtectionScheme(ue.ProtectionScheme)
+	f.homeNetworkPublicKeyID = 0
+	f.schemeOutput = encSchemeOutput(ue.MSIN)
+
+	data := new(bytes.Buffer)
+	binary.Write(data, binary.BigEndian, f)
+	pdu = data.Bytes()
+
+	return
+}
+
+type FiveGSMobileIDIMEISV struct {
+	length uint16
+	imeisv [9]byte
+}
+
+func (ue *UE) enc5GSMobileIDTypeIMEISV() (pdu []byte) {
+
+	var f FiveGSMobileIDIMEISV
+	var typeID uint8 = TypeIDIMEISV
+
+	f.length = 9
+
+	if len(ue.IMEISV) / 2 == 1 {
+		typeID |= 0x08 // odd even bit
+	}
+
+	imeisv := fmt.Sprintf("%x%sf", typeID, ue.IMEISV)
+	for i, v := range Str2BCD(imeisv) {
+		f.imeisv[i] = v
+	}
+	data := new(bytes.Buffer)
+	binary.Write(data, binary.BigEndian, f)
+	pdu = data.Bytes()
 
 	return
 }
@@ -414,90 +531,6 @@ func encSchemeOutput(msin string) (so [5]byte) {
 	for i, v := range Str2BCD(msin) {
 		so[i] = v
 	}
-	return
-}
-
-// 9.11.3.1 5GMM capability
-type FiveGMMCapability struct {
-	iei         uint8
-	length      uint8
-	capability1 uint8
-}
-
-const (
-	FiveGMMCapN3data = 0x20
-)
-
-func enc5GMMCapability() (f FiveGMMCapability) {
-	f.iei = 0x10
-	f.length = 1
-	f.capability1 = FiveGMMCapN3data
-
-	return
-}
-
-// 9.11.3.4 5GS mobile identity
-// I need C 'union' for golang...
-type FiveGSMobileID struct {
-	length                 uint16
-	supiFormatAndTypeID    uint8
-	plmn                   [3]uint8
-	routingIndicator       [2]uint8
-	protectionScheme       uint8
-	homeNetworkPublicKeyID uint8
-	schemeOutput           [5]uint8
-}
-
-const (
-	TypeIDNoIdentity = iota
-	TypeIDSUCI
-	TypeID5GGUTI
-	TypeIDIMEI
-	TypeID5GSTMSI
-	TypeIDIMEISV
-)
-
-const (
-	SUPIFormatIMSI = iota
-	SUPIFormatNetworkSpecificID
-)
-
-const (
-	ProtectionSchemeNull = iota
-	ProtectionSchemeProfileA
-	ProtectionSchemeProfileB
-)
-
-type FiveGSMobileIDIMEISV struct {
-	length uint16
-	typeID uint8
-	imeisv [8]byte
-}
-
-func (ue *UE) enc5GSMobileID(typeID int, iei bool) (id []byte) {
-
-	if iei == true {
-		id = append(id, []byte{iei5GSMobileIdentity}...)
-	}
-
-	switch typeID {
-	//case TypeIDNoIdentity:
-	case TypeIDSUCI:
-		ue.enc5GSMobileIDTypeSUCI()
-	//case TypeID5GGUTI:
-	//case TypeIDIMEI:
-	//case TypeID5GSTMSI:
-	case TypeIDIMEISV:
-		ue.enc5GSMobileIDTypeIMEISV()
-	}
-	return
-}
-
-func (ue *UE) enc5GSMobileIDTypeSUCI() (id []byte) {
-	return
-}
-
-func (ue *UE) enc5GSMobileIDTypeIMEISV() (id []byte) {
 	return
 }
 
