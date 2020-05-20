@@ -39,6 +39,10 @@ type UE struct {
 		securityHeaderParsed bool
 	}
 
+	recv struct {
+		RINMR bool
+	}
+
 	DLCount uint32
 	ULCount uint32
 	indent  int // indent for debug print.
@@ -79,7 +83,7 @@ const (
 	MessageTypeAuthenticationRequest  = 0x56
 	MessageTypeAuthenticationResponse = 0x57
 	MessageTypeSecurityModeCommand    = 0x5d
-	MessageTypeSecurityModeComplete    = 0x5e
+	MessageTypeSecurityModeComplete   = 0x5e
 )
 
 var msgTypeStr = map[int]string{
@@ -87,7 +91,7 @@ var msgTypeStr = map[int]string{
 	MessageTypeAuthenticationRequest:  "Authentication Request",
 	MessageTypeAuthenticationResponse: "Authentication Response",
 	MessageTypeSecurityModeCommand:    "Security Mode Command",
-	MessageTypeSecurityModeComplete:    "Security Mode Complete",
+	MessageTypeSecurityModeComplete:   "Security Mode Complete",
 }
 
 const (
@@ -98,6 +102,7 @@ const (
 	ieiAuthParamRES         = 0x2d
 	ieiUESecurityCapability = 0x2e
 	ieiAdditional5GSecInfo  = 0x36
+	ieiNASMessageContainer  = 0x71
 	iei5GSMobileIdentity    = 0x77
 	ieiNonSupported         = 0xff
 )
@@ -110,7 +115,8 @@ var ieStr = map[int]string{
 	ieiAuthParamRES:         "Authentication response parameter IE",
 	ieiUESecurityCapability: "UE Security Capability IE",
 	ieiAdditional5GSecInfo:  "Additional 5G Security Information IE",
-	iei5GSMobileIdentity:    "5GS Mobile Identity",
+	ieiNASMessageContainer:  "NAS Message Container IE",
+	iei5GSMobileIdentity:    "5GS Mobile Identity IE",
 	ieiNonSupported:         "Non Supported IE",
 }
 
@@ -291,7 +297,7 @@ func (ue *UE) decAuthenticationRequest(pdu *[]byte) {
 func (ue *UE) MakeAuthenticationResponse() (pdu []byte) {
 
 	pdu = ue.enc5GSMMMessageHeader(SecurityHeaderTypePlain,
-	    MessageTypeAuthenticationResponse)
+		MessageTypeAuthenticationResponse)
 
 	data := new(bytes.Buffer)
 	binary.Write(data, binary.BigEndian, ue.encAuthParamRes())
@@ -305,16 +311,16 @@ func (ue *UE) MakeAuthenticationResponse() (pdu []byte) {
 func (ue *UE) MakeRegistrationRequest() (pdu []byte) {
 
 	pdu = ue.enc5GSMMMessageHeader(SecurityHeaderTypePlain,
-	    MessageTypeRegistrationRequest)
+		MessageTypeRegistrationRequest)
 
 	regType := RegistrationTypeInitialRegistration |
 		RegistrationTypeFlagFollowOnRequestPending
 	ngKSI := KeySetIdentityNoKeyIsAvailable
 
-	registrationTypeAndngKSI := byte(regType | (ngKSI <<4))
+	registrationTypeAndngKSI := byte(regType | (ngKSI << 4))
 
 	pdu = append(pdu, []byte{registrationTypeAndngKSI}...)
-	pdu = append(pdu, ue.enc5GSMobileID(TypeIDSUCI, false)...)
+	pdu = append(pdu, ue.enc5GSMobileID(false, TypeIDSUCI)...)
 
 	data := new(bytes.Buffer)
 	binary.Write(data, binary.BigEndian, enc5GMMCapability())
@@ -343,11 +349,15 @@ func (ue *UE) decSecurityModeCommand(pdu *[]byte) {
 func (ue *UE) MakeSecurityModeComplete() (pdu []byte) {
 
 	pdu = ue.enc5GSMMMessageHeader(SecurityHeaderTypePlain,
-	    MessageTypeSecurityModeComplete)
+		MessageTypeSecurityModeComplete)
 
-	pdu = append(pdu, ue.enc5GSMobileID(TypeIDIMEISV, true)...)
-
+	pdu = append(pdu, ue.enc5GSMobileID(true, TypeIDIMEISV)...)
 	ue.dprint("pdu = %x", pdu)
+
+	if ue.recv.RINMR == true {
+		pdu = append(pdu, ue.encNASMessageContainer(true, MessageTypeRegistrationRequest)...)
+		ue.recv.RINMR = false
+	}
 
 	return
 }
@@ -360,7 +370,7 @@ type NasMessageMM struct {
 }
 
 func (ue *UE) enc5GSMMMessageHeader(
-    headType uint8, msgType uint8) (pdu []byte) {
+	headType uint8, msgType uint8) (pdu []byte) {
 
 	pdu = append(pdu, []byte{EPD5GSMobilityManagement}...)
 	pdu = append(pdu, []byte{headType}...)
@@ -417,7 +427,7 @@ const (
 	ProtectionSchemeProfileB
 )
 
-func (ue *UE) enc5GSMobileID(typeID int, iei bool) (pdu []byte) {
+func (ue *UE) enc5GSMobileID(iei bool, typeID int) (pdu []byte) {
 
 	if iei == true {
 		pdu = append(pdu, []byte{iei5GSMobileIdentity}...)
@@ -483,7 +493,7 @@ func (ue *UE) enc5GSMobileIDTypeIMEISV() (pdu []byte) {
 
 	f.length = 9
 
-	if len(ue.IMEISV) / 2 == 1 {
+	if len(ue.IMEISV)/2 == 1 {
 		typeID |= 0x08 // odd even bit
 	}
 
@@ -578,9 +588,11 @@ func (ue *UE) decAdditional5GSecInfo(pdu *[]byte) {
 	}
 	ue.dprinti("KAMF derivation is %srequired", not)
 
+	ue.recv.RINMR = true
 	not = ""
 	if val&0x02 == 0x00 {
 		not = "not "
+		ue.recv.RINMR = false
 	}
 	ue.dprinti("Retransmission of the initial NAS message %srequested", not)
 
@@ -652,9 +664,9 @@ func (ue *UE) encAuthParamRes() (res AuthParamRes) {
 	}
 	res.length = uint8(len(res.resstar))
 
-//	data := new(bytes.Buffer)
-//	binary.Write(data, binary.BigEndian, ue.encAuthParamRes())
-//	pdu = append(pdu, data.Bytes()...)
+	//	data := new(bytes.Buffer)
+	//	binary.Write(data, binary.BigEndian, ue.encAuthParamRes())
+	//	pdu = append(pdu, data.Bytes()...)
 
 	return
 }
@@ -680,6 +692,29 @@ func (ue *UE) decngKSI(pdu *[]byte) {
 	ksi := int((*pdu)[0])
 	ue.dprint("ngKSI: 0x%x", ksi)
 	*pdu = (*pdu)[1:]
+
+	return
+}
+
+// 9.11.3.33 NAS message container
+func (ue *UE) encNASMessageContainer(iei bool, msgType int) (pdu []byte) {
+
+	if iei == true {
+		pdu = append(pdu, []byte{ieiNASMessageContainer}...)
+	}
+
+	tmp := []byte{}
+	switch msgType {
+	case MessageTypeRegistrationRequest:
+		tmp = ue.MakeRegistrationRequest()
+	default:
+	}
+
+	length := make([]byte, 2)
+	binary.BigEndian.PutUint16(length, uint16(len(tmp)))
+
+	pdu = append(pdu, length...)
+	pdu = append(pdu, tmp...)
 
 	return
 }
