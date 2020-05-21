@@ -35,18 +35,50 @@ type UE struct {
 	ProtectionScheme string
 	AuthParam        AuthParam
 
-	state struct {
-		securityHeaderParsed bool
-	}
+	state5GMM int
 
 	recv struct {
-		RINMR bool
+		flag struct {
+			rinmr bool
+		}
+		state int
 	}
 
 	DLCount uint32
 	ULCount uint32
-	indent  int // indent for debug print.
+
+	wa struct {
+		securityHeaderParsed bool
+	}
+	indent int // indent for debug print.
 }
+
+// 5.1.3 5GMM sublayer states
+// actual value is not defined in the standard.
+const (
+	//fiveGMMNULL = iota
+	state5GMMDeregistared = iota
+	state5GMMRegistaredInitiated
+	state5GMMRegistared
+	state5GMMServiceRequestInitiated
+	state5GMMDeregistaredInitiated
+)
+
+var state5GMMstr = map[int]string{
+	//state5GMMNULL:                    "5GMM-NULL",
+	state5GMMDeregistared:            "5GMM-DEREGISTERED",
+	state5GMMRegistaredInitiated:     "5GMM-REGISTERED-INITIATED",
+	state5GMMRegistared:              "5GMM-REGISTERED",
+	state5GMMServiceRequestInitiated: "5GMM-SERVICE-REQUEST-INITIATED",
+	state5GMMDeregistaredInitiated:   "5GMM-DEREGISTERED-INITIATED",
+}
+
+// my receive flag definition
+const (
+	rcvdNull = iota
+	rcvdAuthenticationRequest
+	rcvdSecurityModeCommand
+)
 
 // TS 24.007 11.2.3.1.1A Extended protocol discriminator (EPD)
 const (
@@ -120,17 +152,35 @@ var ieStr = map[int]string{
 	ieiNonSupported:         "Non Supported IE",
 }
 
-func NewNAS(filename string) (p *UE) {
+func NewNAS(filename string) (ue *UE) {
 
 	bytes, err := ioutil.ReadFile(filename)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	var ue UE
-	p = &ue
-	json.Unmarshal(bytes, p)
+	var obj UE
+	ue = &obj
+	json.Unmarshal(bytes, ue)
 
+	ue.PowerON()
+
+	return
+}
+
+func (ue *UE) PowerON() {
+	ue.state5GMM = state5GMMDeregistared
+	ue.recv.state = rcvdNull
+}
+
+func (ue *UE) MakeNasPdu() (pdu []byte) {
+	switch ue.recv.state {
+	case rcvdNull:
+	case rcvdAuthenticationRequest:
+		pdu = ue.MakeAuthenticationResponse()
+	case rcvdSecurityModeCommand:
+		pdu = ue.MakeSecurityModeComplete()
+	}
 	return
 }
 
@@ -145,7 +195,7 @@ func (ue *UE) Decode(pdu *[]byte, length int) (msgType int) {
 	*pdu = (*pdu)[1:]
 	length--
 
-	if secHeader != 0x00 && ue.state.securityHeaderParsed == false {
+	if secHeader != 0x00 && ue.wa.securityHeaderParsed == false {
 		mac := (*pdu)[:4]
 		ue.dprinti("mac: %x", mac)
 		*pdu = (*pdu)[4:]
@@ -167,7 +217,7 @@ func (ue *UE) Decode(pdu *[]byte, length int) (msgType int) {
 		*pdu = (*pdu)[1:]
 		length--
 
-		ue.state.securityHeaderParsed = true
+		ue.wa.securityHeaderParsed = true
 		msgType = ue.Decode(pdu, length)
 		return
 	}
@@ -194,7 +244,7 @@ func (ue *UE) Decode(pdu *[]byte, length int) (msgType int) {
 	}
 	ue.indent--
 
-	ue.state.securityHeaderParsed = false
+	ue.wa.securityHeaderParsed = false
 	return
 }
 
@@ -290,6 +340,9 @@ func (ue *UE) decAuthenticationRequest(pdu *[]byte) {
 	ue.dprint("RES* : %x", ue.AuthParam.RESstar)
 	ue.dprint("received and calculated MAC values match.")
 	ue.indent = orig
+
+	ue.recv.state = rcvdAuthenticationRequest
+
 	return
 }
 
@@ -327,6 +380,10 @@ func (ue *UE) MakeRegistrationRequest() (pdu []byte) {
 	binary.Write(data, binary.BigEndian, encUESecurityCapability())
 	pdu = append(pdu, data.Bytes()...)
 
+	ue.state5GMM = state5GMMRegistaredInitiated
+
+	// start T3510 timer. see 5.5.1.2.2 Initial registration initiation
+
 	return
 }
 
@@ -342,6 +399,8 @@ func (ue *UE) decSecurityModeCommand(pdu *[]byte) {
 	ue.decInformationElement(pdu)
 	ue.indent--
 
+	ue.recv.state = rcvdSecurityModeCommand
+
 	return
 }
 
@@ -354,9 +413,9 @@ func (ue *UE) MakeSecurityModeComplete() (pdu []byte) {
 	pdu = append(pdu, ue.enc5GSMobileID(true, TypeIDIMEISV)...)
 	ue.dprint("pdu = %x", pdu)
 
-	if ue.recv.RINMR == true {
+	if ue.recv.flag.rinmr == true {
 		pdu = append(pdu, ue.encNASMessageContainer(true, MessageTypeRegistrationRequest)...)
-		ue.recv.RINMR = false
+		ue.recv.flag.rinmr = false
 	}
 
 	return
@@ -588,11 +647,11 @@ func (ue *UE) decAdditional5GSecInfo(pdu *[]byte) {
 	}
 	ue.dprinti("KAMF derivation is %srequired", not)
 
-	ue.recv.RINMR = true
+	ue.recv.flag.rinmr = true
 	not = ""
 	if val&0x02 == 0x00 {
 		not = "not "
-		ue.recv.RINMR = false
+		ue.recv.flag.rinmr = false
 	}
 	ue.dprinti("Retransmission of the initial NAS message %srequested", not)
 

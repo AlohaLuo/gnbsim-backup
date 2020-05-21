@@ -62,7 +62,7 @@ func TestMakeSecurityModeComplete(t *testing.T) {
 	v := ue.MakeSecurityModeComplete()
 	fmt.Printf("MakeSecurityModeCoplete: %02x\n", v)
 
-	ue.recv.RINMR = true
+	ue.recv.flag.rinmr = true
 	v = ue.MakeSecurityModeComplete()
 	fmt.Printf("MakeSecurityModeCoplete: %02x\n", v)
 	/*
