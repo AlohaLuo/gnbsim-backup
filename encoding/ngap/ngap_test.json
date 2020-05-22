@@ -1,7 +1,7 @@
 {
 	"GlobalGNBID": {
-		"mcc": 123,
-		"mnc": 45,
+		"mcc": 208,
+		"mnc": 93,
 		"gnbid": 1
 	},
 	"SupportedTAList" : [
@@ -9,8 +9,8 @@
 			"TAC": "0x000102",
 			"BroadcastPLMNList": [
 				{
-					"mcc": 123,
-					"mnc": 45,
+					"mcc": 208,
+					"mnc": 93,
 					"SliceSupportList": [
 						{
 							"sst": 1,
@@ -25,8 +25,9 @@
 	"RANUENGAPID" : 0,
 	"UE": {
 		"msin": "0123456789",
-		"mcc": 123,
-		"mnc": 45,
+		"mcc": 208,
+		"mnc": 93,
+		"imeisv": "0000000100000101",
 		"RoutingIndicator": 1234,
 		"ProtectionScheme": "null",
 		"AuthParam": {
@@ -37,15 +38,15 @@
 	"ULInfoNR": {
 		"NRCGI": {
 			"PLMN": {
-				"mcc": 123,
-				"mnc": 45
+				"mcc": 208,
+				"mnc": 93
 			},
 			"NRCellID": 1
 		},
 		"TAI": {
 			"PLMN": {
-				"mcc": 123,
-				"mnc": 45
+				"mcc": 208,
+				"mnc": 93
 			},
 			"TAC": "0x000102"
 		}

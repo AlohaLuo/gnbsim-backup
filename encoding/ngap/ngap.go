@@ -228,7 +228,8 @@ func (gnb *GNB) MakeUplinkNASTransport() (pdu []byte) {
 	//fmt.Printf("debug: global RAN-UE-NGAP-ID = %02x\n", tmp)
 	v = append(v, tmp...)
 
-	tmp = encNASPDU(gnb.UE.MakeAuthenticationResponse())
+	//tmp = encNASPDU(gnb.UE.MakeAuthenticationResponse())
+	tmp = encNASPDU(gnb.UE.MakeNasPdu())
 	//fmt.Printf("debug: 5G NAS PDU = %02x\n", tmp)
 	v = append(v, tmp...)
 
