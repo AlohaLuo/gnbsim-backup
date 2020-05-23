@@ -56,17 +56,31 @@ func TestMakeRegistrationRequest(t *testing.T) {
 
 func TestMakeSecurityModeComplete(t *testing.T) {
 
+	pattern := []struct {
+		imeisv     bool
+		rinmr      bool
+		forceRINMR bool
+	}{
+		{false, false, false},
+		{true, false, false},
+		{true, true, false},
+		{true, false, true},
+	}
+
 	ue := NewNAS("nas_test.json")
+	v := []byte{}
 
 	receive(ue, TestAuthenticationRequest)
 	receive(ue, TestSecurityModeCommand)
 
-	v := ue.MakeSecurityModeComplete()
-	fmt.Printf("MakeSecurityModeCoplete: %02x\n", v)
+	for _, p := range pattern {
+		ue.recv.flag.imeisv = p.imeisv
+		ue.recv.flag.rinmr = p.rinmr
+		ue.wa.forceRINMR = p.forceRINMR
+		v = ue.MakeSecurityModeComplete()
+		fmt.Printf("MakeSecurityModeCoplete: %02x\n", v)
 
-	ue.recv.flag.rinmr = true
-	v = ue.MakeSecurityModeComplete()
-	fmt.Printf("MakeSecurityModeCoplete: %02x\n", v)
+	}
 
 	/*
 		expect_str := "7e004179000d0102f8392143000010325476981001202e0480a00000"

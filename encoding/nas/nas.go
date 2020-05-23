@@ -39,7 +39,8 @@ type UE struct {
 
 	recv struct {
 		flag struct {
-			rinmr bool
+			imeisv bool
+			rinmr  bool
 		}
 		state int
 	}
@@ -49,6 +50,7 @@ type UE struct {
 
 	wa struct {
 		securityHeaderParsed bool
+		forceRINMR           bool
 	}
 	indent int // indent for debug print.
 }
@@ -171,6 +173,8 @@ func NewNAS(filename string) (ue *UE) {
 func (ue *UE) PowerON() {
 	ue.state5GMM = state5GMMDeregistared
 	ue.recv.state = rcvdNull
+
+	ue.wa.forceRINMR = true
 }
 
 func (ue *UE) MakeNasPdu() (pdu []byte) {
@@ -407,13 +411,17 @@ func (ue *UE) decSecurityModeCommand(pdu *[]byte) {
 // 8.2.26 Security mode complete
 func (ue *UE) MakeSecurityModeComplete() (pdu []byte) {
 
-	pdu = ue.enc5GSMMMessageHeader(SecurityHeaderTypePlain,
+	pdu = ue.enc5GSMMMessageHeader(
+		//SecurityHeaderTypeIntegrityProtectedAndCipheredWithNewContext,
+		SecurityHeaderTypePlain,
 		MessageTypeSecurityModeComplete)
 
-	pdu = append(pdu, ue.enc5GSMobileID(true, TypeIDIMEISV)...)
-	ue.dprint("pdu = %x", pdu)
+	if ue.recv.flag.imeisv {
+		pdu = append(pdu, ue.enc5GSMobileID(true, TypeIDIMEISV)...)
+		ue.recv.flag.imeisv = false
+	}
 
-	if ue.recv.flag.rinmr == true {
+	if ue.recv.flag.rinmr || ue.wa.forceRINMR {
 		pdu = append(pdu, ue.encNASMessageContainer(true, MessageTypeRegistrationRequest)...)
 		ue.recv.flag.rinmr = false
 	}
@@ -750,6 +758,9 @@ func (ue *UE) decIMEISVRequest(pdu *[]byte) {
 
 	val := int((*pdu)[0])
 	ue.dprinti("value: 0x%x", val)
+	if val&0x01 != 0 {
+		ue.recv.flag.imeisv = true
+	}
 	*pdu = (*pdu)[1:]
 	return
 }
