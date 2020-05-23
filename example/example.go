@@ -52,6 +52,7 @@ func main() {
 	conn.SubscribeEvents(sctp.SCTP_EVENT_DATA_IO)
 
 	gnb := ngap.NewNGAP("example.json")
+	gnb.UE.PowerON()
 	buf := []byte{}
 
 	sendbuf := gnb.MakeNGSetupRequest()
@@ -76,6 +77,27 @@ func main() {
 	gnb.Decode(&buf)
 
 	sendbuf = gnb.MakeInitialUEMessage()
+	n, err = conn.SCTPWrite(sendbuf, info)
+
+	if err != nil {
+		log.Fatalf("failed to write: %v", err)
+	}
+
+	log.Printf("write: len %d", n)
+
+	buf = make([]byte, 1500)
+	n, info, err = conn.SCTPRead(buf)
+
+	if err != nil {
+		log.Fatalf("failed to read: %v", err)
+	}
+
+	log.Printf("read: len %d, info: %+v", n, info)
+	buf = buf[:n]
+	fmt.Printf("dump: %x\n", buf)
+	gnb.Decode(&buf)
+
+	sendbuf = gnb.MakeUplinkNASTransport()
 	n, err = conn.SCTPWrite(sendbuf, info)
 
 	if err != nil {
