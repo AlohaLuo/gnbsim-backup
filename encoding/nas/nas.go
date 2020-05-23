@@ -418,22 +418,36 @@ func (ue *UE) MakeSecurityModeComplete() (pdu []byte) {
 		ue.recv.flag.rinmr = false
 	}
 
+	head := ue.enc5GSecurityProtectedMessageHeader(
+		SecurityHeaderTypeIntegrityProtectedAndCipheredWithNewContext, &pdu)
+
+	pdu = append(head, pdu...)
+
 	return
 }
 
 // 9.1.1 NAS message format
-type NasMessageMM struct {
-	ExtendedProtocolDiscriminator uint8
-	SecurityHeaderType            uint8
-	MessageType                   uint8
+func (ue *UE) enc5GSMMMessageHeader(
+	headType uint8, msgType uint8) (head []byte) {
+
+	head = append(head, []byte{EPD5GSMobilityManagement}...)
+	head = append(head, []byte{headType}...)
+	head = append(head, []byte{msgType}...)
+
+	return
 }
 
-func (ue *UE) enc5GSMMMessageHeader(
-	headType uint8, msgType uint8) (pdu []byte) {
+func (ue *UE) enc5GSecurityProtectedMessageHeader(
+	headType uint8, pdu *[]byte) (head []byte) {
 
-	pdu = append(pdu, []byte{EPD5GSMobilityManagement}...)
-	pdu = append(pdu, []byte{headType}...)
-	pdu = append(pdu, []byte{msgType}...)
+	head = append(head, []byte{EPD5GSMobilityManagement}...)
+	head = append(head, []byte{headType}...)
+
+	seq := []byte{uint8(ue.ULCount)}
+	*pdu = append(seq, *pdu...)
+
+	mac := ue.ComputeMAC(0, 0, pdu)
+	head = append(head, mac...)
 
 	return
 }
@@ -1046,8 +1060,6 @@ func (ue *UE) ComputeKamf() {
 	mac := hmac.New(sha256.New, ue.AuthParam.Kseaf)
 	mac.Write(s)
 	ue.AuthParam.Kamf = mac.Sum(nil)
-
-	// ue.AuthParam.Kamf, _ = hex.DecodeString("2836b8c08e73027fd28135ac1a9640203f98eb7a5613f8f303c5b559d4601ec3")
 
 	return
 }
