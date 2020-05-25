@@ -9,6 +9,7 @@ import (
 
 var TestAuthenticationRequest string = "7e005600020000217d9192431b0560ca6c35a0212d6759e520109a4a995a657a800089c03b9ac78a0614"
 var TestSecurityModeCommand string = "7e03ca400b02007e035d02000480a00000e1360100"
+var TestRegistrationAccept string = "7e02823d94a5017e0242010177000b0202f839cafe000000000154070002f839000001150a040101020304011122335e010616012c"
 
 func receive(ue *UE, msg string) {
 	in, _ := hex.DecodeString(msg)
@@ -99,6 +100,7 @@ func TestDecode(t *testing.T) {
 	}{
 		{TestAuthenticationRequest},
 		{TestSecurityModeCommand},
+		{TestRegistrationAccept},
 	}
 
 	for _, p := range pattern {

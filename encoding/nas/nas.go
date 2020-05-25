@@ -80,6 +80,7 @@ const (
 	rcvdNull = iota
 	rcvdAuthenticationRequest
 	rcvdSecurityModeCommand
+	rcvdRegistrationAccept
 )
 
 // TS 24.007 11.2.3.1.1A Extended protocol discriminator (EPD)
@@ -114,6 +115,7 @@ const (
 // 9.7 Message type
 const (
 	MessageTypeRegistrationRequest    = 0x41
+	MessageTypeRegistrationAccept     = 0x42
 	MessageTypeAuthenticationRequest  = 0x56
 	MessageTypeAuthenticationResponse = 0x57
 	MessageTypeSecurityModeCommand    = 0x5d
@@ -122,6 +124,7 @@ const (
 
 var msgTypeStr = map[int]string{
 	MessageTypeRegistrationRequest:    "Registration Request",
+	MessageTypeRegistrationAccept:     "Registration Accept",
 	MessageTypeAuthenticationRequest:  "Authentication Request",
 	MessageTypeAuthenticationResponse: "Authentication Response",
 	MessageTypeSecurityModeCommand:    "Security Mode Command",
@@ -237,6 +240,9 @@ func (ue *UE) Decode(pdu *[]byte, length int) (msgType int) {
 
 	ue.indent++
 	switch msgType {
+	case MessageTypeRegistrationAccept:
+		ue.decRegistrationAccept(pdu)
+		break
 	case MessageTypeAuthenticationRequest:
 		ue.decAuthenticationRequest(pdu)
 		break
@@ -387,6 +393,20 @@ func (ue *UE) MakeRegistrationRequest() (pdu []byte) {
 	ue.state5GMM = state5GMMRegistaredInitiated
 
 	// start T3510 timer. see 5.5.1.2.2 Initial registration initiation
+
+	return
+}
+
+// 8.2.7 Registration accept
+func (ue *UE) decRegistrationAccept(pdu *[]byte) {
+
+	ue.dprint("Registration Accept")
+
+	ue.indent++
+	ue.dec5GSRegistrationResult(pdu)
+	ue.indent--
+
+	ue.recv.state = rcvdRegistrationAccept
 
 	return
 }
@@ -622,6 +642,54 @@ func encSchemeOutput(msin string) (so [5]byte) {
 	for i, v := range Str2BCD(msin) {
 		so[i] = v
 	}
+	return
+}
+
+// 9.11.3.6 5GS registration result
+const (
+	regResultNull = iota
+	regResult3GPP
+	regResultNon3GPP
+	regResult3GPPandNon3GPP
+)
+
+var regResultStr = map[uint8]string{
+	regResult3GPP:           "3GPP access",
+	regResultNon3GPP:        "Non-3GPP access",
+	regResult3GPPandNon3GPP: "3GPP access and non-3GPP access",
+}
+
+func (ue *UE) dec5GSRegistrationResult(pdu *[]byte) {
+
+	length := int((*pdu)[0])
+	*pdu = (*pdu)[1:]
+	val := (*pdu)[:length]
+	*pdu = (*pdu)[length:]
+
+	ue.dprint("5G Registration Result: %x", val)
+	result := uint8(val[0])
+
+	not := "R"
+	if result&0x20 == 0 {
+		not = "Not r"
+	}
+	ue.dprinti("%segistered for emergency services", not)
+
+	not = ""
+	if result&0x10 == 0 {
+		not = "not "
+	}
+	ue.dprinti("Network slice-specific authentication and authorization is %sto be performed", not)
+
+	not = ""
+	if result&0x8 == 0 {
+		not = "not "
+	}
+	ue.dprinti("SMS over NAS %sallowed", not)
+
+	ind := result & 0x7
+	ue.dprinti(regResultStr[ind])
+
 	return
 }
 
