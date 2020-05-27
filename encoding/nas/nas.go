@@ -42,7 +42,8 @@ type UE struct {
 			imeisv bool
 			rinmr  bool
 		}
-		state int
+		state     int
+		fiveGGUTI []byte
 	}
 
 	DLCount uint32
@@ -285,7 +286,8 @@ func (ue *UE) decInformationElement(pdu *[]byte) {
 			ue.decAuthParamRAND(pdu)
 		case ieiAdditional5GSecInfo:
 			ue.decAdditional5GSecInfo(pdu)
-			break
+		case iei5GSMobileIdentity:
+			ue.dec5GSMobileID(pdu)
 		default:
 			*pdu = []byte{}
 		}
@@ -404,6 +406,7 @@ func (ue *UE) decRegistrationAccept(pdu *[]byte) {
 
 	ue.indent++
 	ue.dec5GSRegistrationResult(pdu)
+	ue.decInformationElement(pdu)
 	ue.indent--
 
 	ue.recv.state = rcvdRegistrationAccept
@@ -420,7 +423,6 @@ func (ue *UE) decSecurityModeCommand(pdu *[]byte) {
 	ue.decNASSecurityAlgorithms(pdu)
 	ue.decngKSI(pdu)
 	ue.decUESecurityCapability(pdu)
-	ue.decInformationElement(pdu)
 	ue.indent--
 
 	ue.recv.state = rcvdSecurityModeCommand
@@ -642,6 +644,29 @@ func encSchemeOutput(msin string) (so [5]byte) {
 	for i, v := range Str2BCD(msin) {
 		so[i] = v
 	}
+	return
+}
+
+func (ue *UE) dec5GSMobileID(pdu *[]byte) {
+
+	length := binary.BigEndian.Uint16(*pdu)
+	id := int((*pdu)[2] & 0x7)
+	*pdu = (*pdu)[3:]
+
+	ue.dprinti("id = %d", id)
+
+	switch id {
+	case TypeID5GGUTI:
+		ue.dec5GSMobileIDType5GGUTI((*pdu)[:length])
+	}
+	*pdu = (*pdu)[length:]
+
+	return
+}
+
+func (ue *UE) dec5GSMobileIDType5GGUTI(pdu []byte) {
+	ue.recv.fiveGGUTI = pdu
+	ue.dprinti("5G-GUTI: %x", ue.recv.fiveGGUTI)
 	return
 }
 
