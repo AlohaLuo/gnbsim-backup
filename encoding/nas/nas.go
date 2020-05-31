@@ -44,6 +44,7 @@ type UE struct {
 		}
 		state     int
 		fiveGGUTI []byte
+		tai       []TAI
 	}
 
 	DLCount uint32
@@ -140,6 +141,7 @@ const (
 	ieiAuthParamRES         = 0x2d
 	ieiUESecurityCapability = 0x2e
 	ieiAdditional5GSecInfo  = 0x36
+	ieiTAIList              = 0x54
 	ieiNASMessageContainer  = 0x71
 	iei5GSMobileIdentity    = 0x77
 	ieiNonSupported         = 0xff
@@ -153,6 +155,7 @@ var ieStr = map[int]string{
 	ieiAuthParamRES:         "Authentication response parameter IE",
 	ieiUESecurityCapability: "UE Security Capability IE",
 	ieiAdditional5GSecInfo:  "Additional 5G Security Information IE",
+	ieiTAIList:              "Tracking Area Identity List IE",
 	ieiNASMessageContainer:  "NAS Message Container IE",
 	iei5GSMobileIdentity:    "5GS Mobile Identity IE",
 	ieiNonSupported:         "Non Supported IE",
@@ -272,10 +275,11 @@ func (ue *UE) decInformationElement(pdu *[]byte) {
 			*pdu = (*pdu)[1:]
 		}
 
-		if ieStr[iei] == "" {
-			iei = 0xff
+		msg := ieStr[iei]
+		if msg == "" {
+			msg = ieStr[0xff]
 		}
-		ue.dprint(ieStr[iei])
+		ue.dprint("%s: 0x%x", msg, iei)
 
 		switch iei {
 		case ieiIMEISVRequest:
@@ -286,6 +290,8 @@ func (ue *UE) decInformationElement(pdu *[]byte) {
 			ue.decAuthParamRAND(pdu)
 		case ieiAdditional5GSecInfo:
 			ue.decAdditional5GSecInfo(pdu)
+		case ieiTAIList:
+			ue.decTAIList(pdu)
 		case iei5GSMobileIdentity:
 			ue.dec5GSMobileID(pdu)
 		default:
@@ -624,6 +630,29 @@ func encPLMN(mcc, mnc int) (plmn [3]byte) {
 	return
 }
 
+func (ue *UE) decPLMN(pdu *[]byte) (mcc, mnc int) {
+
+	oct1 := int((*pdu)[0])
+	oct2 := int((*pdu)[1])
+	oct3 := int((*pdu)[2])
+	*pdu = (*pdu)[3:]
+
+	mcc = (oct1 & 0xf) * 100
+	mcc = mcc + 10*(oct1>>4)
+	mcc = mcc + (oct2 & 0xf)
+
+	mnc = 0
+	if (oct2 & 0xf0) != 0xf0 {
+		mnc = 100 * (oct2 >> 4)
+	}
+	mnc = mnc + 10*(oct3&0xf)
+	mnc = mnc + (oct3 >> 4)
+
+	ue.dprint("mcc = %d, mnc = %d", mcc, mnc)
+
+	return
+}
+
 func encRoutingIndicator(ind uint16) (ri [2]byte) {
 	str := fmt.Sprintf("%d", ind)
 	for i, v := range Str2BCD(str) {
@@ -652,8 +681,7 @@ func (ue *UE) dec5GSMobileID(pdu *[]byte) {
 	length := binary.BigEndian.Uint16(*pdu)
 	id := int((*pdu)[2] & 0x7)
 	*pdu = (*pdu)[3:]
-
-	ue.dprinti("id = %d", id)
+	length--
 
 	switch id {
 	case TypeID5GGUTI:
@@ -724,12 +752,63 @@ const (
 	RegistrationTypeFlagFollowOnRequestPending = 0x08
 )
 
+// 9.11.3.9 5GS tracking area identity list
+func (ue *UE) decTAIList(pdu *[]byte) {
+	length := int((*pdu)[0])
+	*pdu = (*pdu)[1:]
+
+	tmp := (*pdu)[0]
+	elementNum := int(tmp&0x1f) + 1
+	typeOfList := tmp >> 5
+	*pdu = (*pdu)[1:]
+
+	ue.indent++
+	ue.dprint("number of element: %d", elementNum)
+	ue.dprint("type of list: 0x%x", typeOfList)
+
+	switch typeOfList {
+	case 0x00:
+		ue.decTAIListType00(pdu, elementNum)
+		/*
+			case 0x01:
+				break
+			case 0x10:
+				break
+		*/
+	default:
+		ue.dprinti("unknown list type: 0x%x", typeOfList)
+		*pdu = (*pdu)[length:]
+	}
+	ue.indent--
+	return
+}
+
+type TAI struct {
+	mcc int
+	mnc int
+	tac []byte
+}
+
+func (ue *UE) decTAIListType00(pdu *[]byte, num int) {
+
+	mcc, mnc := ue.decPLMN(pdu)
+
+	const tacSize = 3
+	for num > 0 {
+		tac := (*pdu)[:tacSize]
+		*pdu = (*pdu)[tacSize:]
+		ue.recv.tai = append(ue.recv.tai, TAI{mcc, mnc, tac})
+		ue.dprint("tac: 0x%x", tac)
+		num--
+	}
+	return
+}
+
 // 9.11.3.10 ABBA
 func (ue *UE) decABBA(pdu *[]byte) {
 
 	length := int((*pdu)[0])
 	*pdu = (*pdu)[1:]
-
 	ue.AuthParam.abba = (*pdu)[:length]
 	*pdu = (*pdu)[length:]
 
