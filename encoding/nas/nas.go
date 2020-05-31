@@ -1045,7 +1045,8 @@ func (ue *UE) decAllowedNSSAI(pdu *[]byte) {
 	ue.indent++
 	for length > 0 {
 		lenBefore := len(*pdu)
-		append(ue.recv.allowedNSSAI, ue.decSNSSAI(false, pdu))
+		snssai := ue.decSNSSAI(false, pdu)
+		ue.recv.allowedNSSAI = append(ue.recv.allowedNSSAI, snssai)
 
 		lenAfter := len(*pdu)
 		length -= lenBefore - lenAfter
