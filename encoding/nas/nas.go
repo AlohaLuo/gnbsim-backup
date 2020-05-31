@@ -46,6 +46,8 @@ type UE struct {
 		fiveGGUTI    []byte
 		tai          []TAI
 		allowedNSSAI []SNSSAI
+		t3502        int
+		t3512        int
 	}
 
 	DLCount uint32
@@ -138,12 +140,14 @@ const (
 	ieiIMEISVRequest        = 0xe
 	iei5GMMCapability       = 0x10
 	ieiAllowedNSSAI         = 0x15
+	ieiT3502Timer           = 0x16
 	ieiAuthParamAUTN        = 0x20
 	ieiAuthParamRAND        = 0x21
 	ieiAuthParamRES         = 0x2d
 	ieiUESecurityCapability = 0x2e
 	ieiAdditional5GSecInfo  = 0x36
 	ieiTAIList              = 0x54
+	ieiT3512Timer           = 0x5e
 	ieiNASMessageContainer  = 0x71
 	iei5GSMobileIdentity    = 0x77
 	ieiNonSupported         = 0xff
@@ -153,12 +157,14 @@ var ieStr = map[int]string{
 	ieiIMEISVRequest:        "IMEISV Request IE",
 	iei5GMMCapability:       "5G MM Capability IE",
 	ieiAllowedNSSAI:         "Allowd NSSAI IE",
+	ieiT3502Timer:           "T3502 Timer IE",
 	ieiAuthParamAUTN:        "Authentication Parameter AUTN IE",
 	ieiAuthParamRAND:        "Authentication Parameter RAND IE",
 	ieiAuthParamRES:         "Authentication response parameter IE",
 	ieiUESecurityCapability: "UE Security Capability IE",
 	ieiAdditional5GSecInfo:  "Additional 5G Security Information IE",
 	ieiTAIList:              "Tracking Area Identity List IE",
+	ieiT3512Timer:           "T3512 Timer IE",
 	ieiNASMessageContainer:  "NAS Message Container IE",
 	iei5GSMobileIdentity:    "5GS Mobile Identity IE",
 	ieiNonSupported:         "Non Supported IE",
@@ -284,11 +290,14 @@ func (ue *UE) decInformationElement(pdu *[]byte) {
 		}
 		ue.dprint("%s: 0x%x", msg, iei)
 
+		ue.indent++
 		switch iei {
 		case ieiIMEISVRequest:
 			ue.decIMEISVRequest(pdu)
 		case ieiAllowedNSSAI:
 			ue.decAllowedNSSAI(pdu)
+		case ieiT3502Timer:
+			ue.decGPRSTimer2(pdu)
 		case ieiAuthParamAUTN:
 			ue.decAuthParamAUTN(pdu)
 		case ieiAuthParamRAND:
@@ -297,11 +306,14 @@ func (ue *UE) decInformationElement(pdu *[]byte) {
 			ue.decAdditional5GSecInfo(pdu)
 		case ieiTAIList:
 			ue.decTAIList(pdu)
+		case ieiT3512Timer:
+			ue.decGPRSTimer3(pdu)
 		case iei5GSMobileIdentity:
 			ue.dec5GSMobileID(pdu)
 		default:
 			*pdu = []byte{}
 		}
+		ue.indent--
 	}
 }
 
@@ -490,6 +502,58 @@ func (ue *UE) enc5GSecurityProtectedMessageHeader(
 	mac := ue.ComputeMAC(0, 0, pdu)
 	head = append(head, mac...)
 
+	return
+}
+
+// 9.11.2.4 GPRS timer 2
+// See subclause 10.5.7.4 in 3GPP TS 24.008.
+func (ue *UE) decGPRSTimer2(pdu *[]byte) {
+
+	tmp := int((*pdu)[1])
+
+	multiple := 2 // 2 seconds
+	switch tmp >> 5 {
+	case 0x1:
+		multiple = 60 // 1 minute
+	case 0x2:
+		multiple = 60 * 60 / 10 // 1 decihours
+	case 0x7:
+		multiple = 0 // deactivated
+	}
+
+	ue.recv.t3502 = (tmp & 0x1f) * multiple
+	*pdu = (*pdu)[2:]
+	ue.dprint("T3502: %d sec", ue.recv.t3502)
+
+	return
+}
+
+// 9.11.2.5 GPRS timer 3
+// See subclause 10.5.7.4a in 3GPP TS 24.008.
+func (ue *UE) decGPRSTimer3(pdu *[]byte) {
+	tmp := int((*pdu)[1])
+
+	multiple := 60 * 10 // 60 minutes
+	switch tmp >> 5 {
+	case 0x1:
+		multiple = 60 * 60 // 1 hour
+	case 0x2:
+		multiple = 60 * 60 * 10 // 10 hours
+	case 0x3:
+		multiple = 2 // 2 seconds
+	case 0x4:
+		multiple = 30 // 30 seconds
+	case 0x5:
+		multiple = 60 // 1 minute
+	case 0x6:
+		multiple = 230 * 60 * 60 // 320 hours
+	case 0x7:
+		multiple = 0 // deactivated
+	}
+
+	ue.recv.t3512 = (tmp & 0x1f) * multiple
+	*pdu = (*pdu)[2:]
+	ue.dprint("T3512: %d sec", ue.recv.t3512)
 	return
 }
 
@@ -744,7 +808,7 @@ func (ue *UE) dec5GSMobileID(pdu *[]byte) {
 
 func (ue *UE) dec5GSMobileIDType5GGUTI(pdu []byte) {
 	ue.recv.fiveGGUTI = pdu
-	ue.dprinti("5G-GUTI: %x", ue.recv.fiveGGUTI)
+	ue.dprint("5G-GUTI: %x", ue.recv.fiveGGUTI)
 	return
 }
 
@@ -812,7 +876,6 @@ func (ue *UE) decTAIList(pdu *[]byte) {
 	typeOfList := tmp >> 5
 	*pdu = (*pdu)[1:]
 
-	ue.indent++
 	ue.dprint("number of element: %d", elementNum)
 	ue.dprint("type of list: 0x%x", typeOfList)
 
@@ -829,7 +892,6 @@ func (ue *UE) decTAIList(pdu *[]byte) {
 		ue.dprinti("unknown list type: 0x%x", typeOfList)
 		*pdu = (*pdu)[length:]
 	}
-	ue.indent--
 	return
 }
 
@@ -1042,7 +1104,6 @@ func (ue *UE) decAllowedNSSAI(pdu *[]byte) {
 	length := int((*pdu)[0])
 	*pdu = (*pdu)[1:]
 
-	ue.indent++
 	for length > 0 {
 		lenBefore := len(*pdu)
 		snssai := ue.decSNSSAI(false, pdu)
@@ -1051,7 +1112,6 @@ func (ue *UE) decAllowedNSSAI(pdu *[]byte) {
 		lenAfter := len(*pdu)
 		length -= lenBefore - lenAfter
 	}
-	ue.indent--
 
 	return
 }
