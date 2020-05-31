@@ -42,9 +42,10 @@ type UE struct {
 			imeisv bool
 			rinmr  bool
 		}
-		state     int
-		fiveGGUTI []byte
-		tai       []TAI
+		state        int
+		fiveGGUTI    []byte
+		tai          []TAI
+		allowedNSSAI []SNSSAI
 	}
 
 	DLCount uint32
@@ -136,6 +137,7 @@ var msgTypeStr = map[int]string{
 const (
 	ieiIMEISVRequest        = 0xe
 	iei5GMMCapability       = 0x10
+	ieiAllowedNSSAI         = 0x15
 	ieiAuthParamAUTN        = 0x20
 	ieiAuthParamRAND        = 0x21
 	ieiAuthParamRES         = 0x2d
@@ -150,6 +152,7 @@ const (
 var ieStr = map[int]string{
 	ieiIMEISVRequest:        "IMEISV Request IE",
 	iei5GMMCapability:       "5G MM Capability IE",
+	ieiAllowedNSSAI:         "Allowd NSSAI IE",
 	ieiAuthParamAUTN:        "Authentication Parameter AUTN IE",
 	ieiAuthParamRAND:        "Authentication Parameter RAND IE",
 	ieiAuthParamRES:         "Authentication response parameter IE",
@@ -284,6 +287,8 @@ func (ue *UE) decInformationElement(pdu *[]byte) {
 		switch iei {
 		case ieiIMEISVRequest:
 			ue.decIMEISVRequest(pdu)
+		case ieiAllowedNSSAI:
+			ue.decAllowedNSSAI(pdu)
 		case ieiAuthParamAUTN:
 			ue.decAuthParamAUTN(pdu)
 		case ieiAuthParamRAND:
@@ -484,6 +489,51 @@ func (ue *UE) enc5GSecurityProtectedMessageHeader(
 
 	mac := ue.ComputeMAC(0, 0, pdu)
 	head = append(head, mac...)
+
+	return
+}
+
+// 9.11.2.8 S-NSSAI
+type SNSSAI struct {
+	sst       int
+	sd        []byte
+	mappedsst int
+	mappedsd  []byte
+}
+
+func (ue *UE) decSNSSAI(iei bool, pdu *[]byte) (snssai SNSSAI) {
+
+	if iei == true {
+		ue.dprint("error: decSNSSAI with iei not supported yet.")
+		return
+	}
+
+	length := int((*pdu)[0])
+	*pdu = (*pdu)[1:]
+
+	snssai.sst = int((*pdu)[0])
+	*pdu = (*pdu)[1:]
+	ue.dprint("SST: %d", snssai.sst)
+
+	switch length {
+	case 4, 5, 8:
+		snssai.sd = (*pdu)[:3]
+		*pdu = (*pdu)[3:]
+		ue.dprint("SD: 0x%x", snssai.sd)
+	}
+
+	switch length {
+	case 2, 5, 8:
+		snssai.mappedsst = int((*pdu)[0])
+		*pdu = (*pdu)[1:]
+		ue.dprint("Mapped HPLMN SST: %d", snssai.mappedsst)
+	}
+
+	if length == 8 {
+		snssai.mappedsd = (*pdu)[:3]
+		*pdu = (*pdu)[3:]
+		ue.dprint("Mapped HPLMN SD: 0x%x", snssai.mappedsd)
+	}
 
 	return
 }
@@ -982,6 +1032,25 @@ func (ue *UE) decNASSecurityAlgorithms(pdu *[]byte) {
 	alg := (*pdu)[:1]
 	ue.dprinti(" NAS Security Algorithms: 0x%02x", alg)
 	*pdu = (*pdu)[1:]
+
+	return
+}
+
+// 9.11.3.37 NSSAI
+func (ue *UE) decAllowedNSSAI(pdu *[]byte) {
+
+	length := int((*pdu)[0])
+	*pdu = (*pdu)[1:]
+
+	ue.indent++
+	for length > 0 {
+		lenBefore := len(*pdu)
+		append(ue.recv.allowedNSSAI, ue.decSNSSAI(false, pdu))
+
+		lenAfter := len(*pdu)
+		length -= lenBefore - lenAfter
+	}
+	ue.indent--
 
 	return
 }
