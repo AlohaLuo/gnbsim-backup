@@ -55,6 +55,19 @@ func TestMakeRegistrationRequest(t *testing.T) {
 	}
 }
 
+func TestMakeRegistrationComplete(t *testing.T) {
+
+	ue := NewNAS("nas_test.json")
+	v := []byte{}
+
+	receive(ue, TestAuthenticationRequest)
+	receive(ue, TestSecurityModeCommand)
+	receive(ue, TestRegistrationAccept)
+
+	v = ue.MakeRegistrationComplete()
+	fmt.Printf("MakeRegistrationComplete: %02x\n", v)
+}
+
 func TestMakeSecurityModeComplete(t *testing.T) {
 
 	pattern := []struct {

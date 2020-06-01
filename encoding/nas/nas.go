@@ -121,6 +121,7 @@ const (
 const (
 	MessageTypeRegistrationRequest    = 0x41
 	MessageTypeRegistrationAccept     = 0x42
+	MessageTypeRegistrationComplete   = 0x43
 	MessageTypeAuthenticationRequest  = 0x56
 	MessageTypeAuthenticationResponse = 0x57
 	MessageTypeSecurityModeCommand    = 0x5d
@@ -130,6 +131,7 @@ const (
 var msgTypeStr = map[int]string{
 	MessageTypeRegistrationRequest:    "Registration Request",
 	MessageTypeRegistrationAccept:     "Registration Accept",
+	MessageTypeRegistrationComplete:   "Registration Complete",
 	MessageTypeAuthenticationRequest:  "Authentication Request",
 	MessageTypeAuthenticationResponse: "Authentication Response",
 	MessageTypeSecurityModeCommand:    "Security Mode Command",
@@ -200,6 +202,8 @@ func (ue *UE) MakeNasPdu() (pdu []byte) {
 		pdu = ue.MakeAuthenticationResponse()
 	case rcvdSecurityModeCommand:
 		pdu = ue.MakeSecurityModeComplete()
+	case rcvdRegistrationAccept:
+		pdu = ue.MakeRegistrationComplete()
 	}
 	return
 }
@@ -433,6 +437,21 @@ func (ue *UE) decRegistrationAccept(pdu *[]byte) {
 	ue.indent--
 
 	ue.recv.state = rcvdRegistrationAccept
+
+	return
+}
+
+// 8.2.8 Registration complete
+func (ue *UE) MakeRegistrationComplete() (pdu []byte) {
+
+	pdu = ue.enc5GSMMMessageHeader(
+		SecurityHeaderTypePlain,
+		MessageTypeRegistrationComplete)
+
+	head := ue.enc5GSecurityProtectedMessageHeader(
+		SecurityHeaderTypeIntegrityProtectedAndCipheredWithNewContext, &pdu)
+
+	pdu = append(head, pdu...)
 
 	return
 }
