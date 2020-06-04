@@ -152,6 +152,32 @@ func TestEncLengthDeterminant(t *testing.T) {
 	}
 }
 
+func TestDecLengthDeterminant(t *testing.T) {
+
+	pattern := []struct {
+		in     []byte
+		max    int
+		length int
+		err    bool
+	}{
+		{[]byte{}, 1, 0, true},
+		{[]byte{0x7f}, 0, 0x7f, false},
+		{[]byte{0x80, 0xff}, 0, 0xff, false},
+	}
+
+	for _, p := range pattern {
+
+		length, err := DecLengthDeterminant(&p.in, p.max)
+
+		if length != p.length ||
+			(p.err == true && err == nil) || (p.err == false && err != nil) {
+
+			t.Errorf("expect length %d, got %d", p.length, length)
+			t.Errorf("expect error: %v, got %v", p.err, err)
+		}
+	}
+}
+
 func TestEncInteger(t *testing.T) {
 
 	pattern := []struct {

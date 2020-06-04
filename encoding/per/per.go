@@ -170,6 +170,25 @@ func EncLengthDeterminant(input, max int) (
 	return
 }
 
+func DecLengthDeterminant(pdu *[]byte, max int) (length int, err error) {
+
+	if max != 0 {
+		err = fmt.Errorf("DecLengthDeterminant: "+
+			"not implemented yet for max=%d", max)
+		return
+	}
+
+	oct1 := (*pdu)[0]
+	if (oct1 & 0x80) == 0 {
+		length = int((*pdu)[0])
+		return
+	}
+
+	(*pdu)[0] &= 0x7f /// lay the most significant bit down
+	length = int(binary.BigEndian.Uint16(*pdu))
+	return
+}
+
 func encConstrainedWholeNumberWithExtmark(input, min, max int64, extmark bool) (
 	v []byte, bitlen int, err error) {
 	v, bitlen, err = EncConstrainedWholeNumber(input, min, max)
