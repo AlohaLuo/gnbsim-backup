@@ -41,6 +41,7 @@ const (
 // Elementary Procedures constants
 const (
 	idDownlinkNASTransport = 4
+	idInitialContextSetup  = 14
 	idInitialUEMessage     = 15
 	idNGSetup              = 21
 	idUplinkNASTransport   = 46
@@ -48,6 +49,7 @@ const (
 
 var procID = map[int]string{
 	idDownlinkNASTransport: "id-DownlinkNASTransport",
+	idInitialContextSetup:  "id-InitialContextSetup",
 	idInitialUEMessage:     "id-InitialUEMessage",
 	idNGSetup:              "id-NGSetup",
 	idUplinkNASTransport:   "id-UplinkNASTransport",
@@ -103,11 +105,9 @@ func (gnb *GNB) Decode(pdu *[]byte) {
 	_, procCode, _, _ := decNgapPdu(pdu)
 
 	fmt.Printf("Procedure Code: %s (%d)\n", procID[procCode], procCode)
-	offset := 0
-	length := (*pdu)[offset]
-	offset += 1
+
+	length, _ := per.DecLengthDeterminant(pdu, 0)
 	fmt.Printf("PDU Length: %d\n", length)
-	*pdu = (*pdu)[offset:]
 
 	num, _ := gnb.decProtocolIEContainer(pdu)
 	fmt.Printf("Protocol IEs: %d items\n", num)
