@@ -169,7 +169,7 @@ func TestDecLengthDeterminant(t *testing.T) {
 
 		length, err := DecLengthDeterminant(&p.in, p.max)
 
-		if length != p.length ||
+		if length != p.length || len(p.in) != 0 ||
 			(p.err == true && err == nil) || (p.err == false && err != nil) {
 
 			t.Errorf("expect length %d, got %d", p.length, length)

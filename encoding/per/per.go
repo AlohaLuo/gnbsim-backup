@@ -181,11 +181,13 @@ func DecLengthDeterminant(pdu *[]byte, max int) (length int, err error) {
 	oct1 := (*pdu)[0]
 	if (oct1 & 0x80) == 0 {
 		length = int((*pdu)[0])
+		*pdu = (*pdu)[1:]
 		return
 	}
 
 	(*pdu)[0] &= 0x7f /// lay the most significant bit down
 	length = int(binary.BigEndian.Uint16(*pdu))
+	*pdu = (*pdu)[2:]
 	return
 }
 
