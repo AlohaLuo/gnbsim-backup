@@ -21,6 +21,7 @@ import (
 	"log"
 	"math/bits"
 	"strconv"
+	"strings"
 
 	"github.com/hhorai/gnbsim/encoding/nas"
 	"github.com/hhorai/gnbsim/encoding/per"
@@ -102,6 +103,8 @@ type GNB struct {
 	recv struct {
 		AMFUENGAPID []byte
 	}
+
+	indent int // indent for debug print.
 }
 
 func NewNGAP(filename string) (p *GNB) {
@@ -122,17 +125,20 @@ func (gnb *GNB) Decode(pdu *[]byte) {
 
 	_, procCode, _, _ := decNgapPdu(pdu)
 
-	fmt.Printf("Procedure Code: %s (%d)\n", procID[procCode], procCode)
+	gnb.dprint("Procedure Code: %s (%d)", procID[procCode], procCode)
 
 	length, _ := per.DecLengthDeterminant(pdu, 0)
-	fmt.Printf("PDU Length: %d\n", length)
+	gnb.dprint("PDU Length: %d", length)
 
 	num, _ := gnb.decProtocolIEContainer(pdu)
-	fmt.Printf("Protocol IEs: %d items\n", num)
+	gnb.dprint("Protocol IEs: %d items", num)
 
 	for idx := 0; idx < num; idx++ {
-		fmt.Printf(" Item %d\n", idx)
+		gnb.indent++
+		gnb.dprint("Item %d", idx)
+		gnb.indent++
 		gnb.decProtocolIE(pdu)
+		gnb.indent -= 2
 	}
 	return
 }
@@ -159,29 +165,22 @@ InitialUEMessage-IEs NGAP-PROTOCOL-IES ::= {
 func (gnb *GNB) MakeInitialUEMessage() (pdu []byte) {
 
 	pdu = encNgapPdu(initiatingMessage, idInitialUEMessage, ignore)
-	//fmt.Printf("debug: pdu = %02x\n", pdu)
 
 	v := encProtocolIEContainer(4)
-	//fmt.Printf("debug: ie container = %02x\n", v)
 
 	tmp := encRANUENGAPID(gnb.RANUENGAPID)
-	//fmt.Printf("debug: global RAN-UE-NGAP-ID = %02x\n", tmp)
 	v = append(v, tmp...)
 
 	tmp = encNASPDU(gnb.UE.MakeRegistrationRequest())
-	//fmt.Printf("debug: 5G NAS PDU = %02x\n", tmp)
 	v = append(v, tmp...)
 
 	tmp, _ = gnb.encUserLocationInformation()
-	//fmt.Printf("debug: User Location Information = %02x\n", tmp)
 	v = append(v, tmp...)
 
 	tmp, _ = gnb.encRRCEstablishmentCause(rrcMoSignalling)
-	//fmt.Printf("debug: RRC Establishment Cause = %02x\n", tmp)
 	v = append(v, tmp...)
 
 	tmp, _ = gnb.encUEContextRequest()
-	//fmt.Printf("debug: UE Context Request = %02x\n", tmp)
 	v = append(v, tmp...)
 
 	length, _, _ := per.EncLengthDeterminant(len(v), 0)
@@ -233,26 +232,20 @@ func (gnb *GNB) MakeUplinkNASTransport() (pdu []byte) {
 	// Authentiation Response only for now.
 
 	pdu = encNgapPdu(initiatingMessage, idUplinkNASTransport, ignore)
-	//fmt.Printf("debug: pdu = %02x\n", pdu)
 
 	v := encProtocolIEContainer(4)
-	//fmt.Printf("debug: ie container = %02x\n", v)
 
 	tmp := gnb.encAMFUENGAPID()
-	//fmt.Printf("debug: global AMF-UE-NGAP-ID = %02x\n", tmp)
 	v = append(v, tmp...)
 
 	tmp = encRANUENGAPID(gnb.RANUENGAPID)
-	//fmt.Printf("debug: global RAN-UE-NGAP-ID = %02x\n", tmp)
 	v = append(v, tmp...)
 
 	//tmp = encNASPDU(gnb.UE.MakeAuthenticationResponse())
 	tmp = encNASPDU(gnb.UE.MakeNasPdu())
-	//fmt.Printf("debug: 5G NAS PDU = %02x\n", tmp)
 	v = append(v, tmp...)
 
 	tmp, _ = gnb.encUserLocationInformation()
-	//fmt.Printf("debug: User Location Information = %02x\n", tmp)
 	v = append(v, tmp...)
 
 	length, _, _ := per.EncLengthDeterminant(len(v), 0)
@@ -282,21 +275,16 @@ NGSetupRequestIEs NGAP-PROTOCOL-IES ::= {
 func (gnb *GNB) MakeNGSetupRequest() (pdu []byte) {
 
 	pdu = encNgapPdu(initiatingMessage, idNGSetup, reject)
-	//fmt.Printf("debug: pdu = %02x\n", pdu)
 
 	v := encProtocolIEContainer(3)
-	//fmt.Printf("debug: ie container = %02x\n", v)
 
 	tmp, _ := gnb.encGlobalRANNodeID(&gnb.GlobalGNBID)
-	//fmt.Printf("debug: global RAN Node ID = %02x\n", tmp)
 	v = append(v, tmp...)
 
 	tmp, _ = gnb.encSupportedTAList(&gnb.SupportedTAList)
-	//fmt.Printf("debug: Supported TA List = %02x\n", tmp)
 	v = append(v, tmp...)
 
-	tmp, _ = encPagingDRX(gnb.PagingDRX)
-	//fmt.Printf("debug: PagingDRX = %02x\n", tmp)
+	tmp, _ = gnb.encPagingDRX(gnb.PagingDRX)
 	v = append(v, tmp...)
 
 	length, _, _ := per.EncLengthDeterminant(len(v), 0)
@@ -417,25 +405,28 @@ func (gnb *GNB) decProtocolIE(pdu *[]byte) (err error) {
 	offset := 0
 	id := int(binary.BigEndian.Uint16((*pdu)[offset:]))
 	offset += 2
-	fmt.Printf("  Protocol IE: %s (%d)\n", ieID[id], id)
+	gnb.dprint("Protocol IE: %s (%d)", ieID[id], id)
+	gnb.indent++
 
 	offset += 1 // skip ciritcality
 
 	length := int((*pdu)[offset])
-	fmt.Printf("   IE length: %d\n", length)
+	gnb.dprint("IE length: %d", length)
+	gnb.indent++
 	offset += 1
-
 	*pdu = (*pdu)[offset:]
+
 	switch id {
 	case idAMFUENGAPID:
 		gnb.decAMFUENGAPID(pdu, length)
 	case idNASPDU:
 		gnb.decNASPDU(pdu, length)
 	default:
-		fmt.Printf("   decoding id(%d) not supported yet.\n", id)
-		fmt.Printf("   dump: %02x\n", (*pdu)[:length])
+		gnb.dprint("decoding id(%d) not supported yet.", id)
+		gnb.dprint("dump: %02x", (*pdu)[:length])
 		*pdu = (*pdu)[length:]
 	}
+	gnb.indent -= 2
 	return
 }
 
@@ -656,7 +647,7 @@ PagingDRX ::= ENUMERATED {
     ...
 }
 */
-func encPagingDRX(drx string) (v []byte, err error) {
+func (gnb *GNB) encPagingDRX(drx string) (v []byte, err error) {
 
 	head, err := encProtocolIE(idDefaultPagingDRX, ignore)
 
@@ -672,7 +663,7 @@ func encPagingDRX(drx string) (v []byte, err error) {
 	case "v256":
 		n = 3
 	default:
-		fmt.Printf("encPagingDRX: no such DRX value(%s)\n", drx)
+		gnb.dprint("encPagingDRX: no such DRX value(%s)", drx)
 		return
 	}
 	pv, _, _ := per.EncEnumerated(n, 0, 3, true)
@@ -884,11 +875,12 @@ func encNASPDU(pdu []byte) (v []byte) {
 }
 
 func (gnb *GNB) decNASPDU(pdu *[]byte, length int) (err error) {
-	fmt.Printf("   pseudo DecOctetString(%x)\n", length)
+	gnb.dprint("pseudo DecOctetString(%x)", length)
 
 	octlen := int((*pdu)[0])
 	*pdu = (*pdu)[1:]
 
+	gnb.UE.SetIndent(gnb.indent)
 	gnb.UE.Decode(pdu, octlen)
 
 	return
@@ -1037,4 +1029,17 @@ func (gnb *GNB) encUEContextRequest() (v []byte, err error) {
 	head = append(head, length...)
 	v = append(head, v...)
 	return
+}
+
+//-----
+func (gnb *GNB) dprint(format string, v ...interface{}) {
+	indent := strings.Repeat("  ", gnb.indent)
+	fmt.Printf(indent+format+"\n", v...)
+	return
+}
+
+func (gnb *GNB) dprinti(format string, v ...interface{}) {
+	gnb.indent++
+	gnb.dprint(format, v...)
+	gnb.indent--
 }

@@ -88,6 +88,13 @@ const (
 	rcvdRegistrationAccept
 )
 
+var rcvdStateStr = map[int]string{
+	rcvdNull:                  "NULL",
+	rcvdAuthenticationRequest: "Received Authentication Request",
+	rcvdSecurityModeCommand:   "Received Security Mode Command",
+	rcvdRegistrationAccept:    "Received Registration Accept",
+}
+
 // TS 24.007 11.2.3.1.1A Extended protocol discriminator (EPD)
 const (
 	EPD5GSSessionManagement  = 0x2e
@@ -196,6 +203,9 @@ func (ue *UE) PowerON() {
 }
 
 func (ue *UE) MakeNasPdu() (pdu []byte) {
+
+	ue.dprint("MakeNasPdu: called in %s", rcvdStateStr[ue.recv.state])
+
 	switch ue.recv.state {
 	case rcvdNull:
 	case rcvdAuthenticationRequest:
@@ -247,8 +257,11 @@ func (ue *UE) Decode(pdu *[]byte, length int) (msgType int) {
 	}
 
 	if secHeader != 0x00 {
-		ue.dprinti("# Well..., free5gc seems to set the security header != 0" +
-			" for the plain NAS message. My workaround is invoked.")
+		/*
+		 * free5gc seems to set the security header != 0 for the plain NAS
+		 * message. My workaround is invoked.
+		 */
+		ue.dprinti("### do workaround 1.")
 	}
 
 	msgType = int((*pdu)[0])
@@ -1444,6 +1457,11 @@ func (ue *UE) ComputeMAC(bearer uint8, dir uint8, pdu *[]byte) (mac []byte) {
 }
 
 //-----
+func (ue *UE) SetIndent(indent int) {
+	ue.indent = indent
+	return
+}
+
 func (ue *UE) dprint(format string, v ...interface{}) {
 	indent := strings.Repeat("  ", ue.indent)
 	fmt.Printf(indent+format+"\n", v...)
