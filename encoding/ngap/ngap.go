@@ -56,21 +56,39 @@ var procID = map[int]string{
 }
 
 const (
+	idAllowedNSSAI            = 0
 	idAMFUENGAPID             = 10
 	idDefaultPagingDRX        = 21
 	idGlobalRANNodeID         = 27
+	idGUAMI                   = 28
+	idMaskedIMEISV            = 34
+	idMobilityRestrictionList = 36
 	idNASPDU                  = 38
 	idRANUENGAPID             = 85
 	idRRCEstablishmentCause   = 90
+	idSecurityKey             = 94
 	idSupportedTAList         = 102
 	idUEContextRequest        = 112
+	idUESecurityCapabilities  = 119
 	idUserLocationInformation = 121
 )
 
 var ieID = map[int]string{
-	idAMFUENGAPID: "id-AMF-UE-NGAP-ID",
-	idNASPDU:      "id-NAS-PDU",
-	idRANUENGAPID: "id-RAN-UE-NGAP-ID",
+	idAllowedNSSAI:            "id-AllowedNSSAI",
+	idAMFUENGAPID:             "id-AMF-UE-NGAP-ID",
+	idDefaultPagingDRX:        "",
+	idGlobalRANNodeID:         "",
+	idGUAMI:                   "id-GUAMI",
+	idMaskedIMEISV:            "id-MaskedIMEISV",
+	idMobilityRestrictionList: "id-MobilityRestrictionList",
+	idNASPDU:                  "id-NAS-PDU",
+	idRANUENGAPID:             "id-RAN-UE-NGAP-ID",
+	idRRCEstablishmentCause:   "",
+	idSecurityKey:             "id-SecurityKey",
+	idSupportedTAList:         "",
+	idUEContextRequest:        "",
+	idUESecurityCapabilities:  "id-UESecurityCapabilities",
+	idUserLocationInformation: "",
 }
 
 type GNB struct {
@@ -415,7 +433,7 @@ func (gnb *GNB) decProtocolIE(pdu *[]byte) (err error) {
 		gnb.decNASPDU(pdu, length)
 	default:
 		fmt.Printf("   decoding id(%d) not supported yet.\n", id)
-		fmt.Printf("   %02x\n", (*pdu)[:length])
+		fmt.Printf("   dump: %02x\n", (*pdu)[:length])
 		*pdu = (*pdu)[length:]
 	}
 	return
