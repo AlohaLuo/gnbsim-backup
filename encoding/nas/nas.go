@@ -57,7 +57,9 @@ type UE struct {
 		securityHeaderParsed bool
 		forceRINMR           bool
 	}
-	indent int // indent for debug print.
+
+	dbgLevel int
+	indent   int // indent for debug print.
 }
 
 // 5.1.3 5GMM sublayer states
@@ -196,6 +198,8 @@ func NewNAS(filename string) (ue *UE) {
 }
 
 func (ue *UE) PowerON() {
+	ue.dbgLevel = 0
+
 	ue.state5GMM = state5GMMDeregistared
 	ue.recv.state = rcvdNull
 
@@ -1462,7 +1466,15 @@ func (ue *UE) SetIndent(indent int) {
 	return
 }
 
+func (ue *UE) SetDebugLevel(level int) {
+	ue.dbgLevel = level
+	return
+}
+
 func (ue *UE) dprint(format string, v ...interface{}) {
+	if ue.dbgLevel == 0 {
+		return
+	}
 	indent := strings.Repeat("  ", ue.indent)
 	fmt.Printf(indent+format+"\n", v...)
 	return
