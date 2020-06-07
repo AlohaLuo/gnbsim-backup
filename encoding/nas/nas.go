@@ -482,6 +482,7 @@ func (ue *UE) decSecurityModeCommand(pdu *[]byte) {
 	ue.decNASSecurityAlgorithms(pdu)
 	ue.decngKSI(pdu)
 	ue.decUESecurityCapability(pdu)
+	ue.decInformationElement(pdu)
 	ue.indent--
 
 	ue.recv.state = rcvdSecurityModeCommand
