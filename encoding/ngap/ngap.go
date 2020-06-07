@@ -35,7 +35,7 @@ const (
 
 const (
 	initiatingMessage = iota
-	sucessfulOutcome
+	successfulOutcome
 	unsuccessfulOutcome
 )
 
@@ -104,7 +104,8 @@ type GNB struct {
 		AMFUENGAPID []byte
 	}
 
-	indent int // indent for debug print.
+	dbgLevel int
+	indent   int // indent for debug print.
 }
 
 func NewNGAP(filename string) (p *GNB) {
@@ -118,6 +119,7 @@ func NewNGAP(filename string) (p *GNB) {
 	p = &gnb
 	json.Unmarshal(bytes, p)
 
+	p.dbgLevel = 0
 	return
 }
 
@@ -140,6 +142,42 @@ func (gnb *GNB) Decode(pdu *[]byte) {
 		gnb.decProtocolIE(pdu)
 		gnb.indent -= 2
 	}
+	return
+}
+
+// 9.2.2.2 INITIAL CONTEXT SETUP RESPONSE
+/*
+InitialContextSetupResponse ::= SEQUENCE {
+    protocolIEs     ProtocolIE-Container        { {InitialContextSetupResponseIEs} },
+    ...
+}
+
+InitialContextSetupResponseIEs NGAP-PROTOCOL-IES ::= {
+    { ID id-AMF-UE-NGAP-ID                              CRITICALITY ignore  TYPE AMF-UE-NGAP-ID                                             PRESENCE mandatory  }|
+    { ID id-RAN-UE-NGAP-ID                              CRITICALITY ignore  TYPE RAN-UE-NGAP-ID                                             PRESENCE mandatory  }|
+    { ID id-PDUSessionResourceSetupListCxtRes           CRITICALITY ignore  TYPE PDUSessionResourceSetupListCxtRes                  PRESENCE optional       }|
+    { ID id-PDUSessionResourceFailedToSetupListCxtRes   CRITICALITY ignore  TYPE PDUSessionResourceFailedToSetupListCxtRes      PRESENCE optional       }|
+    { ID id-CriticalityDiagnostics                      CRITICALITY ignore  TYPE CriticalityDiagnostics                                 PRESENCE optional       },
+    ...
+}
+*/
+func (gnb *GNB) MakeInitialContextSetupResponse() (pdu []byte) {
+
+	pdu = encNgapPdu(successfulOutcome, idInitialContextSetup, reject)
+
+	v := encProtocolIEContainer(2)
+
+	tmp := gnb.encAMFUENGAPID()
+	v = append(v, tmp...)
+
+	tmp = gnb.encRANUENGAPID()
+	v = append(v, tmp...)
+
+	length, _, _ := per.EncLengthDeterminant(len(v), 0)
+
+	pdu = append(pdu, length...)
+	pdu = append(pdu, v...)
+
 	return
 }
 
@@ -168,7 +206,7 @@ func (gnb *GNB) MakeInitialUEMessage() (pdu []byte) {
 
 	v := encProtocolIEContainer(4)
 
-	tmp := encRANUENGAPID(gnb.RANUENGAPID)
+	tmp := gnb.encRANUENGAPID()
 	v = append(v, tmp...)
 
 	tmp = encNASPDU(gnb.UE.MakeRegistrationRequest())
@@ -238,7 +276,7 @@ func (gnb *GNB) MakeUplinkNASTransport() (pdu []byte) {
 	tmp := gnb.encAMFUENGAPID()
 	v = append(v, tmp...)
 
-	tmp = encRANUENGAPID(gnb.RANUENGAPID)
+	tmp = gnb.encRANUENGAPID()
 	v = append(v, tmp...)
 
 	//tmp = encNASPDU(gnb.UE.MakeAuthenticationResponse())
@@ -847,9 +885,9 @@ func (gnb *GNB) decAMFUENGAPID(pdu *[]byte, length int) {
 /*
 RAN-UE-NGAP-ID ::= INTEGER (0..4294967295)
 */
-func encRANUENGAPID(id uint32) (v []byte) {
+func (gnb *GNB) encRANUENGAPID() (v []byte) {
 	head, _ := encProtocolIE(idRANUENGAPID, reject)
-	v, _, _ = per.EncInteger(int64(id), 0, 4294967295, false)
+	v, _, _ = per.EncInteger(int64(gnb.RANUENGAPID), 0, 4294967295, false)
 
 	length, _, _ := per.EncLengthDeterminant(len(v), 0)
 	head = append(head, length...)
@@ -1032,7 +1070,15 @@ func (gnb *GNB) encUEContextRequest() (v []byte, err error) {
 }
 
 //-----
+func (gnb *GNB) SetDebugLevel(level int) {
+	gnb.dbgLevel = level
+	return
+}
+
 func (gnb *GNB) dprint(format string, v ...interface{}) {
+	if gnb.dbgLevel == 0 {
+		return
+	}
 	indent := strings.Repeat("  ", gnb.indent)
 	fmt.Printf(indent+format+"\n", v...)
 	return
