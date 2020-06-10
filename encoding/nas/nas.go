@@ -54,7 +54,6 @@ type UE struct {
 	ULCount uint32
 
 	wa struct {
-		securityHeaderParsed bool
 		forceRINMR           bool
 	}
 
@@ -233,7 +232,7 @@ func (ue *UE) Decode(pdu *[]byte, length int) (msgType int) {
 	*pdu = (*pdu)[1:]
 	length--
 
-	if secHeader != 0x00 && ue.wa.securityHeaderParsed == false {
+	if secHeader != 0x00 {
 		mac := (*pdu)[:4]
 		ue.dprinti("mac: %x", mac)
 		*pdu = (*pdu)[4:]
@@ -255,7 +254,6 @@ func (ue *UE) Decode(pdu *[]byte, length int) (msgType int) {
 		*pdu = (*pdu)[1:]
 		length--
 
-		ue.wa.securityHeaderParsed = true
 		msgType = ue.Decode(pdu, length)
 		return
 	}
@@ -280,7 +278,6 @@ func (ue *UE) Decode(pdu *[]byte, length int) (msgType int) {
 	}
 	ue.indent--
 
-	ue.wa.securityHeaderParsed = false
 	return
 }
 
