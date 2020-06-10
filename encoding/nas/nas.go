@@ -241,7 +241,7 @@ func (ue *UE) Decode(pdu *[]byte, length int) (msgType int) {
 		seq := uint8((*pdu)[0])
 		ue.dprinti("seq: %d", seq)
 
-		macCalc := ue.ComputeMAC(0, 1, pdu)
+		macCalc := ue.ComputeMAC(1, pdu)
 		if reflect.DeepEqual(mac, macCalc) == false {
 			ue.dprint("***** Integrity check failed...")
 			ue.dprint("Received  : %x", mac)
@@ -525,7 +525,7 @@ func (ue *UE) enc5GSecurityProtectedMessageHeader(
 	seq := []byte{uint8(ue.ULCount)}
 	*pdu = append(seq, *pdu...)
 
-	mac := ue.ComputeMAC(0, 0, pdu)
+	mac := ue.ComputeMAC(0, pdu)
 	head = append(head, mac...)
 
 	return
@@ -1428,7 +1428,7 @@ func (ue *UE) ComputeAlgKey() {
 	return
 }
 
-func (ue *UE) ComputeMAC(bearer uint8, dir uint8, pdu *[]byte) (mac []byte) {
+func (ue *UE) ComputeMAC(dir uint8, pdu *[]byte) (mac []byte) {
 
 	m := []byte{}
 
@@ -1438,6 +1438,7 @@ func (ue *UE) ComputeMAC(bearer uint8, dir uint8, pdu *[]byte) (mac []byte) {
 	m = append(m, tmp...)
 
 	tmp = make([]byte, 1)
+	var bearer uint8 = 1 // is the same value as free5gc v3.0.2
 	tmp[0] = (bearer << 3) | (dir << 2) // bearer is 5 bit field.
 	m = append(m, tmp...)
 	m = append(m, []byte{0, 0, 0}...) // 24 bit padding
