@@ -1387,7 +1387,7 @@ func (ue *UE) ComputeKamf() {
 	fc := []byte{0x6d}
 	s = append(s, fc...)
 
-	supi := fmt.Sprintf("imsi-%d%d%s", ue.MCC, ue.MNC, ue.MSIN)
+	supi := fmt.Sprintf("%d%d%s", ue.MCC, ue.MNC, ue.MSIN)
 	p0 := []byte(supi)
 	s = append(s, p0...)
 
