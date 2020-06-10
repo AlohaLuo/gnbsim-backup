@@ -54,6 +54,7 @@ type UE struct {
 	ULCount uint32
 
 	wa struct {
+		securityHeaderParsed bool
 		forceRINMR           bool
 	}
 
@@ -232,7 +233,7 @@ func (ue *UE) Decode(pdu *[]byte, length int) (msgType int) {
 	*pdu = (*pdu)[1:]
 	length--
 
-	if secHeader != 0x00 {
+	if secHeader != 0x00 && ue.wa.securityHeaderParsed == false {
 		mac := (*pdu)[:4]
 		ue.dprinti("mac: %x", mac)
 		*pdu = (*pdu)[4:]
@@ -254,8 +255,17 @@ func (ue *UE) Decode(pdu *[]byte, length int) (msgType int) {
 		*pdu = (*pdu)[1:]
 		length--
 
+		ue.wa.securityHeaderParsed = true
 		msgType = ue.Decode(pdu, length)
 		return
+	}
+
+	if secHeader != 0x00 {
+		/*
+		 * free5gc seems to set the security header != 0 for the plain NAS
+		 * message. My workaround is invoked.
+		 */
+		ue.dprinti("### workaround: SecurityHeaderParsed.")
 	}
 
 	msgType = int((*pdu)[0])
@@ -277,6 +287,7 @@ func (ue *UE) Decode(pdu *[]byte, length int) (msgType int) {
 		break
 	}
 	ue.indent--
+	ue.wa.securityHeaderParsed = false
 
 	return
 }
