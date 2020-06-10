@@ -260,14 +260,6 @@ func (ue *UE) Decode(pdu *[]byte, length int) (msgType int) {
 		return
 	}
 
-	if secHeader != 0x00 {
-		/*
-		 * free5gc seems to set the security header != 0 for the plain NAS
-		 * message. My workaround is invoked.
-		 */
-		ue.dprinti("### do workaround 1.")
-	}
-
 	msgType = int((*pdu)[0])
 	ue.dprint("Message Type: %s (0x%x)", msgTypeStr[msgType], msgType)
 	*pdu = (*pdu)[1:]
