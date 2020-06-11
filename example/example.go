@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"strings"
+	"time"
 )
 
 func main() {
@@ -37,6 +38,9 @@ func main() {
 	}
 
 	conn, err := sctp.DialSCTP("sctp", laddr, addr)
+	if err != nil {
+		log.Fatalf("failed to dial: %v", err)
+	}
 	log.Printf("Dail LocalAddr: %s; RemoteAddr: %s", conn.LocalAddr(), conn.RemoteAddr())
 
 	sndbuf, err := conn.GetWriteBuffer()
@@ -53,6 +57,9 @@ func main() {
 
 	gnb := ngap.NewNGAP("example.json")
 	gnb.UE.PowerON()
+	gnb.SetDebugLevel(1)
+	gnb.UE.SetDebugLevel(1)
+
 	buf := []byte{}
 
 	sendbuf := gnb.MakeNGSetupRequest()
@@ -118,6 +125,7 @@ func main() {
 	fmt.Printf("dump: %x\n", buf)
 	gnb.Decode(&buf)
 
+	//---
 	sendbuf = gnb.MakeUplinkNASTransport()
 	n, err = conn.SCTPWrite(sendbuf, info)
 
@@ -139,5 +147,24 @@ func main() {
 	fmt.Printf("dump: %x\n", buf)
 	gnb.Decode(&buf)
 
+	//---
+	sendbuf = gnb.MakeInitialContextSetupResponse()
+	n, err = conn.SCTPWrite(sendbuf, info)
+
+	if err != nil {
+		log.Fatalf("failed to write: %v", err)
+	}
+	log.Printf("write: len %d", n)
+
+	sendbuf = gnb.MakeUplinkNASTransport()
+	n, err = conn.SCTPWrite(sendbuf, info)
+
+	if err != nil {
+		log.Fatalf("failed to write: %v", err)
+	}
+
+	log.Printf("write: len %d", n)
+
+	time.Sleep(time.Second * 5)
 	return
 }
