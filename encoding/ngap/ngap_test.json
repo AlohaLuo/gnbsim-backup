@@ -6,7 +6,7 @@
 	},
 	"SupportedTAList" : [
 		{
-			"TAC": "0x000102",
+			"TAC": "0x000001",
 			"BroadcastPLMNList": [
 				{
 					"mcc": 208,
@@ -14,7 +14,7 @@
 					"SliceSupportList": [
 						{
 							"sst": 1,
-							"sd": "0x123456"
+							"sd": "0x010203"
 						}
 					]
 				}
@@ -48,7 +48,7 @@
 				"mcc": 208,
 				"mnc": 93
 			},
-			"TAC": "0x000102"
+			"TAC": "0x000001"
 		}
 	}
 }

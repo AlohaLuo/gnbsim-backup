@@ -7,9 +7,21 @@ import (
 	"testing"
 )
 
-var TestAuthenticationRequest string = "7e005600020000217d9192431b0560ca6c35a0212d6759e520109a4a995a657a800089c03b9ac78a0614"
-var TestSecurityModeCommand string = "7e03ca400b02007e035d02000480a00000e1360100"
-var TestRegistrationAccept string = "7e02823d94a5017e0242010177000b0202f839cafe000000000154070002f839000001150a040101020304011122335e010616012c"
+// send
+var TestRegistrationRequest string = "7e004179000d0102f8392143000010325476981001202e0480a00000"
+var TestAuthenticationResponse string = "7e00572d10803adcacc364fc000bdc0f65e324eaa1"
+var TestSecurityModeComplete []string = []string{
+	"7e04da52b828007e005e",
+	"7e0452a73e0c007e005e7700090500000001000001f1",
+	"7e04a860200b007e005e7700090500000001000001f171001c7e004179000d0102f8392143000010325476981001202e0480a00000",
+	"7e04a860200b007e005e7700090500000001000001f171001c7e004179000d0102f8392143000010325476981001202e0480a00000",
+}
+var TestRegistrationComplete string = "7e04006d1298007e0043"
+
+// receive
+var TestAuthenticationRequest string = "7e00560002000021fc64081953bb33c0682edf1690b25821201094bbaf40940a8000c6a72c4efbaf0337"
+var TestSecurityModeCommand string = "7e03461235ef007e035d02000480a00000e1360100"
+var TestRegistrationAccept string = "7e02930d75cf017e0242010177000b0202f839cafe000000000154070002f839000001150a040101020304011122335e010616012c"
 
 func receive(ue *UE, msg string) {
 	in, _ := hex.DecodeString(msg)
@@ -33,11 +45,10 @@ func TestStr2BCD(t *testing.T) {
 
 func TestMakeAuthenticationResponse(t *testing.T) {
 	ue := NewNAS("nas_test.json")
-	ue.AuthParam.RESstar = []byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-		0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f}
+
+	receive(ue, TestAuthenticationRequest)
 	v := ue.MakeAuthenticationResponse()
-	//fmt.Printf("MakeRegistrationRequest: %02x\n", v)
-	expect_str := "7e00572d10000102030405060708090a0b0c0d0e0f"
+	expect_str := TestAuthenticationResponse
 	expect, _ := hex.DecodeString(expect_str)
 	if reflect.DeepEqual(expect, v) == false {
 		t.Errorf("AuthenticationResponse\nexpect: %x\nactual: %x", expect, v)
@@ -48,7 +59,7 @@ func TestMakeRegistrationRequest(t *testing.T) {
 	ue := NewNAS("nas_test.json")
 	v := ue.MakeRegistrationRequest()
 	//fmt.Printf("MakeRegistrationRequest: %02x\n", v)
-	expect_str := "7e004179000d0102f8392143000010325476981001202e0480a00000"
+	expect_str := TestRegistrationRequest
 	expect, _ := hex.DecodeString(expect_str)
 	if reflect.DeepEqual(expect, v) == false {
 		t.Errorf("RegistrationRequest\nexpect: %x\nactual: %x", expect, v)
@@ -65,7 +76,11 @@ func TestMakeRegistrationComplete(t *testing.T) {
 	receive(ue, TestRegistrationAccept)
 
 	v = ue.MakeRegistrationComplete()
-	fmt.Printf("MakeRegistrationComplete: %02x\n", v)
+	expect_str := TestRegistrationComplete
+	expect, _ := hex.DecodeString(expect_str)
+	if reflect.DeepEqual(expect, v) == false {
+		t.Errorf("RegistrationComplete\nexpect: %x\nactual: %x", expect, v)
+	}
 }
 
 func TestMakeSecurityModeComplete(t *testing.T) {
@@ -87,26 +102,24 @@ func TestMakeSecurityModeComplete(t *testing.T) {
 	receive(ue, TestAuthenticationRequest)
 	receive(ue, TestSecurityModeCommand)
 
-	for _, p := range pattern {
+	for i, p := range pattern {
 		ue.recv.flag.imeisv = p.imeisv
 		ue.recv.flag.rinmr = p.rinmr
 		ue.wa.forceRINMR = p.forceRINMR
 		v = ue.MakeSecurityModeComplete()
-		fmt.Printf("MakeSecurityModeCoplete: %02x\n", v)
-
-	}
-
-	/*
-		expect_str := "7e004179000d0102f8392143000010325476981001202e0480a00000"
+		expect_str := TestSecurityModeComplete[i]
 		expect, _ := hex.DecodeString(expect_str)
 		if reflect.DeepEqual(expect, v) == false {
-			t.Errorf("RegistrationRequest\nexpect: %x\nactual: %x", expect, v)
+			t.Errorf("SecurityModeComplete[%d]\nexpect: %x\nactual: %x", i, expect, v)
 		}
-	*/
+
+	}
 }
 
 func TestDecode(t *testing.T) {
 	ue := NewNAS("nas_test.json")
+
+	ue.dbgLevel = 0
 
 	pattern := []struct {
 		in_str string
@@ -117,7 +130,6 @@ func TestDecode(t *testing.T) {
 	}
 
 	for _, p := range pattern {
-		fmt.Printf("----------\n")
 		receive(ue, p.in_str)
 	}
 }

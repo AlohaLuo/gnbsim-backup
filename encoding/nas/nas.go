@@ -1449,7 +1449,7 @@ func (ue *UE) ComputeMAC(dir uint8, pdu *[]byte) (mac []byte) {
 	m = append(m, tmp...)
 
 	tmp = make([]byte, 1)
-	var bearer uint8 = 1 // is the same value as free5gc v3.0.2
+	var bearer uint8 = 1                // is the same value as free5gc v3.0.2
 	tmp[0] = (bearer << 3) | (dir << 2) // bearer is 5 bit field.
 	m = append(m, tmp...)
 	m = append(m, []byte{0, 0, 0}...) // 24 bit padding
