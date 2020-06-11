@@ -8,8 +8,9 @@ These instructions will get you a copy of the project up and running on your loc
 
 ### Prerequisites
 
-* golang environment on localhost.
-  - 'Registration Request' doesn't complete for now.
+* golang environment on linux host.
+  - gnbsim can complete 'Initial Registration'.
+  - gnbsim cannot complete 'PDU Session Establishment' for now.
   - I will try to update my code step by step...
 * running free5gc somewhere.
   - subscriber has been registered by free5gc web console.
@@ -17,7 +18,7 @@ These instructions will get you a copy of the project up and running on your loc
 
 ### Installing and testing
 
-* Downlod the related files.
+* Download the related files.
 
 ```shell
 $ git clone https://github.com/hhorai/gnbsim.git
@@ -46,6 +47,8 @@ $ ./example -ip <AMF NGAP listen ip address set above>
 ```
 ***** Integrity check passed
 ```
+
+* And you could also find your UE in 'subscriber' page of free5gc web console. In my environment, free5gc dashboard doesn't show my UE, but the actual transfered packet that is respond from web conole includes the information (PLMN and IMSI) of it in json format.
 
 <!--
 ## Running the tests
