@@ -67,8 +67,8 @@ type UE struct {
 const (
 	//fiveGMMNULL = iota
 	state5GMMDeregistared = iota
-	state5GMMRegistaredInitiated
-	state5GMMRegistared
+	state5GMMRegisteredInitiated
+	state5GMMRegistered
 	state5GMMServiceRequestInitiated
 	state5GMMDeregistaredInitiated
 )
@@ -76,8 +76,8 @@ const (
 var state5GMMstr = map[int]string{
 	//state5GMMNULL:                    "5GMM-NULL",
 	state5GMMDeregistared:            "5GMM-DEREGISTERED",
-	state5GMMRegistaredInitiated:     "5GMM-REGISTERED-INITIATED",
-	state5GMMRegistared:              "5GMM-REGISTERED",
+	state5GMMRegisteredInitiated:     "5GMM-REGISTERED-INITIATED",
+	state5GMMRegistered:              "5GMM-REGISTERED",
 	state5GMMServiceRequestInitiated: "5GMM-SERVICE-REQUEST-INITIATED",
 	state5GMMDeregistaredInitiated:   "5GMM-DEREGISTERED-INITIATED",
 }
@@ -107,15 +107,6 @@ var epdStr = map[int]string{
 	EPD5GSSessionManagement:  "5G Session Management",
 	EPD5GSMobilityManagement: "5G Mobility Management",
 }
-
-/*
-type NasMessageSM struct {
-	ExtendedProtocolDiscriminator uint8
-	PDUSessionID uint8
-	ProcedureTransactionID uint8
-	MessageType uint8
-}
-*/
 
 // 9.3 Security header type
 const (
@@ -436,7 +427,7 @@ func (ue *UE) MakeRegistrationRequest() (pdu []byte) {
 	binary.Write(data, binary.BigEndian, encUESecurityCapability())
 	pdu = append(pdu, data.Bytes()...)
 
-	ue.state5GMM = state5GMMRegistaredInitiated
+	ue.state5GMM = state5GMMRegisteredInitiated
 
 	// start T3510 timer. see 5.5.1.2.2 Initial registration initiation
 
