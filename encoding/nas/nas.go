@@ -36,6 +36,7 @@ type UE struct {
 	AuthParam        AuthParam
 
 	state5GMM int
+	state5GSM int
 
 	recv struct {
 		flag struct {
@@ -511,9 +512,19 @@ func (ue *UE) MakeSecurityModeComplete() (pdu []byte) {
 func (ue *UE) enc5GSMMMessageHeader(
 	headType uint8, msgType uint8) (head []byte) {
 
-	head = append(head, []byte{EPD5GSMobilityManagement}...)
-	head = append(head, []byte{headType}...)
-	head = append(head, []byte{msgType}...)
+	head = append(head, EPD5GSMobilityManagement)
+	head = append(head, headType)
+	head = append(head, msgType)
+
+	return
+}
+func (ue *UE) enc5GSSMMessageHeader(
+	psi uint8, pti uint8, msgType uint8) (head []byte) {
+
+	head = append(head, EPD5GSSessionManagement)
+	head = append(head, psid)
+	head = append(head, ptid)
+	head = append(head, msgType)
 
 	return
 }
