@@ -120,26 +120,29 @@ const (
 
 // 9.7 Message type
 const (
-	MessageTypeRegistrationRequest    = 0x41
-	MessageTypeRegistrationAccept     = 0x42
-	MessageTypeRegistrationComplete   = 0x43
-	MessageTypeAuthenticationRequest  = 0x56
-	MessageTypeAuthenticationResponse = 0x57
-	MessageTypeSecurityModeCommand    = 0x5d
-	MessageTypeSecurityModeComplete   = 0x5e
+	MessageTypeRegistrationRequest            = 0x41
+	MessageTypeRegistrationAccept             = 0x42
+	MessageTypeRegistrationComplete           = 0x43
+	MessageTypeAuthenticationRequest          = 0x56
+	MessageTypeAuthenticationResponse         = 0x57
+	MessageTypeSecurityModeCommand            = 0x5d
+	MessageTypeSecurityModeComplete           = 0x5e
+	MessageTypePDUSessionEstablishmentRequest = 0xc1
 )
 
 var msgTypeStr = map[int]string{
-	MessageTypeRegistrationRequest:    "Registration Request",
-	MessageTypeRegistrationAccept:     "Registration Accept",
-	MessageTypeRegistrationComplete:   "Registration Complete",
-	MessageTypeAuthenticationRequest:  "Authentication Request",
-	MessageTypeAuthenticationResponse: "Authentication Response",
-	MessageTypeSecurityModeCommand:    "Security Mode Command",
-	MessageTypeSecurityModeComplete:   "Security Mode Complete",
+	MessageTypeRegistrationRequest:            "Registration Request",
+	MessageTypeRegistrationAccept:             "Registration Accept",
+	MessageTypeRegistrationComplete:           "Registration Complete",
+	MessageTypeAuthenticationRequest:          "Authentication Request",
+	MessageTypeAuthenticationResponse:         "Authentication Response",
+	MessageTypeSecurityModeCommand:            "Security Mode Command",
+	MessageTypeSecurityModeComplete:           "Security Mode Complete",
+	MessageTypePDUSessionEstablishmentRequest: "PDU Session Establishment Request",
 }
 
 const (
+	ieiPDUSessionType       = 0x9
 	ieiIMEISVRequest        = 0xe
 	iei5GMMCapability       = 0x10
 	ieiAllowedNSSAI         = 0x15
@@ -157,6 +160,7 @@ const (
 )
 
 var ieStr = map[int]string{
+	ieiPDUSessionType:       "PDU Session Type IE",
 	ieiIMEISVRequest:        "IMEISV Request IE",
 	iei5GMMCapability:       "5G MM Capability IE",
 	ieiAllowedNSSAI:         "Allowd NSSAI IE",
@@ -486,7 +490,6 @@ func (ue *UE) decSecurityModeCommand(pdu *[]byte) {
 func (ue *UE) MakeSecurityModeComplete() (pdu []byte) {
 
 	pdu = ue.enc5GSMMMessageHeader(
-		//SecurityHeaderTypeIntegrityProtectedAndCipheredWithNewContext,
 		SecurityHeaderTypePlain,
 		MessageTypeSecurityModeComplete)
 
@@ -508,6 +511,20 @@ func (ue *UE) MakeSecurityModeComplete() (pdu []byte) {
 	return
 }
 
+// 8.3.1 PDU session establishment request
+func (ue *UE) MakePDUSessionEstablishmentRequest() (pdu []byte) {
+
+	pdu = ue.enc5GSSMMessageHeader(
+		0x01, // 9.4 PDU Session ID
+		0x01, // 9.6 Procedure Transaction ID
+		MessageTypePDUSessionEstablishmentRequest)
+
+	pdu = append(pdu, ue.encIntegrityProtectionMaximuDataRate()...)
+	pdu = append(pdu, ue.encPDUSessionType()...)
+
+	return
+}
+
 // 9.1.1 NAS message format
 func (ue *UE) enc5GSMMMessageHeader(
 	headType uint8, msgType uint8) (head []byte) {
@@ -522,8 +539,8 @@ func (ue *UE) enc5GSSMMessageHeader(
 	psi uint8, pti uint8, msgType uint8) (head []byte) {
 
 	head = append(head, EPD5GSSessionManagement)
-	head = append(head, psid)
-	head = append(head, ptid)
+	head = append(head, psi)
+	head = append(head, pti)
 	head = append(head, msgType)
 
 	return
@@ -1195,6 +1212,29 @@ func (ue *UE) decUESecurityCapability(pdu *[]byte) {
 	ue.dprinti("Capability: 0x%02x", cap)
 	*pdu = (*pdu)[length:]
 
+	return
+}
+
+// 9.11.4.7 Integrity protection maximum data rate
+func (ue *UE) encIntegrityProtectionMaximuDataRate() (pdu []byte) {
+
+	uplink := 0xff
+	downlink := 0xff
+
+	pdu = append(pdu, byte(uplink))
+	pdu = append(pdu, byte(downlink))
+	return
+}
+
+// 9.11.4.11 PDU session type
+const (
+	PDUSessionIPv4   = 0x01
+	PDUSessionIPv6   = 0x02
+	PDUSessionIPv4v6 = 0x03
+)
+
+func (ue *UE) encPDUSessionType() (pdu []byte) {
+	pdu = []byte{byte((ieiPDUSessionType << 4) | PDUSessionIPv4v6)}
 	return
 }
 

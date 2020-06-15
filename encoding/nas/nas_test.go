@@ -51,7 +51,7 @@ func TestMakeAuthenticationResponse(t *testing.T) {
 	expect_str := TestAuthenticationResponse
 	expect, _ := hex.DecodeString(expect_str)
 	if reflect.DeepEqual(expect, v) == false {
-		t.Errorf("AuthenticationResponse\nexpect: %x\nactual: %x", expect, v)
+		t.Errorf("Authentication Response\nexpect: %x\nactual: %x", expect, v)
 	}
 }
 
@@ -62,7 +62,7 @@ func TestMakeRegistrationRequest(t *testing.T) {
 	expect_str := TestRegistrationRequest
 	expect, _ := hex.DecodeString(expect_str)
 	if reflect.DeepEqual(expect, v) == false {
-		t.Errorf("RegistrationRequest\nexpect: %x\nactual: %x", expect, v)
+		t.Errorf("Registration Request\nexpect: %x\nactual: %x", expect, v)
 	}
 }
 
@@ -79,7 +79,7 @@ func TestMakeRegistrationComplete(t *testing.T) {
 	expect_str := TestRegistrationComplete
 	expect, _ := hex.DecodeString(expect_str)
 	if reflect.DeepEqual(expect, v) == false {
-		t.Errorf("RegistrationComplete\nexpect: %x\nactual: %x", expect, v)
+		t.Errorf("Registration Complete\nexpect: %x\nactual: %x", expect, v)
 	}
 }
 
@@ -110,10 +110,22 @@ func TestMakeSecurityModeComplete(t *testing.T) {
 		expect_str := TestSecurityModeComplete[i]
 		expect, _ := hex.DecodeString(expect_str)
 		if reflect.DeepEqual(expect, v) == false {
-			t.Errorf("SecurityModeComplete[%d]\nexpect: %x\nactual: %x", i, expect, v)
+			t.Errorf("Security Mode Complete[%d]\nexpect: %x\nactual: %x", i, expect, v)
 		}
 
 	}
+}
+
+func TestMakePDUSessionEstablishmentRequest(t *testing.T) {
+
+	ue := NewNAS("nas_test.json")
+	v := ue.MakePDUSessionEstablishmentRequest()
+	expect_str := ""
+	expect, _ := hex.DecodeString(expect_str)
+	if reflect.DeepEqual(expect, v) == false {
+		t.Errorf("PDU Session Establishemnt Request\nexpect: %x\nactual: %x", expect, v)
+	}
+
 }
 
 func TestDecode(t *testing.T) {
