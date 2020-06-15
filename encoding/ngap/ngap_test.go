@@ -24,6 +24,7 @@ var TestInitialContextSetupRequest string = "000e0080a7000009000a000200010055000
 func receive(gnb *GNB, msg string) {
 	in, _ := hex.DecodeString(msg)
 	gnb.Decode(&in)
+	gnb.SendtoUE()
 	fmt.Printf("")
 }
 

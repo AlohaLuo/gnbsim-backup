@@ -202,6 +202,11 @@ func (ue *UE) PowerON() {
 	ue.wa.forceRINMR = true
 }
 
+func (ue *UE) Receive(pdu *[]byte) {
+	ue.Decode(pdu)
+	return
+}
+
 func (ue *UE) MakeNasPdu() (pdu []byte) {
 
 	ue.dprint("MakeNasPdu: called in %s", rcvdStateStr[ue.recv.state])
@@ -218,22 +223,19 @@ func (ue *UE) MakeNasPdu() (pdu []byte) {
 	return
 }
 
-func (ue *UE) Decode(pdu *[]byte, length int) (msgType int) {
+func (ue *UE) Decode(pdu *[]byte) (msgType int) {
 	epd := int((*pdu)[0])
 	ue.dprint("EPD: %s (0x%x)", epdStr[epd], epd)
 	*pdu = (*pdu)[1:]
-	length--
 
 	secHeader := int((*pdu)[0])
 	ue.dprint("Security Header: 0x%x", secHeader)
 	*pdu = (*pdu)[1:]
-	length--
 
 	if secHeader != 0x00 && ue.wa.securityHeaderParsed == false {
 		mac := (*pdu)[:4]
 		ue.dprinti("mac: %x", mac)
 		*pdu = (*pdu)[4:]
-		length -= 4
 
 		seq := uint8((*pdu)[0])
 		ue.dprinti("seq: %d", seq)
@@ -249,10 +251,9 @@ func (ue *UE) Decode(pdu *[]byte, length int) (msgType int) {
 		ue.dprint("***** Integrity check passed")
 
 		*pdu = (*pdu)[1:]
-		length--
 
 		ue.wa.securityHeaderParsed = true
-		msgType = ue.Decode(pdu, length)
+		msgType = ue.Decode(pdu)
 		return
 	}
 

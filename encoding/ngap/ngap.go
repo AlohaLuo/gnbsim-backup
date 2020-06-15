@@ -104,6 +104,9 @@ type GNB struct {
 		AMFUENGAPID []byte
 	}
 
+	SendNasMsg *[]byte
+	RecvNasMsg *[]byte
+
 	dbgLevel int
 	indent   int // indent for debug print.
 }
@@ -120,6 +123,19 @@ func NewNGAP(filename string) (p *GNB) {
 	json.Unmarshal(bytes, p)
 
 	p.dbgLevel = 0
+	return
+}
+
+func (gnb *GNB) SendtoUE() {
+
+	if gnb.SendNasMsg != nil {
+		gnb.UE.Receive(gnb.SendNasMsg)
+	}
+	return
+}
+
+func (gnb *GNB) RecvfromUE(pdu *[]byte) {
+	gnb.RecvNasMsg = pdu
 	return
 }
 
@@ -153,11 +169,11 @@ InitialContextSetupResponse ::= SEQUENCE {
 }
 
 InitialContextSetupResponseIEs NGAP-PROTOCOL-IES ::= {
-    { ID id-AMF-UE-NGAP-ID                              CRITICALITY ignore  TYPE AMF-UE-NGAP-ID                                             PRESENCE mandatory  }|
-    { ID id-RAN-UE-NGAP-ID                              CRITICALITY ignore  TYPE RAN-UE-NGAP-ID                                             PRESENCE mandatory  }|
-    { ID id-PDUSessionResourceSetupListCxtRes           CRITICALITY ignore  TYPE PDUSessionResourceSetupListCxtRes                  PRESENCE optional       }|
+    { ID id-AMF-UE-NGAP-ID                              CRITICALITY ignore  TYPE AMF-UE-NGAP-ID                                 PRESENCE mandatory  }|
+    { ID id-RAN-UE-NGAP-ID                              CRITICALITY ignore  TYPE RAN-UE-NGAP-ID                                 PRESENCE mandatory  }|
+    { ID id-PDUSessionResourceSetupListCxtRes           CRITICALITY ignore  TYPE PDUSessionResourceSetupListCxtRes              PRESENCE optional       }|
     { ID id-PDUSessionResourceFailedToSetupListCxtRes   CRITICALITY ignore  TYPE PDUSessionResourceFailedToSetupListCxtRes      PRESENCE optional       }|
-    { ID id-CriticalityDiagnostics                      CRITICALITY ignore  TYPE CriticalityDiagnostics                                 PRESENCE optional       },
+    { ID id-CriticalityDiagnostics                      CRITICALITY ignore  TYPE CriticalityDiagnostics                         PRESENCE optional       },
     ...
 }
 */
@@ -279,7 +295,6 @@ func (gnb *GNB) MakeUplinkNASTransport() (pdu []byte) {
 	tmp = gnb.encRANUENGAPID()
 	v = append(v, tmp...)
 
-	//tmp = encNASPDU(gnb.UE.MakeAuthenticationResponse())
 	tmp = encNASPDU(gnb.UE.MakeNasPdu())
 	v = append(v, tmp...)
 
@@ -919,7 +934,8 @@ func (gnb *GNB) decNASPDU(pdu *[]byte, length int) (err error) {
 	*pdu = (*pdu)[1:]
 
 	gnb.UE.SetIndent(gnb.indent)
-	gnb.UE.Decode(pdu, octlen)
+	msg := (*pdu)[:octlen]
+	gnb.SendNasMsg = &msg
 
 	return
 }

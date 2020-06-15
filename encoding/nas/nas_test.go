@@ -25,7 +25,7 @@ var TestRegistrationAccept string = "7e02930d75cf017e0242010177000b0202f839cafe0
 
 func receive(ue *UE, msg string) {
 	in, _ := hex.DecodeString(msg)
-	ue.Decode(&in, len(in))
+	ue.Decode(&in)
 	fmt.Printf("")
 }
 
