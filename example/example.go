@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/hhorai/gnbsim/encoding/nas"
 	"github.com/hhorai/gnbsim/encoding/ngap"
 	"github.com/ishidawataru/sctp"
 	"log"
@@ -11,7 +12,15 @@ import (
 	"time"
 )
 
-func main() {
+type testSession struct {
+	conn *sctp.SCTPConn
+	info *sctp.SndRcvInfo
+	gnb  *ngap.GNB
+	ue   *nas.UE
+}
+
+func setupSCTP() (conn *sctp.SCTPConn, info *sctp.SndRcvInfo) {
+
 	var ip = flag.String("ip", "localhost", "destinaion ip address")
 	var port = flag.Int("port", 38412, "destination port")
 	var lport = flag.Int("lport", 38412, "local port")
@@ -41,130 +50,131 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to dial: %v", err)
 	}
-	log.Printf("Dail LocalAddr: %s; RemoteAddr: %s", conn.LocalAddr(), conn.RemoteAddr())
+	log.Printf("Dail LocalAddr: %s; RemoteAddr: %s",
+		conn.LocalAddr(), conn.RemoteAddr())
 
 	sndbuf, err := conn.GetWriteBuffer()
 	rcvbuf, err := conn.GetReadBuffer()
 	log.Printf("SndBufSize: %d, RcvBufSize: %d", sndbuf, rcvbuf)
 
 	ppid := 0
-	info := &sctp.SndRcvInfo{
+	info = &sctp.SndRcvInfo{
 		Stream: uint16(ppid),
 		PPID:   0x3c000000,
 	}
 
 	conn.SubscribeEvents(sctp.SCTP_EVENT_DATA_IO)
 
+	return
+}
+
+func (t *testSession) sendtoAMF(pdu []byte) {
+
+	n, err := t.conn.SCTPWrite(pdu, t.info)
+	if err != nil {
+		log.Fatalf("failed to write: %v", err)
+	}
+	log.Printf("write: len %d, info: %+v", n, t.info)
+	return
+}
+
+func (t *testSession) recvfromAMF() {
+
+	buf := make([]byte, 1500)
+	n, info, err := t.conn.SCTPRead(buf)
+	t.info = info
+
+	if err != nil {
+		log.Fatalf("failed to read: %v", err)
+	}
+	log.Printf("read: len %d, info: %+v", n, t.info)
+
+	buf = buf[:n]
+	fmt.Printf("dump: %x\n", buf)
+	t.gnb.Decode(&buf)
+
+	return
+}
+
+func initRAN() (t *testSession) {
+
+	t = new(testSession)
 	gnb := ngap.NewNGAP("example.json")
-	gnb.UE.PowerON()
 	gnb.SetDebugLevel(1)
-	gnb.UE.SetDebugLevel(1)
 
-	buf := []byte{}
+	conn, info := setupSCTP()
 
-	sendbuf := gnb.MakeNGSetupRequest()
-	n, err := conn.SCTPWrite(sendbuf, info)
+	t.gnb = gnb
+	t.conn = conn
+	t.info = info
 
-	if err != nil {
-		log.Fatalf("failed to write: %v", err)
-	}
+	pdu := gnb.MakeNGSetupRequest()
+	t.sendtoAMF(pdu)
+	t.recvfromAMF()
 
-	log.Printf("write: len %d", n)
+	return
+}
 
-	buf = make([]byte, 1500)
-	n, info, err = conn.SCTPRead(buf)
+func (t *testSession) initUE() {
+	t.ue = &t.gnb.UE
+	t.ue.PowerON()
+	t.ue.SetDebugLevel(1)
+	return
+}
 
-	if err != nil {
-		log.Fatalf("failed to read: %v", err)
-	}
+func (t *testSession) registrationRequest() {
 
-	log.Printf("read: len %d, info: %+v", n, info)
-	buf = buf[:n]
-	fmt.Printf("dump: %x\n", buf)
-	gnb.Decode(&buf)
+	pdu := t.ue.MakeRegistrationRequest()
+	t.gnb.RecvfromUE(&pdu)
+	sendbuf := t.gnb.MakeInitialUEMessage()
 
-	sendbuf = gnb.MakeInitialUEMessage()
-	n, err = conn.SCTPWrite(sendbuf, info)
-
-	if err != nil {
-		log.Fatalf("failed to write: %v", err)
-	}
-
-	log.Printf("write: len %d", n)
-
-	buf = make([]byte, 1500)
-	n, info, err = conn.SCTPRead(buf)
-
-	if err != nil {
-		log.Fatalf("failed to read: %v", err)
-	}
-
-	log.Printf("read: len %d, info: %+v", n, info)
-	buf = buf[:n]
-	fmt.Printf("dump: %x\n", buf)
-	gnb.Decode(&buf)
-
-	sendbuf = gnb.MakeUplinkNASTransport()
-	n, err = conn.SCTPWrite(sendbuf, info)
-
-	if err != nil {
-		log.Fatalf("failed to write: %v", err)
-	}
-
-	log.Printf("write: len %d", n)
-
-	buf = make([]byte, 1500)
-	n, info, err = conn.SCTPRead(buf)
-
-	if err != nil {
-		log.Fatalf("failed to read: %v", err)
-	}
-
-	log.Printf("read: len %d, info: %+v", n, info)
-	buf = buf[:n]
-	fmt.Printf("dump: %x\n", buf)
-	gnb.Decode(&buf)
-
-	//---
-	sendbuf = gnb.MakeUplinkNASTransport()
-	n, err = conn.SCTPWrite(sendbuf, info)
-
-	if err != nil {
-		log.Fatalf("failed to write: %v", err)
-	}
-
-	log.Printf("write: len %d", n)
-
-	buf = make([]byte, 1500)
-	n, info, err = conn.SCTPRead(buf)
-
-	if err != nil {
-		log.Fatalf("failed to read: %v", err)
-	}
-
-	log.Printf("read: len %d, info: %+v", n, info)
-	buf = buf[:n]
-	fmt.Printf("dump: %x\n", buf)
-	gnb.Decode(&buf)
-
-	//---
-	sendbuf = gnb.MakeInitialContextSetupResponse()
-	n, err = conn.SCTPWrite(sendbuf, info)
+	n, err := t.conn.SCTPWrite(sendbuf, t.info)
 
 	if err != nil {
 		log.Fatalf("failed to write: %v", err)
 	}
 	log.Printf("write: len %d", n)
 
-	sendbuf = gnb.MakeUplinkNASTransport()
-	n, err = conn.SCTPWrite(sendbuf, info)
+	return
+}
 
-	if err != nil {
-		log.Fatalf("failed to write: %v", err)
-	}
+func main() {
 
-	log.Printf("write: len %d", n)
+	t := initRAN()
+	t.initUE()
+
+	t.registrationRequest()
+	t.recvfromAMF()
+
+	pdu := t.ue.MakeAuthenticationResponse()
+	t.gnb.RecvfromUE(&pdu)
+	buf := t.gnb.MakeUplinkNASTransport()
+	t.sendtoAMF(buf)
+	t.recvfromAMF()
+
+	pdu = t.ue.MakeSecurityModeComplete()
+	t.gnb.RecvfromUE(&pdu)
+	buf = t.gnb.MakeUplinkNASTransport()
+	t.sendtoAMF(buf)
+	t.recvfromAMF()
+
+	buf = t.gnb.MakeInitialContextSetupResponse()
+	t.sendtoAMF(buf)
+
+	pdu = t.ue.MakeRegistrationComplete()
+	t.gnb.RecvfromUE(&pdu)
+	buf = t.gnb.MakeUplinkNASTransport()
+	t.sendtoAMF(buf)
+
+	time.Sleep(time.Second * 1)
+
+	pdu = t.ue.MakePDUSessionEstablishmentRequest()
+	t.gnb.RecvfromUE(&pdu)
+	buf = t.gnb.MakeUplinkNASTransport()
+	t.sendtoAMF(buf)
+	t.recvfromAMF()
 
 	time.Sleep(time.Second * 5)
+
 	return
 }
