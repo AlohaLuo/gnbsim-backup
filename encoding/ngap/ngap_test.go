@@ -21,7 +21,7 @@ var TestDLAuthenticationRequest string = "0004403e000003000a00020001005500020000
 var TestDLSecurityModeCommand string = "00044029000003000a0002000100550002000000260016157e036c2b24e2007e005d02000480a00000e1360100"
 var TestInitialContextSetupRequest string = "000e0080a7000009000a00020001005500020000001c00070002f839cafe000000000a2201010203100811223300770009000004000000000000005e002013663ab7286c9a6af7cba0b1fd9e6ed48045d4356d46ff3944c81c63324fd803002440040002f839002240080000000100ffff0100264036357e02930d75cf017e0242010177000b0202f839cafe000000000154070002f839000001150a040101020304011122335e010616012c"
 
-func receive(gnb *GNB, msg string) {
+func recvfromNW(gnb *GNB, msg string) {
 	in, _ := hex.DecodeString(msg)
 	gnb.Decode(&in)
 	gnb.SendtoUE()
@@ -32,7 +32,7 @@ func TestInitialContestSetupResponse(t *testing.T) {
 	gnb := NewNGAP("ngap_test.json")
 	gnb.UE.PowerON()
 
-	receive(gnb, TestDLAuthenticationRequest)
+	recvfromNW(gnb, TestDLAuthenticationRequest)
 	v := gnb.MakeInitialContextSetupResponse()
 	expect_str := TestInitialContextSetupResponse
 	expect, _ := hex.DecodeString(expect_str)
@@ -44,6 +44,9 @@ func TestInitialContestSetupResponse(t *testing.T) {
 func TestMakeInitialUEMessage(t *testing.T) {
 	gnb := NewNGAP("ngap_test.json")
 	gnb.UE.PowerON()
+
+	pdu := gnb.UE.MakeRegistrationRequest()
+	gnb.RecvfromUE(&pdu)
 	v := gnb.MakeInitialUEMessage()
 	expect_str := TestInitialUEMessage
 	expect, _ := hex.DecodeString(expect_str)
@@ -59,7 +62,10 @@ func TestMakeUplinkNASTransport(t *testing.T) {
 	var expect_str string
 	var expect []byte
 
-	receive(gnb, TestDLAuthenticationRequest)
+	recvfromNW(gnb, TestDLAuthenticationRequest)
+	pdu := gnb.UE.MakeAuthenticationResponse()
+	gnb.RecvfromUE(&pdu)
+
 	v := gnb.MakeUplinkNASTransport()
 	expect_str = TestULAuthenticationResponse
 	expect, _ = hex.DecodeString(expect_str)
@@ -67,7 +73,10 @@ func TestMakeUplinkNASTransport(t *testing.T) {
 		t.Errorf("UplinkNASTransport1\nexpect: %x\nactual: %x", expect, v)
 	}
 
-	receive(gnb, TestDLSecurityModeCommand)
+	recvfromNW(gnb, TestDLSecurityModeCommand)
+	pdu = gnb.UE.MakeSecurityModeComplete()
+	gnb.RecvfromUE(&pdu)
+
 	v = gnb.MakeUplinkNASTransport()
 	expect_str = TestULSecurityModeComplete
 	expect, _ = hex.DecodeString(expect_str)
@@ -75,7 +84,10 @@ func TestMakeUplinkNASTransport(t *testing.T) {
 		t.Errorf("UplinkNASTransport2\nexpect: %x\nactual: %x", expect, v)
 	}
 
-	receive(gnb, TestInitialContextSetupRequest)
+	recvfromNW(gnb, TestInitialContextSetupRequest)
+	pdu = gnb.UE.MakeRegistrationComplete()
+	gnb.RecvfromUE(&pdu)
+
 	v = gnb.MakeUplinkNASTransport()
 	expect_str = TestULRegistrationComplete
 	expect, _ = hex.DecodeString(expect_str)
@@ -108,6 +120,6 @@ func TestDecode(t *testing.T) {
 	gnb := NewNGAP("ngap_test.json")
 
 	for _, p := range pattern {
-		receive(gnb, p.in_str)
+		recvfromNW(gnb, p.in_str)
 	}
 }

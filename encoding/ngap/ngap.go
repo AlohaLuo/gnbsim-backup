@@ -126,10 +126,11 @@ func NewNGAP(filename string) (p *GNB) {
 	return
 }
 
-func (gnb *GNB) SendtoUE() {
+func (gnb *GNB) SendtoUE(pdu *[]byte) {
 
-	if gnb.SendNasMsg != nil {
-		gnb.UE.Receive(gnb.SendNasMsg)
+	if pdu != nil {
+		gnb.UE.SetIndent(gnb.indent)
+		gnb.UE.Receive(pdu)
 	}
 	return
 }
@@ -225,7 +226,7 @@ func (gnb *GNB) MakeInitialUEMessage() (pdu []byte) {
 	tmp := gnb.encRANUENGAPID()
 	v = append(v, tmp...)
 
-	tmp = encNASPDU(gnb.UE.MakeRegistrationRequest())
+	tmp = gnb.encNASPDU()
 	v = append(v, tmp...)
 
 	tmp, _ = gnb.encUserLocationInformation()
@@ -295,7 +296,7 @@ func (gnb *GNB) MakeUplinkNASTransport() (pdu []byte) {
 	tmp = gnb.encRANUENGAPID()
 	v = append(v, tmp...)
 
-	tmp = encNASPDU(gnb.UE.MakeNasPdu())
+	tmp = gnb.encNASPDU()
 	v = append(v, tmp...)
 
 	tmp, _ = gnb.encUserLocationInformation()
@@ -914,28 +915,33 @@ func (gnb *GNB) encRANUENGAPID() (v []byte) {
 /*
 NAS-PDU ::= OCTET STRING
 */
-func encNASPDU(pdu []byte) (v []byte) {
+func (gnb *GNB) encNASPDU() (v []byte) {
+
+	if gnb.RecvNasMsg == nil {
+		return
+	}
 
 	head, _ := encProtocolIE(idNASPDU, reject)
 
+	pdu := *gnb.RecvNasMsg
 	pv, _, v, _ := per.EncOctetString(pdu, 0, 0, false)
 	v = append(pv, v...)
 
 	length, _, _ := per.EncLengthDeterminant(len(v), 0)
 	head = append(head, length...)
 	v = append(head, v...)
+	gnb.RecvNasMsg = nil
+
 	return
 }
 
 func (gnb *GNB) decNASPDU(pdu *[]byte, length int) (err error) {
 	gnb.dprint("pseudo DecOctetString(%x)", length)
 
-	octlen := int((*pdu)[0])
+	_ = int((*pdu)[0])
 	*pdu = (*pdu)[1:]
 
-	gnb.UE.SetIndent(gnb.indent)
-	msg := (*pdu)[:octlen]
-	gnb.SendNasMsg = &msg
+	gnb.SendtoUE(pdu)
 
 	return
 }
