@@ -12,9 +12,9 @@ var TestRegistrationRequest string = "7e004179000d0102f8392143000010325476981001
 var TestAuthenticationResponse string = "7e00572d10803adcacc364fc000bdc0f65e324eaa1"
 var TestSecurityModeComplete []string = []string{
 	"7e04da52b828007e005e",
-	"7e0452a73e0c007e005e7700090500000001000001f1",
-	"7e04a860200b007e005e7700090500000001000001f171001c7e004179000d0102f8392143000010325476981001202e0480a00000",
-	"7e04a860200b007e005e7700090500000001000001f171001c7e004179000d0102f8392143000010325476981001202e0480a00000",
+	"7e042e7d15af017e005e7700090500000001000001f1",
+	"7e042bcd6bc3027e005e7700090500000001000001f171001c7e004179000d0102f8392143000010325476981001202e0480a00000",
+	"7e04a314ad62037e005e7700090500000001000001f171001c7e004179000d0102f8392143000010325476981001202e0480a00000",
 }
 var TestRegistrationComplete string = "7e04006d1298007e0043"
 
@@ -119,6 +119,11 @@ func TestMakeSecurityModeComplete(t *testing.T) {
 func TestMakePDUSessionEstablishmentRequest(t *testing.T) {
 
 	ue := NewNAS("nas_test.json")
+
+	receive(ue, TestAuthenticationRequest)
+	receive(ue, TestSecurityModeCommand)
+	receive(ue, TestRegistrationAccept)
+
 	v := ue.MakePDUSessionEstablishmentRequest()
 	expect_str := ""
 	expect, _ := hex.DecodeString(expect_str)

@@ -51,6 +51,8 @@ type UE struct {
 		t3512        int
 	}
 
+	NasCount uint32
+
 	DLCount uint32
 	ULCount uint32
 
@@ -523,6 +525,11 @@ func (ue *UE) MakePDUSessionEstablishmentRequest() (pdu []byte) {
 	pdu = append(pdu, ue.encIntegrityProtectionMaximuDataRate()...)
 	pdu = append(pdu, ue.encPDUSessionType()...)
 
+	head := ue.enc5GSecurityProtectedMessageHeader(
+		SecurityHeaderTypeIntegrityProtectedAndCiphered, &pdu)
+
+	pdu = append(head, pdu...)
+
 	return
 }
 
@@ -553,11 +560,13 @@ func (ue *UE) enc5GSecurityProtectedMessageHeader(
 	head = append(head, []byte{EPD5GSMobilityManagement}...)
 	head = append(head, []byte{headType}...)
 
-	seq := []byte{uint8(ue.ULCount)}
+	seq := []byte{uint8(ue.NasCount)}
 	*pdu = append(seq, *pdu...)
 
 	mac := ue.ComputeMAC(0, pdu)
 	head = append(head, mac...)
+
+	ue.NasCount++
 
 	return
 }
@@ -1487,8 +1496,8 @@ func (ue *UE) ComputeMAC(dir uint8, pdu *[]byte) (mac []byte) {
 	m := []byte{}
 
 	tmp := make([]byte, 4)
-	ue.DLCount = uint32((*pdu)[0])
-	binary.BigEndian.PutUint32(tmp, ue.DLCount)
+	count := uint32((*pdu)[0])
+	binary.BigEndian.PutUint32(tmp, count)
 	m = append(m, tmp...)
 
 	tmp = make([]byte, 1)
