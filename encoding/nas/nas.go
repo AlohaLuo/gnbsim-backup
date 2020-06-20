@@ -53,9 +53,6 @@ type UE struct {
 
 	NasCount uint32
 
-	DLCount uint32
-	ULCount uint32
-
 	wa struct {
 		securityHeaderParsed bool
 		forceRINMR           bool
@@ -129,6 +126,8 @@ const (
 	MessageTypeAuthenticationResponse         = 0x57
 	MessageTypeSecurityModeCommand            = 0x5d
 	MessageTypeSecurityModeComplete           = 0x5e
+	MessageTypeULNasTransport                 = 0x67
+	MessageTypeDLNasTransport                 = 0x68
 	MessageTypePDUSessionEstablishmentRequest = 0xc1
 )
 
@@ -140,6 +139,8 @@ var msgTypeStr = map[int]string{
 	MessageTypeAuthenticationResponse:         "Authentication Response",
 	MessageTypeSecurityModeCommand:            "Security Mode Command",
 	MessageTypeSecurityModeComplete:           "Security Mode Complete",
+	MessageTypeULNasTransport:                 "UL NAS Transport",
+	MessageTypeDLNasTransport:                 "DL NAS Transport",
 	MessageTypePDUSessionEstablishmentRequest: "PDU Session Establishment Request",
 }
 
@@ -472,6 +473,24 @@ func (ue *UE) MakeRegistrationComplete() (pdu []byte) {
 	return
 }
 
+// 8.2.10 UL NAS transport
+func (ue *UE) MakeULNasTransport(payloadType uint8, payload *[]byte) (pdu []byte) {
+
+	pdu = ue.enc5GSMMMessageHeader(
+		SecurityHeaderTypePlain,
+		MessageTypeULNasTransport)
+
+	pdu = append(pdu, byte(payloadType))
+
+	length := make([]byte, 2)
+	binary.BigEndian.PutUint16(length, uint16(len(*payload)))
+	pdu = append(pdu, length...)
+
+	pdu = append(pdu, *payload...)
+
+	return
+}
+
 // 8.2.25 Security mode command
 func (ue *UE) decSecurityModeCommand(pdu *[]byte) {
 
@@ -524,6 +543,8 @@ func (ue *UE) MakePDUSessionEstablishmentRequest() (pdu []byte) {
 
 	pdu = append(pdu, ue.encIntegrityProtectionMaximuDataRate()...)
 	pdu = append(pdu, ue.encPDUSessionType()...)
+
+	pdu = ue.MakeULNasTransport(PayloadContainerN1SMInformation, &pdu)
 
 	head := ue.enc5GSecurityProtectedMessageHeader(
 		SecurityHeaderTypeIntegrityProtectedAndCiphered, &pdu)
@@ -1181,6 +1202,11 @@ func (ue *UE) decAllowedNSSAI(pdu *[]byte) {
 
 	return
 }
+
+// 9.11.3.40 Payload container type
+const (
+	PayloadContainerN1SMInformation = 0x01
+)
 
 // 9.11.3.54 UE security capability
 type UESecurityCapability struct {
