@@ -38,6 +38,11 @@ type UE struct {
 	state5GMM int
 	state5GSM int
 
+	sm struct {
+		pduSessionId uint8
+		procedureTransactionId uint8
+	}
+
 	recv struct {
 		flag struct {
 			imeisv bool
@@ -148,6 +153,7 @@ const (
 	ieiPDUSessionType       = 0x9
 	ieiIMEISVRequest        = 0xe
 	iei5GMMCapability       = 0x10
+	ieiPDUSessionID2        = 0x12
 	ieiAllowedNSSAI         = 0x15
 	ieiT3502Timer           = 0x16
 	ieiAuthParamAUTN        = 0x20
@@ -166,6 +172,7 @@ var ieStr = map[int]string{
 	ieiPDUSessionType:       "PDU Session Type IE",
 	ieiIMEISVRequest:        "IMEISV Request IE",
 	iei5GMMCapability:       "5G MM Capability IE",
+	ieiPDUSessionID2:        "PDU Session Identity 2 IE",
 	ieiAllowedNSSAI:         "Allowd NSSAI IE",
 	ieiT3502Timer:           "T3502 Timer IE",
 	ieiAuthParamAUTN:        "Authentication Parameter AUTN IE",
@@ -485,8 +492,11 @@ func (ue *UE) MakeULNasTransport(payloadType uint8, payload *[]byte) (pdu []byte
 	length := make([]byte, 2)
 	binary.BigEndian.PutUint16(length, uint16(len(*payload)))
 	pdu = append(pdu, length...)
-
 	pdu = append(pdu, *payload...)
+
+	if payloadType == PayloadContainerN1SMInformation {
+		pdu = append(pdu, ue.encPDUSessionID2(ue.sm.pduSessionId)...)
+	}
 
 	return
 }
@@ -536,9 +546,12 @@ func (ue *UE) MakeSecurityModeComplete() (pdu []byte) {
 // 8.3.1 PDU session establishment request
 func (ue *UE) MakePDUSessionEstablishmentRequest() (pdu []byte) {
 
+	ue.sm.pduSessionId = 0x01
+	ue.sm.procedureTransactionId = 0x01
+
 	pdu = ue.enc5GSSMMessageHeader(
-		0x01, // 9.4 PDU Session ID
-		0x01, // 9.6 Procedure Transaction ID
+		ue.sm.pduSessionId,           // 9.4 PDU Session ID
+		ue.sm.procedureTransactionId, // 9.6 Procedure Transaction ID
 		MessageTypePDUSessionEstablishmentRequest)
 
 	pdu = append(pdu, ue.encIntegrityProtectionMaximuDataRate()...)
@@ -1207,6 +1220,15 @@ func (ue *UE) decAllowedNSSAI(pdu *[]byte) {
 const (
 	PayloadContainerN1SMInformation = 0x01
 )
+
+// 9.11.3.41 PDU session identity 2
+func (ue *UE) encPDUSessionID2(id uint8) (pdu []byte) {
+
+	pdu = append(pdu, byte(ieiPDUSessionID2))
+	pdu = append(pdu, byte(id))
+
+	return
+}
 
 // 9.11.3.54 UE security capability
 type UESecurityCapability struct {
