@@ -39,7 +39,7 @@ type UE struct {
 	state5GSM int
 
 	sm struct {
-		pduSessionId uint8
+		pduSessionId           uint8
 		procedureTransactionId uint8
 	}
 
@@ -150,6 +150,7 @@ var msgTypeStr = map[int]string{
 }
 
 const (
+	ieiRequestType          = 0x8
 	ieiPDUSessionType       = 0x9
 	ieiIMEISVRequest        = 0xe
 	iei5GMMCapability       = 0x10
@@ -169,6 +170,7 @@ const (
 )
 
 var ieStr = map[int]string{
+	ieiRequestType:          "Request Type IE",
 	ieiPDUSessionType:       "PDU Session Type IE",
 	ieiIMEISVRequest:        "IMEISV Request IE",
 	iei5GMMCapability:       "5G MM Capability IE",
@@ -481,7 +483,8 @@ func (ue *UE) MakeRegistrationComplete() (pdu []byte) {
 }
 
 // 8.2.10 UL NAS transport
-func (ue *UE) MakeULNasTransport(payloadType uint8, payload *[]byte) (pdu []byte) {
+func (ue *UE) MakeULNasTransport(
+	payloadType uint8, msgType uint8, payload *[]byte) (pdu []byte) {
 
 	pdu = ue.enc5GSMMMessageHeader(
 		SecurityHeaderTypePlain,
@@ -496,6 +499,11 @@ func (ue *UE) MakeULNasTransport(payloadType uint8, payload *[]byte) (pdu []byte
 
 	if payloadType == PayloadContainerN1SMInformation {
 		pdu = append(pdu, ue.encPDUSessionID2(ue.sm.pduSessionId)...)
+	}
+
+	switch msgType {
+	case MessageTypePDUSessionEstablishmentRequest:
+		pdu = append(pdu, ue.encRequestType(RequestTypeInitialRequest)...)
 	}
 
 	return
@@ -557,7 +565,9 @@ func (ue *UE) MakePDUSessionEstablishmentRequest() (pdu []byte) {
 	pdu = append(pdu, ue.encIntegrityProtectionMaximuDataRate()...)
 	pdu = append(pdu, ue.encPDUSessionType()...)
 
-	pdu = ue.MakeULNasTransport(PayloadContainerN1SMInformation, &pdu)
+	pdu = ue.MakeULNasTransport(
+		PayloadContainerN1SMInformation,
+		MessageTypePDUSessionEstablishmentRequest, &pdu)
 
 	head := ue.enc5GSecurityProtectedMessageHeader(
 		SecurityHeaderTypeIntegrityProtectedAndCiphered, &pdu)
@@ -1227,6 +1237,16 @@ func (ue *UE) encPDUSessionID2(id uint8) (pdu []byte) {
 	pdu = append(pdu, byte(ieiPDUSessionID2))
 	pdu = append(pdu, byte(id))
 
+	return
+}
+
+// 9.11.3.47 Request type
+const (
+	RequestTypeInitialRequest = 0x01
+)
+
+func (ue *UE) encRequestType(val uint8) (pdu []byte) {
+	pdu = []byte{byte((ieiRequestType << 4) | val)}
 	return
 }
 
