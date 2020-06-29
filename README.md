@@ -1,5 +1,5 @@
 # gnbsim
-gnbsim is a 5G SA gNB/UE simulator for testing 5GC system. The project is aimed to understand 5GC system more efficiently than just reading 3GPP standard documents.
+gnbsim is a 5G SA gNB/UE (Release 16) simulator for testing 5GC system. The project is aimed to understand 5GC system more efficiently than just reading 3GPP standard documents.
 
 ## Getting Started
 <!--
