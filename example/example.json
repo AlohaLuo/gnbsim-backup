@@ -14,7 +14,7 @@
 					"SliceSupportList": [
 						{
 							"SST": 1,
-							"SD": "0x010203"
+							"SD": "010203"
 						}
 					]
 				}
@@ -33,7 +33,12 @@
 		"AuthParam": {
 			"K": "8baf473f2f8fd09487cccbd7097c6862",
 			"OPc": "8e27b6af0e692e750f32667a3b14605d"
-		}
+		},
+		"snssai": {
+			"sst": 1,
+			"sd": "010203"
+		},
+		"dnn": "internet"
 	},
 	"ULInfoNR": {
 		"NRCGI": {
