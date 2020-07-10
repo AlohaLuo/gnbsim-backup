@@ -17,6 +17,7 @@ var TestSecurityModeComplete []string = []string{
 	"7e04a314ad62037e005e7700090500000001000001f171001c7e004179000d0102f8392143000010325476981001202e0480a00000",
 }
 var TestRegistrationComplete string = "7e04006d1298007e0043"
+var TestPDUSessionEstablishmentRequest string = "7e0208d593cc007e00670100072e0101c1ffff93120181220401010203250908696e7465726e6574"
 
 // receive
 var TestAuthenticationRequest string = "7e00560002000021fc64081953bb33c0682edf1690b25821201094bbaf40940a8000c6a72c4efbaf0337"
@@ -125,7 +126,7 @@ func TestMakePDUSessionEstablishmentRequest(t *testing.T) {
 	receive(ue, TestRegistrationAccept)
 
 	v := ue.MakePDUSessionEstablishmentRequest()
-	expect_str := ""
+	expect_str := TestPDUSessionEstablishmentRequest
 	expect, _ := hex.DecodeString(expect_str)
 	if reflect.DeepEqual(expect, v) == false {
 		t.Errorf("PDU Session Establishemnt Request\nexpect: %x\nactual: %x", expect, v)

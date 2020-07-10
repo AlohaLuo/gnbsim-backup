@@ -34,6 +34,8 @@ type UE struct {
 	RoutingIndicator uint16
 	ProtectionScheme string
 	AuthParam        AuthParam
+	SNSSAI           SNSSAI
+	DNN              string
 
 	state5GMM int
 	state5GSM int
@@ -159,6 +161,8 @@ const (
 	ieiT3502Timer           = 0x16
 	ieiAuthParamAUTN        = 0x20
 	ieiAuthParamRAND        = 0x21
+	ieiSNSSAI               = 0x22
+	ieiDNN                  = 0x25
 	ieiAuthParamRES         = 0x2d
 	ieiUESecurityCapability = 0x2e
 	ieiAdditional5GSecInfo  = 0x36
@@ -179,6 +183,8 @@ var ieStr = map[int]string{
 	ieiT3502Timer:           "T3502 Timer IE",
 	ieiAuthParamAUTN:        "Authentication Parameter AUTN IE",
 	ieiAuthParamRAND:        "Authentication Parameter RAND IE",
+	ieiSNSSAI:               "S-NSSAI IE",
+	ieiDNN:                  "DNN IE",
 	ieiAuthParamRES:         "Authentication response parameter IE",
 	ieiUESecurityCapability: "UE Security Capability IE",
 	ieiAdditional5GSecInfo:  "Additional 5G Security Information IE",
@@ -231,6 +237,7 @@ func (ue *UE) MakeNasPdu() (pdu []byte) {
 		pdu = ue.MakeSecurityModeComplete()
 	case rcvdRegistrationAccept:
 		pdu = ue.MakeRegistrationComplete()
+		ue.dprint("GNBSIM: [REGISTERED]")
 	}
 	return
 }
@@ -506,6 +513,12 @@ func (ue *UE) MakeULNasTransport(
 		pdu = append(pdu, ue.encRequestType(RequestTypeInitialRequest)...)
 	}
 
+	if payloadType == PayloadContainerN1SMInformation &&
+		msgType == MessageTypePDUSessionEstablishmentRequest {
+		pdu = append(pdu, ue.encSNSSAI()...)
+		pdu = append(pdu, ue.encDNN()...)
+	}
+
 	return
 }
 
@@ -615,6 +628,23 @@ func (ue *UE) enc5GSecurityProtectedMessageHeader(
 	return
 }
 
+// 9.11.2.1B DNN
+func (ue *UE) encDNN() (pdu []byte) {
+
+	pdu = append(pdu, byte(ieiDNN))
+
+	dnn := []byte{}
+	for _, str := range strings.Split(ue.DNN, ".") {
+		dnn = append(dnn, byte(len(str)))
+		dnn = append(dnn, []byte(str)...)
+	}
+
+	pdu = append(pdu, byte(len(dnn)))
+	pdu = append(pdu, dnn...)
+
+	return
+}
+
 // 9.11.2.4 GPRS timer 2
 // See subclause 10.5.7.4 in 3GPP TS 24.008.
 func (ue *UE) decGPRSTimer2(pdu *[]byte) {
@@ -669,10 +699,10 @@ func (ue *UE) decGPRSTimer3(pdu *[]byte) {
 
 // 9.11.2.8 S-NSSAI
 type SNSSAI struct {
-	sst       int
-	sd        []byte
+	SST       int
+	SD        string
 	mappedsst int
-	mappedsd  []byte
+	mappedsd  string
 }
 
 func (ue *UE) decSNSSAI(iei bool, pdu *[]byte) (snssai SNSSAI) {
@@ -685,15 +715,15 @@ func (ue *UE) decSNSSAI(iei bool, pdu *[]byte) (snssai SNSSAI) {
 	length := int((*pdu)[0])
 	*pdu = (*pdu)[1:]
 
-	snssai.sst = int((*pdu)[0])
+	snssai.SST = int((*pdu)[0])
 	*pdu = (*pdu)[1:]
-	ue.dprint("SST: %d", snssai.sst)
+	ue.dprint("SST: %d", snssai.SST)
 
 	switch length {
 	case 4, 5, 8:
-		snssai.sd = (*pdu)[:3]
+		snssai.SD = hex.EncodeToString((*pdu)[:3])
 		*pdu = (*pdu)[3:]
-		ue.dprint("SD: 0x%x", snssai.sd)
+		ue.dprint("SD: 0x%x", snssai.SD)
 	}
 
 	switch length {
@@ -704,10 +734,22 @@ func (ue *UE) decSNSSAI(iei bool, pdu *[]byte) (snssai SNSSAI) {
 	}
 
 	if length == 8 {
-		snssai.mappedsd = (*pdu)[:3]
+		snssai.mappedsd = hex.EncodeToString((*pdu)[:3])
 		*pdu = (*pdu)[3:]
 		ue.dprint("Mapped HPLMN SD: 0x%x", snssai.mappedsd)
 	}
+
+	return
+}
+
+func (ue *UE) encSNSSAI() (pdu []byte) {
+
+	pdu = append(pdu, byte(ieiSNSSAI))
+	pdu = append(pdu, byte(4)) // length: sst = 1, ssd = 3
+	pdu = append(pdu, byte(ue.SNSSAI.SST))
+
+	tmp, _ := hex.DecodeString(ue.SNSSAI.SD)
+	pdu = append(pdu, tmp...)
 
 	return
 }
