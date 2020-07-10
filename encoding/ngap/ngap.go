@@ -15,6 +15,7 @@ package ngap
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -821,11 +822,7 @@ func encSNSSAI(sstInt uint8, sdString string) (pv []byte, plen int, v []byte) {
 	pv2, plen2, _, _ := per.EncOctetString(sst, 1, 1, false)
 
 	pv, plen = per.MergeBitField(pv, plen, pv2, plen2)
-
-	tmp, _ := strconv.ParseUint(sdString, 0, 32)
-	sd := make([]byte, 8)
-	binary.BigEndian.PutUint64(sd, tmp)
-	sd = sd[len(sd)-3:]
+	sd, _ := hex.DecodeString(sdString)
 	_, _, v, _ = per.EncOctetString(sd, 3, 3, false)
 	return
 }
