@@ -21,8 +21,9 @@ var TestPDUSessionEstablishmentRequest string = "7e0208d593cc007e00670100072e010
 
 // receive
 var TestAuthenticationRequest string = "7e00560002000021fc64081953bb33c0682edf1690b25821201094bbaf40940a8000c6a72c4efbaf0337"
-var TestSecurityModeCommand string = "7e03461235ef007e035d02000480a00000e1360100"
+var TestSecurityModeCommand string = "7e03937711bc007e035d02000480a00000e1360100"
 var TestRegistrationAccept string = "7e02930d75cf017e0242010177000b0202f839cafe000000000154070002f839000001150a040101020304011122335e010616012c"
+var TestPDUSessionEstablishmentAccept string = "7e0222994e9f027e00680100202e0100c21100090100063131010100000601e80301e80359322905013c3c00011201"
 
 func receive(ue *UE, msg string) {
 	in, _ := hex.DecodeString(msg)
@@ -137,17 +138,20 @@ func TestMakePDUSessionEstablishmentRequest(t *testing.T) {
 func TestDecode(t *testing.T) {
 	ue := NewNAS("nas_test.json")
 
-	ue.dbgLevel = 0
+	ue.dbgLevel = 1
 
 	pattern := []struct {
 		in_str string
+		desc string
 	}{
-		{TestAuthenticationRequest},
-		{TestSecurityModeCommand},
-		{TestRegistrationAccept},
+		{TestAuthenticationRequest, "Authentication Request"},
+		{TestSecurityModeCommand, "Security Mode Command"},
+		{TestRegistrationAccept, "Registration Accept"},
+		{TestPDUSessionEstablishmentAccept, "PDU Session Establishemtn Accept"},
 	}
 
 	for _, p := range pattern {
+		fmt.Printf("---------- test deocde: %s\n", p.desc)
 		receive(ue, p.in_str)
 	}
 }

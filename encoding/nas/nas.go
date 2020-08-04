@@ -299,6 +299,9 @@ func (ue *UE) Decode(pdu *[]byte) (msgType int) {
 	case MessageTypeSecurityModeCommand:
 		ue.decSecurityModeCommand(pdu)
 		break
+	case MessageTypeDLNasTransport:
+		ue.decDLNasTransport(pdu)
+		break
 	default:
 		break
 	}
@@ -518,6 +521,19 @@ func (ue *UE) MakeULNasTransport(
 		pdu = append(pdu, ue.encSNSSAI()...)
 		pdu = append(pdu, ue.encDNN()...)
 	}
+
+	return
+}
+
+// 8.2.11 DL NAS transport
+func (ue *UE) decDLNasTransport(pdu *[]byte) {
+
+	ue.dprint("DL NAS Transport")
+
+	ue.indent++
+	ue.decPayloadContainerType(pdu)
+	ue.decPayloadContainer(pdu)
+	ue.indent--
 
 	return
 }
@@ -1268,10 +1284,41 @@ func (ue *UE) decAllowedNSSAI(pdu *[]byte) {
 	return
 }
 
+// 9.11.3.39 Payload container
+func (ue *UE) decPayloadContainer(pdu *[]byte) {
+
+	ue.dprint("Payload Container")
+
+	length := binary.BigEndian.Uint16(*pdu)
+	*pdu = (*pdu)[2:]
+	ue.dprinti("Length: %d", length)
+	// ue.Decode(pdu)
+	*pdu = (*pdu)[length:] // TODO: delete
+	length--
+
+	return
+}
+
 // 9.11.3.40 Payload container type
 const (
-	PayloadContainerN1SMInformation = 0x01
+	PayloadContainerN1SMInformation = 0x1
 )
+
+var payloadContainerStr = map[int]string{
+	PayloadContainerN1SMInformation: "N1 SM Information",
+}
+
+func (ue *UE) decPayloadContainerType(pdu *[]byte) {
+
+	ue.dprint("Payload Container Type")
+	ctype := int((*pdu)[0])
+	*pdu = (*pdu)[1:]
+
+	ue.dprinti("Type: %s(0x%x)",
+	    payloadContainerStr[ctype], ctype)
+
+	return
+}
 
 // 9.11.3.41 PDU session identity 2
 func (ue *UE) encPDUSessionID2(id uint8) (pdu []byte) {
