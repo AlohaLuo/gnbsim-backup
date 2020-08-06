@@ -136,6 +136,7 @@ const (
 	MessageTypeULNasTransport                 = 0x67
 	MessageTypeDLNasTransport                 = 0x68
 	MessageTypePDUSessionEstablishmentRequest = 0xc1
+	MessageTypePDUSessionEstablishmentAccept  = 0xc2
 )
 
 var msgTypeStr = map[int]string{
@@ -149,6 +150,7 @@ var msgTypeStr = map[int]string{
 	MessageTypeULNasTransport:                 "UL NAS Transport",
 	MessageTypeDLNasTransport:                 "DL NAS Transport",
 	MessageTypePDUSessionEstablishmentRequest: "PDU Session Establishment Request",
+	MessageTypePDUSessionEstablishmentAccept:  "PDU Session Establishment Accept",
 }
 
 const (
@@ -243,9 +245,21 @@ func (ue *UE) MakeNasPdu() (pdu []byte) {
 }
 
 func (ue *UE) Decode(pdu *[]byte) (msgType int) {
+
 	epd := int((*pdu)[0])
 	ue.dprint("EPD: %s (0x%x)", epdStr[epd], epd)
 	*pdu = (*pdu)[1:]
+
+	if epd == EPD5GSMobilityManagement {
+		msgType = ue.Decode5GMM(pdu)
+		return
+	}
+	msgType = ue.Decode5GSM(pdu)
+	return
+}
+
+// 8.2 5GS mobility management messages
+func (ue *UE) Decode5GMM(pdu *[]byte) (msgType int) {
 
 	secHeader := int((*pdu)[0])
 	ue.dprint("Security Header: 0x%x", secHeader)
@@ -284,9 +298,7 @@ func (ue *UE) Decode(pdu *[]byte) (msgType int) {
 		ue.dprinti("### workaround: SecurityHeaderParsed.")
 	}
 
-	msgType = int((*pdu)[0])
-	ue.dprint("Message Type: %s (0x%x)", msgTypeStr[msgType], msgType)
-	*pdu = (*pdu)[1:]
+	msgType = ue.decMessageType(pdu)
 
 	ue.indent++
 	switch msgType {
@@ -307,6 +319,27 @@ func (ue *UE) Decode(pdu *[]byte) (msgType int) {
 	}
 	ue.indent--
 	ue.wa.securityHeaderParsed = false
+
+	return
+}
+
+// 8.3 5GS session management messages
+func (ue *UE) Decode5GSM(pdu *[]byte) (msgType int) {
+
+	ue.decPDUSessionIdentity(pdu)
+	ue.decProcedureTransactionIdentity(pdu)
+
+	msgType = ue.decMessageType(pdu)
+
+	ue.indent++
+	switch msgType {
+	case MessageTypePDUSessionEstablishmentAccept:
+		ue.decPDUSessionEstablishmentAccept(pdu)
+		break
+	default:
+		break
+	}
+	ue.indent--
 
 	return
 }
@@ -568,7 +601,8 @@ func (ue *UE) MakeSecurityModeComplete() (pdu []byte) {
 	}
 
 	if ue.recv.flag.rinmr || ue.wa.forceRINMR {
-		pdu = append(pdu, ue.encNASMessageContainer(true, MessageTypeRegistrationRequest)...)
+		pdu = append(pdu,
+			ue.encNASMessageContainer(true, MessageTypeRegistrationRequest)...)
 		ue.recv.flag.rinmr = false
 	}
 
@@ -602,6 +636,18 @@ func (ue *UE) MakePDUSessionEstablishmentRequest() (pdu []byte) {
 		SecurityHeaderTypeIntegrityProtectedAndCiphered, &pdu)
 
 	pdu = append(head, pdu...)
+
+	return
+}
+
+// 8.3.2 PDU session establishment accept
+func (ue *UE) decPDUSessionEstablishmentAccept(pdu *[]byte) {
+	ue.dprint("Selected PDU session type")
+	ue.decPDUSessionType(false, pdu)
+	ue.dprint("Selected Selected SSC mode")
+	ue.decSSCMode(false, pdu)
+	*pdu = (*pdu)[1:]
+
 
 	return
 }
@@ -641,6 +687,31 @@ func (ue *UE) enc5GSecurityProtectedMessageHeader(
 
 	ue.NasCount++
 
+	return
+}
+
+// 9.4 PDU session identity
+func (ue *UE) decPDUSessionIdentity(pdu *[]byte) {
+
+	id := int((*pdu)[0])
+	*pdu = (*pdu)[1:]
+	ue.dprint("PDU Session Identity: 0x%x", id)
+	return
+}
+
+// 9.6 Procedure transaction identity
+func (ue *UE) decProcedureTransactionIdentity(pdu *[]byte) {
+	id := int((*pdu)[0])
+	*pdu = (*pdu)[1:]
+	ue.dprint("Procedure Transaction Identity: 0x%x", id)
+	return
+}
+
+// 9.7 Message type
+func (ue *UE) decMessageType(pdu *[]byte) (msgType int){
+	msgType = int((*pdu)[0])
+	ue.dprint("Message Type: %s (0x%x)", msgTypeStr[msgType], msgType)
+	*pdu = (*pdu)[1:]
 	return
 }
 
@@ -1289,12 +1360,12 @@ func (ue *UE) decPayloadContainer(pdu *[]byte) {
 
 	ue.dprint("Payload Container")
 
+	ue.indent++
 	length := binary.BigEndian.Uint16(*pdu)
 	*pdu = (*pdu)[2:]
-	ue.dprinti("Length: %d", length)
-	// ue.Decode(pdu)
-	*pdu = (*pdu)[length:] // TODO: delete
-	length--
+	ue.dprint("Length: %d", length)
+	ue.Decode(pdu)
+	ue.indent--
 
 	return
 }
@@ -1400,8 +1471,30 @@ const (
 	PDUSessionIPv4v6 = 0x03
 )
 
+var pduSessionTypeStr = map[int]string{
+	PDUSessionIPv4: "IPv4",
+	PDUSessionIPv6: "IPv6",
+	PDUSessionIPv4v6: "IPv4v6",
+}
+
 func (ue *UE) encPDUSessionType() (pdu []byte) {
 	pdu = []byte{byte((ieiPDUSessionType << 4) | PDUSessionIPv4v6)}
+	return
+}
+
+func (ue *UE) decPDUSessionType(iei bool, pdu *[]byte) {
+	pduSessionType := 0x0f & int((*pdu)[0])
+	ue.dprinti("PDU Session Type: %s(%d)",
+	    pduSessionTypeStr[pduSessionType], pduSessionType)
+	ShiftType1IE(iei, pdu)
+	return
+}
+
+// 9.11.4.16 SSC mode
+func (ue *UE) decSSCMode(iei bool, pdu *[]byte) {
+	ssc := 0x0f & int((*pdu)[0])
+	ue.dprinti("SSC Mode: SSC mode %d(%d)", ssc, ssc)
+	ShiftType1IE(iei, pdu)
 	return
 }
 
@@ -1426,6 +1519,17 @@ func Str2BCD(str string) (bcd []byte) {
 			bcd[j] |= (byte(n) << 4)
 		}
 	}
+	return
+}
+
+func ShiftType1IE(iei bool, pdu *[]byte) {
+
+	if iei == true {
+		*pdu = (*pdu)[1:]
+		return
+	}
+
+	(*pdu)[0] >>=  4
 	return
 }
 
