@@ -142,7 +142,7 @@ func TestDecode(t *testing.T) {
 
 	pattern := []struct {
 		in_str string
-		desc string
+		desc   string
 	}{
 		{TestAuthenticationRequest, "Authentication Request"},
 		{TestSecurityModeCommand, "Security Mode Command"},

@@ -159,8 +159,8 @@ const (
 	ieiIMEISVRequest        = 0xe
 	iei5GMMCapability       = 0x10
 	ieiPDUSessionID2        = 0x12
-	ieiAllowedNSSAI         = 0x15
-	ieiT3502Timer           = 0x16
+	ieiNSSAI                = 0x15
+	ieiGPRSTimer2           = 0x16
 	ieiAuthParamAUTN        = 0x20
 	ieiAuthParamRAND        = 0x21
 	ieiSNSSAI               = 0x22
@@ -169,32 +169,32 @@ const (
 	ieiUESecurityCapability = 0x2e
 	ieiAdditional5GSecInfo  = 0x36
 	ieiTAIList              = 0x54
-	ieiT3512Timer           = 0x5e
+	ieiGPRSTimer3           = 0x5e
 	ieiNASMessageContainer  = 0x71
 	iei5GSMobileIdentity    = 0x77
 	ieiNonSupported         = 0xff
 )
 
 var ieStr = map[int]string{
-	ieiRequestType:          "Request Type IE",
-	ieiPDUSessionType:       "PDU Session Type IE",
-	ieiIMEISVRequest:        "IMEISV Request IE",
-	iei5GMMCapability:       "5G MM Capability IE",
-	ieiPDUSessionID2:        "PDU Session Identity 2 IE",
-	ieiAllowedNSSAI:         "Allowd NSSAI IE",
-	ieiT3502Timer:           "T3502 Timer IE",
-	ieiAuthParamAUTN:        "Authentication Parameter AUTN IE",
-	ieiAuthParamRAND:        "Authentication Parameter RAND IE",
-	ieiSNSSAI:               "S-NSSAI IE",
-	ieiDNN:                  "DNN IE",
-	ieiAuthParamRES:         "Authentication response parameter IE",
-	ieiUESecurityCapability: "UE Security Capability IE",
-	ieiAdditional5GSecInfo:  "Additional 5G Security Information IE",
-	ieiTAIList:              "Tracking Area Identity List IE",
-	ieiT3512Timer:           "T3512 Timer IE",
-	ieiNASMessageContainer:  "NAS Message Container IE",
-	iei5GSMobileIdentity:    "5GS Mobile Identity IE",
-	ieiNonSupported:         "Non Supported IE",
+	ieiRequestType:          "Request Type",
+	ieiPDUSessionType:       "PDU Session Type",
+	ieiIMEISVRequest:        "IMEISV Request",
+	iei5GMMCapability:       "5G MM Capability",
+	ieiPDUSessionID2:        "PDU Session Identity 2",
+	ieiNSSAI:                "NSSAI",
+	ieiGPRSTimer2:           "T3502 Timer",
+	ieiAuthParamAUTN:        "Authentication Parameter AUTN",
+	ieiAuthParamRAND:        "Authentication Parameter RAND",
+	ieiSNSSAI:               "S-NSSAI",
+	ieiDNN:                  "DNN",
+	ieiAuthParamRES:         "Authentication response parameter",
+	ieiUESecurityCapability: "UE Security Capability",
+	ieiAdditional5GSecInfo:  "Additional 5G Security Information",
+	ieiTAIList:              "Tracking Area Identity List",
+	ieiGPRSTimer3:           "T3512 Timer",
+	ieiNASMessageContainer:  "NAS Message Container",
+	iei5GSMobileIdentity:    "5GS Mobile Identity",
+	ieiNonSupported:         "Non Supported",
 }
 
 func NewNAS(filename string) (ue *UE) {
@@ -344,7 +344,7 @@ func (ue *UE) Decode5GSM(pdu *[]byte) (msgType int) {
 	return
 }
 
-func (ue *UE) decInformationElement(pdu *[]byte) {
+func (ue *UE) decInformationElement(pdu *[]byte, ieStrMap map[int]string) {
 
 	for len(*pdu) > 0 {
 		iei := int((*pdu)[0])
@@ -357,19 +357,15 @@ func (ue *UE) decInformationElement(pdu *[]byte) {
 			*pdu = (*pdu)[1:]
 		}
 
-		msg := ieStr[iei]
-		if msg == "" {
-			msg = ieStr[0xff]
-		}
+		msg := ieStrMap[iei]
 		ue.dprint("%s: 0x%x", msg, iei)
 
-		ue.indent++
 		switch iei {
 		case ieiIMEISVRequest:
 			ue.decIMEISVRequest(pdu)
-		case ieiAllowedNSSAI:
-			ue.decAllowedNSSAI(pdu)
-		case ieiT3502Timer:
+		case ieiNSSAI:
+			ue.decNSSAI(pdu)
+		case ieiGPRSTimer2:
 			ue.decGPRSTimer2(pdu)
 		case ieiAuthParamAUTN:
 			ue.decAuthParamAUTN(pdu)
@@ -379,26 +375,33 @@ func (ue *UE) decInformationElement(pdu *[]byte) {
 			ue.decAdditional5GSecInfo(pdu)
 		case ieiTAIList:
 			ue.decTAIList(pdu)
-		case ieiT3512Timer:
+		case ieiGPRSTimer3:
 			ue.decGPRSTimer3(pdu)
 		case iei5GSMobileIdentity:
 			ue.dec5GSMobileID(pdu)
 		default:
+			ue.dprint("ERROR: unknown information element.")
 			*pdu = []byte{}
 		}
-		ue.indent--
 	}
 }
 
 // 8.2.1 Authentication request
+var ieStrAuthReq = map[int]string{
+	ieiAuthParamAUTN: "Authentication Parameter AUTN IE",
+	ieiAuthParamRAND: "Authentication Parameter RAND IE",
+}
+
 func (ue *UE) decAuthenticationRequest(pdu *[]byte) {
 	ue.dprint("Authentication Request")
 
 	orig := ue.indent
 	ue.indent++
-	ue.decngKSI(pdu)
+	ue.dprint("ngKSI IE")
+	ue.decNASKeySetIdentifier(pdu)
+	ue.dprint("ABBA IE")
 	ue.decABBA(pdu)
-	ue.decInformationElement(pdu)
+	ue.decInformationElement(pdu, ieStrAuthReq)
 	ue.indent--
 
 	k, _ := hex.DecodeString(ue.AuthParam.K)
@@ -413,18 +416,20 @@ func (ue *UE) decAuthenticationRequest(pdu *[]byte) {
 	m.F1()
 
 	ue.indent++
-	ue.dprint("K   : %x", m.K)
-	ue.dprint("OP  : %x", m.OP)
-	ue.dprint("OPc : %x", m.OPc)
-	ue.dprint("AMF : %x", m.AMF)
-	ue.dprint("SQN : %x", m.SQN)
-	ue.dprint("CK  : %x", m.CK)
-	ue.dprint("IK  : %x", m.IK)
-	ue.dprint("AK  : %x", m.AK)
-	ue.dprint("MACA: %x", m.MACA)
-	ue.dprint("MACS: %x", m.MACS)
-	ue.dprint("RAND: %x", m.RAND)
-	ue.dprint("RES : %x", m.RES)
+	/*
+		ue.dprint("K   : %x", m.K)
+		ue.dprint("OP  : %x", m.OP)
+		ue.dprint("OPc : %x", m.OPc)
+		ue.dprint("AMF : %x", m.AMF)
+		ue.dprint("SQN : %x", m.SQN)
+		ue.dprint("CK  : %x", m.CK)
+		ue.dprint("IK  : %x", m.IK)
+		ue.dprint("AK  : %x", m.AK)
+		ue.dprint("MACA: %x", m.MACA)
+		ue.dprint("MACS: %x", m.MACS)
+		ue.dprint("RAND: %x", m.RAND)
+		ue.dprint("RES : %x", m.RES)
+	*/
 
 	if reflect.DeepEqual(ue.AuthParam.mac, m.MACA) == false {
 		ue.dprinti("received and calculated MAC values do not match.\n")
@@ -440,12 +445,14 @@ func (ue *UE) decAuthenticationRequest(pdu *[]byte) {
 
 	ue.ComputeRESstar(m.RAND, m.RES, m.CK, m.IK)
 
-	ue.dprint("Kausf: %x", ue.AuthParam.Kausf)
-	ue.dprint("Kseaf: %x", ue.AuthParam.Kseaf)
-	ue.dprint("Kamf : %x", ue.AuthParam.Kamf)
-	ue.dprint("Kenc : %x", ue.AuthParam.Kenc)
-	ue.dprint("Kint : %x", ue.AuthParam.Kint)
-	ue.dprint("RES* : %x", ue.AuthParam.RESstar)
+	/*
+		ue.dprint("Kausf: %x", ue.AuthParam.Kausf)
+		ue.dprint("Kseaf: %x", ue.AuthParam.Kseaf)
+		ue.dprint("Kamf : %x", ue.AuthParam.Kamf)
+		ue.dprint("Kenc : %x", ue.AuthParam.Kenc)
+		ue.dprint("Kint : %x", ue.AuthParam.Kint)
+		ue.dprint("RES* : %x", ue.AuthParam.RESstar)
+	*/
 	ue.dprint("received and calculated MAC values match.")
 	ue.indent = orig
 
@@ -496,13 +503,22 @@ func (ue *UE) MakeRegistrationRequest() (pdu []byte) {
 }
 
 // 8.2.7 Registration accept
+var ieStrRegAcc = map[int]string{
+	ieiNSSAI:             "Allowed NSSAI",
+	ieiGPRSTimer2:        "T3502 value",
+	ieiTAIList:           "TAI list",
+	ieiGPRSTimer3:        "T3512 value",
+	iei5GSMobileIdentity: "5G-GUTI",
+}
+
 func (ue *UE) decRegistrationAccept(pdu *[]byte) {
 
 	ue.dprint("Registration Accept")
 
 	ue.indent++
+	ue.dprint("5GS registration result IE")
 	ue.dec5GSRegistrationResult(pdu)
-	ue.decInformationElement(pdu)
+	ue.decInformationElement(pdu, ieStrRegAcc)
 	ue.indent--
 
 	ue.recv.state = rcvdRegistrationAccept
@@ -572,15 +588,26 @@ func (ue *UE) decDLNasTransport(pdu *[]byte) {
 }
 
 // 8.2.25 Security mode command
+var ieStrSecModeCmd = map[int]string{
+	ieiIMEISVRequest:       ieStr[ieiIMEISVRequest],
+	ieiAdditional5GSecInfo: ieStr[ieiAdditional5GSecInfo],
+}
+
 func (ue *UE) decSecurityModeCommand(pdu *[]byte) {
 
 	ue.dprint("Security Mode Command")
 
 	ue.indent++
+	ue.dprint("Selected NAS security algorithms IE")
 	ue.decNASSecurityAlgorithms(pdu)
-	ue.decngKSI(pdu)
+
+	ue.dprint("ngKSI IE")
+	ue.decNASKeySetIdentifier(pdu)
+
+	ue.dprint("Replayed UE security capabilities IE")
 	ue.decUESecurityCapability(pdu)
-	ue.decInformationElement(pdu)
+
+	ue.decInformationElement(pdu, ieStrSecModeCmd)
 	ue.indent--
 
 	ue.recv.state = rcvdSecurityModeCommand
@@ -642,12 +669,16 @@ func (ue *UE) MakePDUSessionEstablishmentRequest() (pdu []byte) {
 
 // 8.3.2 PDU session establishment accept
 func (ue *UE) decPDUSessionEstablishmentAccept(pdu *[]byte) {
+
+	ue.dprint("PDU Session Establishment Accept")
+
+	ue.indent++
 	ue.dprint("Selected PDU session type")
 	ue.decPDUSessionType(false, pdu)
 	ue.dprint("Selected Selected SSC mode")
 	ue.decSSCMode(false, pdu)
 	*pdu = (*pdu)[1:]
-
+	ue.indent--
 
 	return
 }
@@ -662,6 +693,7 @@ func (ue *UE) enc5GSMMMessageHeader(
 
 	return
 }
+
 func (ue *UE) enc5GSSMMessageHeader(
 	psi uint8, pti uint8, msgType uint8) (head []byte) {
 
@@ -708,7 +740,7 @@ func (ue *UE) decProcedureTransactionIdentity(pdu *[]byte) {
 }
 
 // 9.7 Message type
-func (ue *UE) decMessageType(pdu *[]byte) (msgType int){
+func (ue *UE) decMessageType(pdu *[]byte) (msgType int) {
 	msgType = int((*pdu)[0])
 	ue.dprint("Message Type: %s (0x%x)", msgTypeStr[msgType], msgType)
 	*pdu = (*pdu)[1:]
@@ -750,7 +782,7 @@ func (ue *UE) decGPRSTimer2(pdu *[]byte) {
 
 	ue.recv.t3502 = (tmp & 0x1f) * multiple
 	*pdu = (*pdu)[2:]
-	ue.dprint("T3502: %d sec", ue.recv.t3502)
+	ue.dprinti("GPRS timer 2: %d sec", ue.recv.t3502)
 
 	return
 }
@@ -780,7 +812,7 @@ func (ue *UE) decGPRSTimer3(pdu *[]byte) {
 
 	ue.recv.t3512 = (tmp & 0x1f) * multiple
 	*pdu = (*pdu)[2:]
-	ue.dprint("T3512: %d sec", ue.recv.t3512)
+	ue.dprinti("GPRS timer 3: %d sec", ue.recv.t3512)
 	return
 }
 
@@ -799,32 +831,36 @@ func (ue *UE) decSNSSAI(iei bool, pdu *[]byte) (snssai SNSSAI) {
 		return
 	}
 
+	ue.dprinti("S-NSSAI")
+
 	length := int((*pdu)[0])
 	*pdu = (*pdu)[1:]
 
+	ue.indent++
 	snssai.SST = int((*pdu)[0])
 	*pdu = (*pdu)[1:]
-	ue.dprint("SST: %d", snssai.SST)
+	ue.dprinti("SST: %d", snssai.SST)
 
 	switch length {
 	case 4, 5, 8:
 		snssai.SD = hex.EncodeToString((*pdu)[:3])
 		*pdu = (*pdu)[3:]
-		ue.dprint("SD: 0x%x", snssai.SD)
+		ue.dprinti("SD: 0x%x", snssai.SD)
 	}
 
 	switch length {
 	case 2, 5, 8:
 		snssai.mappedsst = int((*pdu)[0])
 		*pdu = (*pdu)[1:]
-		ue.dprint("Mapped HPLMN SST: %d", snssai.mappedsst)
+		ue.dprinti("Mapped HPLMN SST: %d", snssai.mappedsst)
 	}
 
 	if length == 8 {
 		snssai.mappedsd = hex.EncodeToString((*pdu)[:3])
 		*pdu = (*pdu)[3:]
-		ue.dprint("Mapped HPLMN SD: 0x%x", snssai.mappedsd)
+		ue.dprinti("Mapped HPLMN SD: 0x%x", snssai.mappedsd)
 	}
+	ue.indent--
 
 	return
 }
@@ -1001,7 +1037,8 @@ func (ue *UE) decPLMN(pdu *[]byte) (mcc, mnc int) {
 	mnc = mnc + 10*(oct3&0xf)
 	mnc = mnc + (oct3 >> 4)
 
-	ue.dprint("mcc = %d, mnc = %d", mcc, mnc)
+	ue.dprinti("MCC: %d", mcc)
+	ue.dprinti("MNC: %d", mnc)
 
 	return
 }
@@ -1031,15 +1068,18 @@ func encSchemeOutput(msin string) (so [5]byte) {
 
 func (ue *UE) dec5GSMobileID(pdu *[]byte) {
 
+	ue.dprinti("5GS mobile identity")
 	length := binary.BigEndian.Uint16(*pdu)
 	id := int((*pdu)[2] & 0x7)
 	*pdu = (*pdu)[3:]
 	length--
 
+	ue.indent++
 	switch id {
 	case TypeID5GGUTI:
 		ue.dec5GSMobileIDType5GGUTI((*pdu)[:length])
 	}
+	ue.indent--
 	*pdu = (*pdu)[length:]
 
 	return
@@ -1047,7 +1087,7 @@ func (ue *UE) dec5GSMobileID(pdu *[]byte) {
 
 func (ue *UE) dec5GSMobileIDType5GGUTI(pdu []byte) {
 	ue.recv.fiveGGUTI = pdu
-	ue.dprint("5G-GUTI: %x", ue.recv.fiveGGUTI)
+	ue.dprinti("5G-GUTI: %x", ue.recv.fiveGGUTI)
 	return
 }
 
@@ -1072,6 +1112,7 @@ func (ue *UE) dec5GSRegistrationResult(pdu *[]byte) {
 	val := (*pdu)[:length]
 	*pdu = (*pdu)[length:]
 
+	ue.indent++
 	ue.dprint("5G Registration Result: %x", val)
 	result := uint8(val[0])
 
@@ -1095,6 +1136,7 @@ func (ue *UE) dec5GSRegistrationResult(pdu *[]byte) {
 
 	ind := result & 0x7
 	ue.dprinti(regResultStr[ind])
+	ue.indent--
 
 	return
 }
@@ -1115,8 +1157,10 @@ func (ue *UE) decTAIList(pdu *[]byte) {
 	typeOfList := tmp >> 5
 	*pdu = (*pdu)[1:]
 
-	ue.dprint("number of element: %d", elementNum)
-	ue.dprint("type of list: 0x%x", typeOfList)
+	ue.indent++
+	ue.dprint("5GS tracking area identity list")
+	ue.dprinti("number of element: %d", elementNum)
+	ue.dprinti("type of list: 0x%x", typeOfList)
 
 	switch typeOfList {
 	case 0x00:
@@ -1131,6 +1175,7 @@ func (ue *UE) decTAIList(pdu *[]byte) {
 		ue.dprinti("unknown list type: 0x%x", typeOfList)
 		*pdu = (*pdu)[length:]
 	}
+	ue.indent--
 	return
 }
 
@@ -1149,7 +1194,7 @@ func (ue *UE) decTAIListType00(pdu *[]byte, num int) {
 		tac := (*pdu)[:tacSize]
 		*pdu = (*pdu)[tacSize:]
 		ue.recv.tai = append(ue.recv.tai, TAI{mcc, mnc, tac})
-		ue.dprint("tac: 0x%x", tac)
+		ue.dprinti("tac: 0x%x", tac)
 		num--
 	}
 	return
@@ -1163,9 +1208,11 @@ func (ue *UE) decABBA(pdu *[]byte) {
 	ue.AuthParam.abba = (*pdu)[:length]
 	*pdu = (*pdu)[length:]
 
+	ue.indent++
 	ue.dprint("ABBA")
 	ue.dprinti("Length: %d", length)
 	ue.dprinti("Value: 0x%02x", ue.AuthParam.abba)
+	ue.indent--
 
 	return
 }
@@ -1294,10 +1341,10 @@ const (
 	KeySetIdentityFlagMappedSecurityContext = 0x08
 )
 
-func (ue *UE) decngKSI(pdu *[]byte) {
+func (ue *UE) decNASKeySetIdentifier(pdu *[]byte) {
 
 	ksi := int((*pdu)[0])
-	ue.dprint("ngKSI: 0x%x", ksi)
+	ue.dprinti("NAS key set identifier: 0x%x", ksi)
 	*pdu = (*pdu)[1:]
 
 	return
@@ -1329,16 +1376,15 @@ func (ue *UE) encNASMessageContainer(iei bool, msgType int) (pdu []byte) {
 // 9.11.3.34 NAS security algorithms
 func (ue *UE) decNASSecurityAlgorithms(pdu *[]byte) {
 
-	ue.dprint("NAS Security Algorithms")
 	alg := (*pdu)[:1]
-	ue.dprinti(" NAS Security Algorithms: 0x%02x", alg)
+	ue.dprinti("NAS Security Algorithms: 0x%02x", alg)
 	*pdu = (*pdu)[1:]
 
 	return
 }
 
 // 9.11.3.37 NSSAI
-func (ue *UE) decAllowedNSSAI(pdu *[]byte) {
+func (ue *UE) decNSSAI(pdu *[]byte) {
 
 	length := int((*pdu)[0])
 	*pdu = (*pdu)[1:]
@@ -1386,7 +1432,7 @@ func (ue *UE) decPayloadContainerType(pdu *[]byte) {
 	*pdu = (*pdu)[1:]
 
 	ue.dprinti("Type: %s(0x%x)",
-	    payloadContainerStr[ctype], ctype)
+		payloadContainerStr[ctype], ctype)
 
 	return
 }
@@ -1442,7 +1488,6 @@ func encUESecurityCapability() (sc UESecurityCapability) {
 
 func (ue *UE) decUESecurityCapability(pdu *[]byte) {
 
-	ue.dprint("Replayed UE Security Capability")
 	length := int((*pdu)[0])
 	*pdu = (*pdu)[1:]
 
@@ -1472,8 +1517,8 @@ const (
 )
 
 var pduSessionTypeStr = map[int]string{
-	PDUSessionIPv4: "IPv4",
-	PDUSessionIPv6: "IPv6",
+	PDUSessionIPv4:   "IPv4",
+	PDUSessionIPv6:   "IPv6",
 	PDUSessionIPv4v6: "IPv4v6",
 }
 
@@ -1485,7 +1530,7 @@ func (ue *UE) encPDUSessionType() (pdu []byte) {
 func (ue *UE) decPDUSessionType(iei bool, pdu *[]byte) {
 	pduSessionType := 0x0f & int((*pdu)[0])
 	ue.dprinti("PDU Session Type: %s(%d)",
-	    pduSessionTypeStr[pduSessionType], pduSessionType)
+		pduSessionTypeStr[pduSessionType], pduSessionType)
 	ShiftType1IE(iei, pdu)
 	return
 }
@@ -1529,7 +1574,7 @@ func ShiftType1IE(iei bool, pdu *[]byte) {
 		return
 	}
 
-	(*pdu)[0] >>=  4
+	(*pdu)[0] >>= 4
 	return
 }
 
@@ -1607,7 +1652,7 @@ func (ue *UE) ComputeKausf(ck, ik []byte) {
 	l0 := make([]byte, 2)
 	binary.BigEndian.PutUint16(l0, uint16(len(p0)))
 	s = append(s, l0...)
-	ue.dprint("ComputeKausf: serving network(%d): %s", len(p0), p0str)
+	//ue.dprint("ComputeKausf: serving network(%d): %s", len(p0), p0str)
 
 	p1 := ue.AuthParam.seqxorak
 	s = append(s, p1...)
@@ -1615,7 +1660,7 @@ func (ue *UE) ComputeKausf(ck, ik []byte) {
 	l1 := make([]byte, 2)
 	binary.BigEndian.PutUint16(l1, uint16(len(p1)))
 	s = append(s, l1...)
-	ue.dprint("ComputeKausf: SEQ xor AK(%d): %x", len(p1), p1)
+	//ue.dprint("ComputeKausf: SEQ xor AK(%d): %x", len(p1), p1)
 
 	k := append(ck, ik...)
 
@@ -1683,7 +1728,7 @@ func (ue *UE) ComputeKseaf() {
 	l0 := make([]byte, 2)
 	binary.BigEndian.PutUint16(l0, uint16(len(p0)))
 	s = append(s, l0...)
-	ue.dprint("ComputeKseaf: serving network(%d): %s", len(p0), p0str)
+	//ue.dprint("ComputeKseaf: serving network(%d): %s", len(p0), p0str)
 
 	mac := hmac.New(sha256.New, ue.AuthParam.Kausf)
 	mac.Write(s)
@@ -1707,7 +1752,7 @@ func (ue *UE) ComputeKamf() {
 	l0 := make([]byte, 2)
 	binary.BigEndian.PutUint16(l0, uint16(len(p0)))
 	s = append(s, l0...)
-	ue.dprint("ComputeKamf: supi(%d): %s", len(p0), supi)
+	//ue.dprint("ComputeKamf: supi(%d): %s", len(p0), supi)
 
 	p1 := ue.AuthParam.abba
 	s = append(s, p1...)
@@ -1715,10 +1760,10 @@ func (ue *UE) ComputeKamf() {
 	l1 := make([]byte, 2)
 	binary.BigEndian.PutUint16(l1, uint16(len(p1)))
 	s = append(s, l1...)
-	ue.dprint("ComputeKamf: abba(%d): %x", len(p1), p1)
+	//ue.dprint("ComputeKamf: abba(%d): %x", len(p1), p1)
 
-	ue.dprint("ComputeKamf: S: %x", s)
-	ue.dprint("ComputeKamf: Kseaf: %x", ue.AuthParam.Kseaf)
+	//ue.dprint("ComputeKamf: S: %x", s)
+	//ue.dprint("ComputeKamf: Kseaf: %x", ue.AuthParam.Kseaf)
 
 	mac := hmac.New(sha256.New, ue.AuthParam.Kseaf)
 	mac.Write(s)
