@@ -675,9 +675,14 @@ func (ue *UE) decPDUSessionEstablishmentAccept(pdu *[]byte) {
 	ue.indent++
 	ue.dprint("Selected PDU session type")
 	ue.decPDUSessionType(false, pdu)
-	ue.dprint("Selected Selected SSC mode")
+
+	ue.dprint("Selected SSC mode")
 	ue.decSSCMode(false, pdu)
 	*pdu = (*pdu)[1:]
+
+	ue.dprint("Authorized QoS rules")
+	ue.decQoSRules(pdu)
+
 	ue.indent--
 
 	return
@@ -1533,6 +1538,93 @@ func (ue *UE) decPDUSessionType(iei bool, pdu *[]byte) {
 		pduSessionTypeStr[pduSessionType], pduSessionType)
 	ShiftType1IE(iei, pdu)
 	return
+}
+
+// 9.11.4.13 QoS rules
+func (ue *UE) decQoSRules(pdu *[]byte) {
+
+	ue.indent++
+	ue.dprint("QoS rules")
+
+	length := binary.BigEndian.Uint16(*pdu)
+	*pdu = (*pdu)[2:]
+	ue.dprinti("Length: %d", length)
+	remain := int(length)
+
+	for i := 0; remain > 0; i++ {
+		ue.indent++
+		ue.dprint("Qos rule %d", i)
+		remain -= ue.decQoSRule(pdu)
+		ue.indent--
+	}
+	*pdu = (*pdu)[length:]
+	ue.indent--
+
+	return
+}
+
+const (
+	ruleOpCodeCreateNewQoSRule = 1
+)
+
+var ruleOpCodeStr = map[int]string{
+	ruleOpCodeCreateNewQoSRule: "Create new QoS rule",
+}
+
+func (ue *UE) decQoSRule(pdu *[]byte) (length int) {
+
+	id := int((*pdu)[0])
+	*pdu = (*pdu)[1:]
+	ue.dprinti("QoS rule identifier: %d", id)
+	length = 1
+
+	ruleLen := binary.BigEndian.Uint16(*pdu)
+	*pdu = (*pdu)[2:]
+	length += 2
+	ue.dprinti("Length: %d", ruleLen)
+	length += int(ruleLen)
+
+	tmp := int((*pdu)[0])
+	*pdu = (*pdu)[1:]
+
+	ruleOpCode := tmp >> 5
+	ue.dprinti("Rule operation code: %s(%d)",
+		ruleOpCodeStr[ruleOpCode], ruleOpCode)
+
+	not := "not "
+	if (tmp>>4)&0x1 != 0 {
+		not = ""
+	}
+	ue.dprinti("the QoS rule is %sthe default QoS rule", not)
+
+	filterNum := int(tmp & 0xf)
+	ue.dprinti("Number of packet filters: %d", filterNum)
+
+	for i := 0; i < filterNum; i++ {
+		ue.dprinti("packet filter %d", i)
+		ue.indent++
+		ue.decPacketFilter(pdu)
+		ue.indent--
+	}
+	return
+}
+
+const (
+	pktFilterDirDownlinkOnly  = 1
+	pktFilterDirUplinkOnly    = 2
+	pktFilterDirBidirectional = 3
+)
+
+var pktFilterDirStr = map[int]string{
+	pktFilterDirBidirectional: "Bidirectional",
+}
+
+func (ue *UE) decPacketFilter(pdu *[]byte) {
+	tmp := int((*pdu)[0])
+	*pdu = (*pdu)[1:]
+
+	tmp &= 0x3f
+	ue.dprinti("Packet filter direction: %s", pktFilterDirStr[tmp>>4])
 }
 
 // 9.11.4.16 SSC mode
