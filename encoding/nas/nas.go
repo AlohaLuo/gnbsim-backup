@@ -1606,6 +1606,21 @@ func (ue *UE) decQoSRule(pdu *[]byte) (length int) {
 		ue.decPacketFilter(pdu)
 		ue.indent--
 	}
+
+	precedence := int((*pdu)[0])
+	*pdu = (*pdu)[1:]
+	ue.dprinti("QoS rule precedence: %d", precedence)
+
+	tmp = int((*pdu)[0])
+	*pdu = (*pdu)[1:]
+
+	not = "not "
+	if (tmp>>6)&0x1 != 0 {
+		not = ""
+	}
+	ue.dprinti("Segregation: Segregation %srequested", not)
+	ue.dprinti("QoS flow identifier: QFI%d", tmp&0x3f)
+
 	return
 }
 
@@ -1619,12 +1634,33 @@ var pktFilterDirStr = map[int]string{
 	pktFilterDirBidirectional: "Bidirectional",
 }
 
+const (
+	pktFilterContentMatchAll = 1
+)
+
+var pktFilterContentStr = map[int]string{
+	pktFilterContentMatchAll: "Match-all type",
+}
+
 func (ue *UE) decPacketFilter(pdu *[]byte) {
 	tmp := int((*pdu)[0])
 	*pdu = (*pdu)[1:]
 
 	tmp &= 0x3f
+	ue.dprinti("Packet filter identifier: %d", tmp&0xf)
 	ue.dprinti("Packet filter direction: %s", pktFilterDirStr[tmp>>4])
+
+	length := int((*pdu)[0])
+	*pdu = (*pdu)[1:]
+	ue.dprinti("Length of packet filter contents: %d", length)
+
+	for i := 0; i < length; i++ {
+		content := int((*pdu)[0])
+		*pdu = (*pdu)[1:]
+		ue.dprinti("Packet filter content %d: %s(%d)",
+			i, pktFilterContentStr[content], content)
+	}
+	return
 }
 
 // 9.11.4.16 SSC mode
