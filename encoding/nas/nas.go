@@ -683,6 +683,9 @@ func (ue *UE) decPDUSessionEstablishmentAccept(pdu *[]byte) {
 	ue.dprint("Authorized QoS rules")
 	ue.decQoSRules(pdu)
 
+	ue.dprint("Session AMBR")
+	ue.decSessionAMBR(pdu)
+
 	ue.indent--
 
 	return
@@ -1557,7 +1560,6 @@ func (ue *UE) decQoSRules(pdu *[]byte) {
 		remain -= ue.decQoSRule(pdu)
 		ue.indent--
 	}
-	*pdu = (*pdu)[length:]
 	ue.indent--
 
 	return
@@ -1660,6 +1662,39 @@ func (ue *UE) decPacketFilter(pdu *[]byte) {
 		ue.dprinti("Packet filter content %d: %s(%d)",
 			i, pktFilterContentStr[content], content)
 	}
+	return
+}
+
+// 9.11.4.14 Session-AMBR
+const (
+	unitAMBRnotUsed = 0
+	unitAMBR1Kbps   = 1
+	unitAMBR4Kbps   = 2
+)
+
+var unitAMBRStr = map[int]string{
+	unitAMBRnotUsed: "not used",
+	unitAMBR1Kbps:   "1Kbps",
+	unitAMBR4Kbps:   "4Kbps",
+}
+
+func (ue *UE) decSessionAMBR(pdu *[]byte) {
+	length := readPduByte(pdu)
+	ue.dprinti("Length of Session-AMBR contents: %d", length)
+
+	unitDL := int(readPduByte(pdu))
+	ue.dprinti("unit for Session-AMBR for downlink: %s(%d)",
+		unitAMBRStr[unitDL], unitDL)
+
+	ambrDL := readPduUint16(pdu)
+	ue.dprinti("Session-AMBR for downlink: %d", ambrDL)
+
+	unitUL := int(readPduByte(pdu))
+	ue.dprinti("unit for Session-AMBR for uplink: %s(%d)",
+		unitAMBRStr[unitUL], unitDL)
+
+	ambrUL := readPduUint16(pdu)
+	ue.dprinti("Session-AMBR for uplink: %d", ambrUL)
 	return
 }
 
@@ -1949,6 +1984,18 @@ func (ue *UE) ComputeMAC(dir uint8, pdu *[]byte) (mac []byte) {
 }
 
 //-----
+func readPduByte(pdu *[]byte) (val byte) {
+	val = byte((*pdu)[0])
+	*pdu = (*pdu)[1:]
+	return
+}
+
+func readPduUint16(pdu *[]byte) (val uint16) {
+	val = binary.BigEndian.Uint16(*pdu)
+	*pdu = (*pdu)[2:]
+	return
+}
+
 func (ue *UE) SetIndent(indent int) {
 	ue.indent = indent
 	return
