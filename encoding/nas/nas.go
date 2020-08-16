@@ -111,7 +111,7 @@ const (
 	EPD5GSMobilityManagement = 0x7e
 )
 
-var epdStr = map[int]string{
+var epdStr = map[byte]string{
 	EPD5GSSessionManagement:  "5G Session Management",
 	EPD5GSMobilityManagement: "5G Mobility Management",
 }
@@ -251,9 +251,8 @@ func (ue *UE) MakeNasPdu() (pdu []byte) {
 
 func (ue *UE) Decode(pdu *[]byte) (msgType int) {
 
-	epd := int((*pdu)[0])
+	epd := readPduByte(pdu)
 	ue.dprint("EPD: %s (0x%x)", epdStr[epd], epd)
-	*pdu = (*pdu)[1:]
 
 	if epd == EPD5GSMobilityManagement {
 		msgType = ue.Decode5GMM(pdu)
@@ -266,14 +265,12 @@ func (ue *UE) Decode(pdu *[]byte) (msgType int) {
 // 8.2 5GS mobility management messages
 func (ue *UE) Decode5GMM(pdu *[]byte) (msgType int) {
 
-	secHeader := int((*pdu)[0])
+	secHeader := readPduByte(pdu)
 	ue.dprint("Security Header: 0x%x", secHeader)
-	*pdu = (*pdu)[1:]
 
 	if secHeader != 0x00 && ue.wa.securityHeaderParsed == false {
-		mac := (*pdu)[:4]
+		mac := readPduByteSlice(pdu, 4)
 		ue.dprinti("mac: %x", mac)
-		*pdu = (*pdu)[4:]
 
 		seq := uint8((*pdu)[0])
 		ue.dprinti("seq: %d", seq)
@@ -288,7 +285,7 @@ func (ue *UE) Decode5GMM(pdu *[]byte) (msgType int) {
 		}
 		ue.dprint("***** Integrity check passed")
 
-		*pdu = (*pdu)[1:]
+		readPduByte(pdu)
 
 		ue.wa.securityHeaderParsed = true
 		msgType = ue.Decode(pdu)
@@ -373,7 +370,7 @@ func (ue *UE) decInformationElement(pdu *[]byte, ieStrMap map[int]string) {
 		if type1ie {
 			(*pdu)[0] &= 0x0f
 		} else {
-			*pdu = (*pdu)[1:]
+			readPduByte(pdu)
 		}
 
 		switch iei {
@@ -421,8 +418,10 @@ func (ue *UE) decAuthenticationRequest(pdu *[]byte) {
 	ue.indent++
 	ue.dprint("ngKSI IE")
 	ue.decNASKeySetIdentifier(pdu)
+
 	ue.dprint("ABBA IE")
 	ue.decABBA(pdu)
+
 	ue.decInformationElement(pdu, ieStrAuthReq)
 	ue.indent--
 
@@ -1454,8 +1453,6 @@ func (ue *UE) decNSSAI(pdu *[]byte) {
 // 9.11.3.39 Payload container
 func (ue *UE) decPayloadContainer(pdu *[]byte) {
 
-	ue.dprint("Payload Container")
-
 	ue.indent++
 	length := int(binary.BigEndian.Uint16(*pdu))
 	*pdu = (*pdu)[2:]
@@ -1478,7 +1475,6 @@ var payloadContainerStr = map[int]string{
 
 func (ue *UE) decPayloadContainerType(pdu *[]byte) {
 
-	ue.dprint("Payload Container Type")
 	ctype := int((*pdu)[0])
 	*pdu = (*pdu)[1:]
 
