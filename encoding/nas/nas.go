@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net"
 	"reflect"
 	"strconv"
 	"strings"
@@ -165,10 +166,12 @@ const (
 	ieiAuthParamRAND        = 0x21
 	ieiSNSSAI               = 0x22
 	ieiDNN                  = 0x25
+	ieiPDUAddress           = 0x29
 	ieiAuthParamRES         = 0x2d
 	ieiUESecurityCapability = 0x2e
 	ieiAdditional5GSecInfo  = 0x36
 	ieiTAIList              = 0x54
+	iei5GSMCause            = 0x59
 	ieiGPRSTimer3           = 0x5e
 	ieiNASMessageContainer  = 0x71
 	iei5GSMobileIdentity    = 0x77
@@ -180,18 +183,20 @@ var ieStr = map[int]string{
 	ieiPDUSessionType:       "PDU Session Type",
 	ieiIMEISVRequest:        "IMEISV Request",
 	iei5GMMCapability:       "5G MM Capability",
-	ieiPDUSessionID2:        "PDU Session Identity 2",
+	ieiPDUSessionID2:        "PDU session identity 2",
 	ieiNSSAI:                "NSSAI",
-	ieiGPRSTimer2:           "T3502 Timer",
+	ieiGPRSTimer2:           "GPRS Timer 2",
 	ieiAuthParamAUTN:        "Authentication Parameter AUTN",
 	ieiAuthParamRAND:        "Authentication Parameter RAND",
 	ieiSNSSAI:               "S-NSSAI",
 	ieiDNN:                  "DNN",
+	ieiPDUAddress:           "PDU address",
 	ieiAuthParamRES:         "Authentication response parameter",
 	ieiUESecurityCapability: "UE Security Capability",
 	ieiAdditional5GSecInfo:  "Additional 5G Security Information",
 	ieiTAIList:              "Tracking Area Identity List",
-	ieiGPRSTimer3:           "T3512 Timer",
+	iei5GSMCause:            "5GSM cause",
+	ieiGPRSTimer3:           "GPRS Timer 3",
 	ieiNASMessageContainer:  "NAS Message Container",
 	iei5GSMobileIdentity:    "5GS Mobile Identity",
 	ieiNonSupported:         "Non Supported",
@@ -347,18 +352,29 @@ func (ue *UE) Decode5GSM(pdu *[]byte) (msgType int) {
 func (ue *UE) decInformationElement(pdu *[]byte, ieStrMap map[int]string) {
 
 	for len(*pdu) > 0 {
+
 		iei := int((*pdu)[0])
 
-		// see Annex K.1 Common information elements.
+		// see Annex K.1 Common information elements in TS 24.008.
+		type1ie := false
 		if iei&0x80 != 0 {
+			type1ie = true
 			iei >>= 4
+		}
+
+		msg := ieStrMap[iei]
+
+		if msg == "" {
+			ue.dprint("error: IE name is not set properly.")
+			break
+		}
+		ue.dprint("%s: 0x%x", msg, iei)
+
+		if type1ie {
 			(*pdu)[0] &= 0x0f
 		} else {
 			*pdu = (*pdu)[1:]
 		}
-
-		msg := ieStrMap[iei]
-		ue.dprint("%s: 0x%x", msg, iei)
 
 		switch iei {
 		case ieiIMEISVRequest:
@@ -371,16 +387,20 @@ func (ue *UE) decInformationElement(pdu *[]byte, ieStrMap map[int]string) {
 			ue.decAuthParamAUTN(pdu)
 		case ieiAuthParamRAND:
 			ue.decAuthParamRAND(pdu)
+		case ieiPDUAddress:
+			ue.decPDUAddress(pdu)
 		case ieiAdditional5GSecInfo:
 			ue.decAdditional5GSecInfo(pdu)
 		case ieiTAIList:
 			ue.decTAIList(pdu)
+		case iei5GSMCause:
+			ue.dec5GSMCause(pdu)
 		case ieiGPRSTimer3:
 			ue.decGPRSTimer3(pdu)
 		case iei5GSMobileIdentity:
 			ue.dec5GSMobileID(pdu)
 		default:
-			ue.dprint("ERROR: unknown information element.")
+			ue.dprint("info: This IE(0x%x) has not been supported yet.", iei)
 			*pdu = []byte{}
 		}
 	}
@@ -575,13 +595,25 @@ func (ue *UE) MakeULNasTransport(
 }
 
 // 8.2.11 DL NAS transport
+var ieStrDLNasTransport = map[int]string{
+	ieiPDUSessionID2: "PDU session ID",
+	//	ieiAdditionalInformation: ieStr[ieiAdditionalInformation],
+	//	iei5GMMCause:             ieStr[iei5GMMCause],
+	//	ieiBackoffTimerValue:     ieStr[ieiBackoffTimerValue],
+}
+
 func (ue *UE) decDLNasTransport(pdu *[]byte) {
 
 	ue.dprint("DL NAS Transport")
 
 	ue.indent++
+	ue.dprint("Payload container type")
 	ue.decPayloadContainerType(pdu)
+
+	ue.dprint("Payload container")
 	ue.decPayloadContainer(pdu)
+
+	ue.decInformationElement(pdu, ieStrDLNasTransport)
 	ue.indent--
 
 	return
@@ -668,6 +700,11 @@ func (ue *UE) MakePDUSessionEstablishmentRequest() (pdu []byte) {
 }
 
 // 8.3.2 PDU session establishment accept
+var ieStrPSEAccept = map[int]string{
+	ieiPDUAddress: ieStr[ieiPDUAddress],
+	iei5GSMCause:  ieStr[iei5GSMCause],
+}
+
 func (ue *UE) decPDUSessionEstablishmentAccept(pdu *[]byte) {
 
 	ue.dprint("PDU Session Establishment Accept")
@@ -685,6 +722,8 @@ func (ue *UE) decPDUSessionEstablishmentAccept(pdu *[]byte) {
 
 	ue.dprint("Session AMBR")
 	ue.decSessionAMBR(pdu)
+
+	ue.decInformationElement(pdu, ieStrPSEAccept)
 
 	ue.indent--
 
@@ -798,6 +837,7 @@ func (ue *UE) decGPRSTimer2(pdu *[]byte) {
 // 9.11.2.5 GPRS timer 3
 // See subclause 10.5.7.4a in 3GPP TS 24.008.
 func (ue *UE) decGPRSTimer3(pdu *[]byte) {
+
 	tmp := int((*pdu)[1])
 
 	multiple := 60 * 10 // 60 minutes
@@ -1415,10 +1455,11 @@ func (ue *UE) decPayloadContainer(pdu *[]byte) {
 	ue.dprint("Payload Container")
 
 	ue.indent++
-	length := binary.BigEndian.Uint16(*pdu)
+	length := int(binary.BigEndian.Uint16(*pdu))
 	*pdu = (*pdu)[2:]
 	ue.dprint("Length: %d", length)
-	ue.Decode(pdu)
+	payload := readPduByteSlice(pdu, length)
+	ue.Decode(&payload)
 	ue.indent--
 
 	return
@@ -1506,6 +1547,23 @@ func (ue *UE) decUESecurityCapability(pdu *[]byte) {
 	return
 }
 
+// 9.11.4.2 5GSM cause
+const (
+	smCausePDUSessionTypeIPv4OnlyeAllowed = 0x32
+)
+
+var smCauseStr = map[byte]string{
+	smCausePDUSessionTypeIPv4OnlyeAllowed: "PDU session type IPv4 only allowed",
+}
+
+func (ue *UE) dec5GSMCause(pdu *[]byte) {
+
+	cause := readPduByte(pdu)
+	ue.dprinti("cause: %s(%d)", smCauseStr[cause], cause)
+
+	return
+}
+
 // 9.11.4.7 Integrity protection maximum data rate
 func (ue *UE) encIntegrityProtectionMaximuDataRate() (pdu []byte) {
 
@@ -1517,6 +1575,28 @@ func (ue *UE) encIntegrityProtectionMaximuDataRate() (pdu []byte) {
 	return
 }
 
+// 9.11.4.10 PDU address
+func (ue *UE) decPDUAddress(pdu *[]byte) {
+
+	length := readPduByte(pdu)
+	ue.dprinti("Length: %d", length)
+
+	pduSessionType := readPduByte(pdu) & 0x7
+	ue.dprinti("PDU session type: %s(%d)",
+		pduSessionTypeStr[pduSessionType], pduSessionType)
+
+	var ueAddress net.IP
+	switch pduSessionType {
+	case PDUSessionIPv4:
+		ueAddress = readPduByteSlice(pdu, net.IPv4len)
+		ue.dprinti("PDU address information: %v", ueAddress)
+	default:
+		ue.dprinti("unsupported PDU session type: %d", pduSessionType)
+	}
+
+	return
+}
+
 // 9.11.4.11 PDU session type
 const (
 	PDUSessionIPv4   = 0x01
@@ -1524,7 +1604,7 @@ const (
 	PDUSessionIPv4v6 = 0x03
 )
 
-var pduSessionTypeStr = map[int]string{
+var pduSessionTypeStr = map[byte]string{
 	PDUSessionIPv4:   "IPv4",
 	PDUSessionIPv6:   "IPv6",
 	PDUSessionIPv4v6: "IPv4v6",
@@ -1536,7 +1616,7 @@ func (ue *UE) encPDUSessionType() (pdu []byte) {
 }
 
 func (ue *UE) decPDUSessionType(iei bool, pdu *[]byte) {
-	pduSessionType := 0x0f & int((*pdu)[0])
+	pduSessionType := 0x0f & (*pdu)[0]
 	ue.dprinti("PDU Session Type: %s(%d)",
 		pduSessionTypeStr[pduSessionType], pduSessionType)
 	ShiftType1IE(iei, pdu)
@@ -1993,6 +2073,12 @@ func readPduByte(pdu *[]byte) (val byte) {
 func readPduUint16(pdu *[]byte) (val uint16) {
 	val = binary.BigEndian.Uint16(*pdu)
 	*pdu = (*pdu)[2:]
+	return
+}
+
+func readPduByteSlice(pdu *[]byte, length int) (val []byte) {
+	val = (*pdu)[:length]
+	*pdu = (*pdu)[length:]
 	return
 }
 
