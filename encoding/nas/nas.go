@@ -379,6 +379,8 @@ func (ue *UE) decInformationElement(pdu *[]byte, ieStrMap map[int]string) {
 		switch iei {
 		case ieiIMEISVRequest:
 			ue.decIMEISVRequest(pdu)
+		case ieiPDUSessionID2:
+			ue.decPDUSessionID2(pdu)
 		case ieiNSSAI:
 			ue.decNSSAI(pdu)
 		case ieiGPRSTimer2:
@@ -1487,6 +1489,12 @@ func (ue *UE) decPayloadContainerType(pdu *[]byte) {
 }
 
 // 9.11.3.41 PDU session identity 2
+func (ue *UE) decPDUSessionID2(pdu *[]byte) {
+	sid := readPduByte(pdu)
+	ue.dprinti("PDU session identity 2 value: %d", sid)
+	return
+}
+
 func (ue *UE) encPDUSessionID2(id uint8) (pdu []byte) {
 
 	pdu = append(pdu, byte(ieiPDUSessionID2))
