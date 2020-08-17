@@ -6,9 +6,6 @@
 // in the 5GS Sytem.
 // document version: 3GPP TS 38.413 v16.0.0 (2019-12)
 
-// Implementing generic aligned PER docoder is higly complicated to me as the
-// hobby coder. At this moment, I plan to use encoding/binary to decode NGAP.
-
 // TODO: implimenting generic PER decoder.
 
 package ngap
@@ -42,55 +39,67 @@ const (
 
 // Elementary Procedures constants
 const (
-	idDownlinkNASTransport = 4
-	idInitialContextSetup  = 14
-	idInitialUEMessage     = 15
-	idNGSetup              = 21
-	idUplinkNASTransport   = 46
+	idDownlinkNASTransport    = 4
+	idInitialContextSetup     = 14
+	idInitialUEMessage        = 15
+	idNGSetup                 = 21
+	idPDUSessionResourceSetup = 29
+	idUplinkNASTransport      = 46
 )
 
 var procID = map[int]string{
-	idDownlinkNASTransport: "id-DownlinkNASTransport",
-	idInitialContextSetup:  "id-InitialContextSetup",
-	idInitialUEMessage:     "id-InitialUEMessage",
-	idNGSetup:              "id-NGSetup",
-	idUplinkNASTransport:   "id-UplinkNASTransport",
+	idDownlinkNASTransport:    "id-DownlinkNASTransport",
+	idInitialContextSetup:     "id-InitialContextSetup",
+	idInitialUEMessage:        "id-InitialUEMessage",
+	idNGSetup:                 "id-NGSetup",
+	idPDUSessionResourceSetup: "id-PDUSessionResourceSetup",
+	idUplinkNASTransport:      "id-UplinkNASTransport",
 }
 
 const (
-	idAllowedNSSAI            = 0
-	idAMFUENGAPID             = 10
-	idDefaultPagingDRX        = 21
-	idGlobalRANNodeID         = 27
-	idGUAMI                   = 28
-	idMaskedIMEISV            = 34
-	idMobilityRestrictionList = 36
-	idNASPDU                  = 38
-	idRANUENGAPID             = 85
-	idRRCEstablishmentCause   = 90
-	idSecurityKey             = 94
-	idSupportedTAList         = 102
-	idUEContextRequest        = 112
-	idUESecurityCapabilities  = 119
-	idUserLocationInformation = 121
+	idAllowedNSSAI                     = 0
+	idAMFName                          = 1
+	idAMFUENGAPID                      = 10
+	idDefaultPagingDRX                 = 21
+	idGlobalRANNodeID                  = 27
+	idGUAMI                            = 28
+	idMaskedIMEISV                     = 34
+	idMobilityRestrictionList          = 36
+	idNASPDU                           = 38
+	idPDUSessionResourceSetupListSUReq = 74
+	idPLMNSupportList                  = 80
+	idRANUENGAPID                      = 85
+	idRelativeAMFCapacity              = 86
+	idRRCEstablishmentCause            = 90
+	idSecurityKey                      = 94
+	idServedGUAMIList                  = 96
+	idSupportedTAList                  = 102
+	idUEContextRequest                 = 112
+	idUESecurityCapabilities           = 119
+	idUserLocationInformation          = 121
 )
 
 var ieID = map[int]string{
-	idAllowedNSSAI:            "id-AllowedNSSAI",
-	idAMFUENGAPID:             "id-AMF-UE-NGAP-ID",
-	idDefaultPagingDRX:        "",
-	idGlobalRANNodeID:         "",
-	idGUAMI:                   "id-GUAMI",
-	idMaskedIMEISV:            "id-MaskedIMEISV",
-	idMobilityRestrictionList: "id-MobilityRestrictionList",
-	idNASPDU:                  "id-NAS-PDU",
-	idRANUENGAPID:             "id-RAN-UE-NGAP-ID",
-	idRRCEstablishmentCause:   "",
-	idSecurityKey:             "id-SecurityKey",
-	idSupportedTAList:         "",
-	idUEContextRequest:        "",
-	idUESecurityCapabilities:  "id-UESecurityCapabilities",
-	idUserLocationInformation: "",
+	idAllowedNSSAI:                     "id-AllowedNSSAI",
+	idAMFName:                          "id-AMFName",
+	idAMFUENGAPID:                      "id-AMF-UE-NGAP-ID",
+	idDefaultPagingDRX:                 "",
+	idGlobalRANNodeID:                  "",
+	idGUAMI:                            "id-GUAMI",
+	idMaskedIMEISV:                     "id-MaskedIMEISV",
+	idMobilityRestrictionList:          "id-MobilityRestrictionList",
+	idNASPDU:                           "id-NAS-PDU",
+	idPDUSessionResourceSetupListSUReq: "id-PDUSessionResourceSetupListSUReq",
+	idPLMNSupportList:                  "id-PLMNSupportList",
+	idRANUENGAPID:                      "id-RAN-UE-NGAP-ID",
+	idRelativeAMFCapacity:              "id-RelativeAMFCapacity",
+	idRRCEstablishmentCause:            "",
+	idSecurityKey:                      "id-SecurityKey",
+	idServedGUAMIList:                  "id-ServedGUAMIList",
+	idSupportedTAList:                  "",
+	idUEContextRequest:                 "",
+	idUESecurityCapabilities:           "id-UESecurityCapabilities",
+	idUserLocationInformation:          "",
 }
 
 type GNB struct {
@@ -114,6 +123,9 @@ type GNB struct {
 
 func NewNGAP(filename string) (p *GNB) {
 
+	log.SetPrefix("[ngap]")
+	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
+
 	bytes, err := ioutil.ReadFile(filename)
 	if err != nil {
 		log.Fatal(err)
@@ -124,6 +136,7 @@ func NewNGAP(filename string) (p *GNB) {
 	json.Unmarshal(bytes, p)
 
 	p.dbgLevel = 0
+
 	return
 }
 
@@ -145,6 +158,10 @@ func (gnb *GNB) Decode(pdu *[]byte) {
 
 	_, procCode, _, _ := decNgapPdu(pdu)
 
+	procIdStr := procID[procCode]
+	if procIdStr == "" {
+		log.Printf("unsupported procedure: %d", procCode)
+	}
 	gnb.dprint("Procedure Code: %s (%d)", procID[procCode], procCode)
 
 	length, _ := per.DecLengthDeterminant(pdu, 0)
@@ -460,6 +477,10 @@ func (gnb *GNB) decProtocolIE(pdu *[]byte) (err error) {
 	offset := 0
 	id := int(binary.BigEndian.Uint16((*pdu)[offset:]))
 	offset += 2
+	if ieID[id] == "" {
+		log.Printf("unsupported Protocol IE: %d", id)
+	}
+
 	gnb.dprint("Protocol IE: %s (%d)", ieID[id], id)
 	gnb.indent++
 
