@@ -180,6 +180,61 @@ func (gnb *GNB) Decode(pdu *[]byte) {
 	return
 }
 
+// 9.2 Message Functional Definition and Content
+// 9.2.1 PDU Session Management Messages
+// 9.2.1.1 PDU SESSION RESOURCE SETUP REQUEST
+/*
+PDUSessionResourceSetupRequest ::= SEQUENCE {
+    protocolIEs     ProtocolIE-Container        { {PDUSessionResourceSetupRequestIEs} },
+    ...
+}
+
+PDUSessionResourceSetupRequestIEs NGAP-PROTOCOL-IES ::= {
+    { ID id-AMF-UE-NGAP-ID                          CRITICALITY reject  TYPE AMF-UE-NGAP-ID                             PRESENCE mandatory  }|
+    { ID id-RAN-UE-NGAP-ID                          CRITICALITY reject  TYPE RAN-UE-NGAP-ID                             PRESENCE mandatory  }|
+    { ID id-RANPagingPriority                       CRITICALITY ignore  TYPE RANPagingPriority                          PRESENCE optional       }|
+    { ID id-NAS-PDU                                 CRITICALITY reject  TYPE NAS-PDU                                    PRESENCE optional       }|
+    { ID id-PDUSessionResourceSetupListSUReq        CRITICALITY reject  TYPE PDUSessionResourceSetupListSUReq       PRESENCE mandatory  }|
+    { ID id-UEAggregateMaximumBitRate               CRITICALITY ignore  TYPE UEAggregateMaximumBitRate              PRESENCE optional       },
+    ...
+}
+
+PDUSessionResourceSetupListSUReq ::= SEQUENCE (SIZE(1..maxnoofPDUSessions)) OF PDUSessionResourceSetupItemSUReq
+
+PDUSessionResourceSetupItemSUReq ::= SEQUENCE {
+    pDUSessionID                                PDUSessionID,
+    pDUSessionNAS-PDU                           NAS-PDU                                             OPTIONAL,
+    s-NSSAI                                     S-NSSAI,
+    pDUSessionResourceSetupRequestTransfer      OCTET STRING (CONTAINING PDUSessionResourceSetupRequestTransfer),
+    iE-Extensions       ProtocolExtensionContainer { {PDUSessionResourceSetupItemSUReq-ExtIEs} }    OPTIONAL,
+    ...
+}
+
+    maxnoofPDUSessions                  INTEGER ::= 256
+*/
+
+func (gnb *GNB) decPDUSessionResourceSetupListSUReq(pdu *[]byte, length int) {
+
+	seqNum := int(readPduByte(pdu)) + 1
+	gnb.dprint("number of sequence: %d", seqNum)
+
+	for i := 0; i < seqNum; i++ {
+		seq := readPduByte(pdu)
+		gnb.decPDUSessionID(pdu)
+
+		seq <<= 1 // skip extension marker
+
+		option := false
+		option = (seq & 0x80) != 0
+		if option {
+			gnb.decNASPDU(pdu)
+		}
+		gnb.decSNSSAI(pdu)
+		gnb.decPDUSessionResourceSetupRequestTransfer(pdu)
+	}
+	return
+}
+
 // 9.2.2.2 INITIAL CONTEXT SETUP RESPONSE
 /*
 InitialContextSetupResponse ::= SEQUENCE {
@@ -493,10 +548,12 @@ func (gnb *GNB) decProtocolIE(pdu *[]byte) (err error) {
 	*pdu = (*pdu)[offset:]
 
 	switch id {
-	case idAMFUENGAPID:
+	case idAMFUENGAPID: //10
 		gnb.decAMFUENGAPID(pdu, length)
-	case idNASPDU:
-		gnb.decNASPDU(pdu, length)
+	case idNASPDU: // 38
+		gnb.decNASPDU(pdu)
+	case idPDUSessionResourceSetupListSUReq: // 74
+		gnb.decPDUSessionResourceSetupListSUReq(pdu, length)
 	default:
 		gnb.dprint("decoding id(%d) not supported yet.", id)
 		gnb.dprint("dump: %02x", (*pdu)[:length])
@@ -848,6 +905,38 @@ func encSNSSAI(sstInt uint8, sdString string) (pv []byte, plen int, v []byte) {
 	return
 }
 
+func (gnb *GNB) decSNSSAI(pdu *[]byte) {
+
+	gnb.dprint("S-NSSAI")
+	seq := readPduByteSlice(pdu, 2)
+
+	per.ShiftLeft(seq, 1) // skip extension marker
+
+	option := false
+	option = (seq[0] & 0x80) != 0
+
+	per.ShiftLeft(seq, 2) // skip 2 optionss
+	sst := int(seq[0])
+
+	gnb.dprinti("SST: %d", sst)
+
+	if option {
+		sd := readPduByteSlice(pdu, 3)
+		gnb.dprinti("SST: 0x%0x", sd)
+	}
+	return
+}
+
+// 9.3.1.50 PDU Session ID
+/*
+PDUSessionID ::= INTEGER (0..255)
+*/
+func (gnb *GNB) decPDUSessionID(pdu *[]byte) (val int) {
+	val = int(readPduByte(pdu))
+	gnb.dprinti("PDU Session ID: %d", val)
+	return
+}
+
 // 9.3.1.111 RRC Establishment Cause
 /*
 RRCEstablishmentCause ::= ENUMERATED {
@@ -908,6 +997,7 @@ func (gnb *GNB) encAMFUENGAPID() (v []byte) {
 	v = append(head, v...)
 	return
 }
+
 func (gnb *GNB) decAMFUENGAPID(pdu *[]byte, length int) {
 	// just storing the received value for now.
 	gnb.recv.AMFUENGAPID = (*pdu)[:length]
@@ -953,12 +1043,10 @@ func (gnb *GNB) encNASPDU() (v []byte) {
 	return
 }
 
-func (gnb *GNB) decNASPDU(pdu *[]byte, length int) (err error) {
-	gnb.dprint("pseudo DecOctetString(%x)", length)
+func (gnb *GNB) decNASPDU(pdu *[]byte) (err error) {
 
-	_ = int((*pdu)[0])
-	*pdu = (*pdu)[1:]
-
+	gnb.dprint("pseudo DecOctetString")
+	readPduByte(pdu)
 	gnb.SendtoUE(pdu)
 
 	return
@@ -997,6 +1085,30 @@ func (gnb *GNB) encTAI(tai *TAI) (pv []byte, plen int, v []byte, err error) {
 	pv, plen, _ = per.EncSequence(true, 1, 0)
 	v = gnb.encPLMNIdentity(tai.PLMN.MCC, tai.PLMN.MNC)
 	v = append(v, gnb.encTAC(tai.TAC)...)
+	return
+}
+
+// 9.3.4.1 PDU Session Resource Setup Request Transfer
+/*
+PDUSessionResourceSetupRequestTransfer ::= SEQUENCE {
+    protocolIEs     ProtocolIE-Container        { {PDUSessionResourceSetupRequestTransferIEs} },
+    ...
+}
+
+PDUSessionResourceSetupRequestTransferIEs NGAP-PROTOCOL-IES ::= {
+    { ID id-PDUSessionAggregateMaximumBitRate   CRITICALITY reject  TYPE PDUSessionAggregateMaximumBitRate      PRESENCE optional       }|
+    { ID id-UL-NGU-UP-TNLInformation            CRITICALITY reject  TYPE UPTransportLayerInformation                PRESENCE mandatory  }|
+    { ID id-AdditionalUL-NGU-UP-TNLInformation  CRITICALITY reject  TYPE UPTransportLayerInformationList        PRESENCE optional       }|
+    { ID id-DataForwardingNotPossible           CRITICALITY reject  TYPE DataForwardingNotPossible              PRESENCE optional       }|
+    { ID id-PDUSessionType                      CRITICALITY reject  TYPE PDUSessionType                             PRESENCE mandatory  }|
+    { ID id-SecurityIndication                  CRITICALITY reject  TYPE SecurityIndication                         PRESENCE optional       }|
+    { ID id-NetworkInstance                     CRITICALITY reject  TYPE NetworkInstance                            PRESENCE optional       }|
+    { ID id-QosFlowSetupRequestList             CRITICALITY reject  TYPE QosFlowSetupRequestList                    PRESENCE mandatory  }|
+    { ID id-CommonNetworkInstance               CRITICALITY ignore  TYPE CommonNetworkInstance                      PRESENCE optional   },
+    ...
+}
+*/
+func (gnb *GNB) decPDUSessionResourceSetupRequestTransfer(pdu *[]byte) {
 	return
 }
 
@@ -1110,6 +1222,24 @@ func (gnb *GNB) encUEContextRequest() (v []byte, err error) {
 }
 
 //-----
+func readPduByte(pdu *[]byte) (val byte) {
+	val = byte((*pdu)[0])
+	*pdu = (*pdu)[1:]
+	return
+}
+
+func readPduUint16(pdu *[]byte) (val uint16) {
+	val = binary.BigEndian.Uint16(*pdu)
+	*pdu = (*pdu)[2:]
+	return
+}
+
+func readPduByteSlice(pdu *[]byte, length int) (val []byte) {
+	val = (*pdu)[:length]
+	*pdu = (*pdu)[length:]
+	return
+}
+
 func (gnb *GNB) SetDebugLevel(level int) {
 	gnb.dbgLevel = level
 	return

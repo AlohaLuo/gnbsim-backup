@@ -362,9 +362,9 @@ func (ue *UE) decInformationElement(pdu *[]byte, ieStrMap map[int]string) {
 		msg := ieStrMap[iei]
 
 		if msg == "" {
-			ue.dprint("error: IE name is not set properly.")
 			break
 		}
+
 		ue.dprint("%s: 0x%x", msg, iei)
 
 		if type1ie {
