@@ -77,6 +77,9 @@ const (
 	idUEContextRequest                 = 112
 	idUESecurityCapabilities           = 119
 	idUserLocationInformation          = 121
+	idPDUSessionType                   = 134
+	idQosFlowSetupRequestList          = 136
+	idULNGUUPTNLInformation            = 139
 )
 
 var ieID = map[int]string{
@@ -100,6 +103,9 @@ var ieID = map[int]string{
 	idUEContextRequest:                 "",
 	idUESecurityCapabilities:           "id-UESecurityCapabilities",
 	idUserLocationInformation:          "",
+	idPDUSessionType:                   "id-PDUSessionType",
+	idQosFlowSetupRequestList:          "id-QosFlowSetupRequestList",
+	idULNGUUPTNLInformation:            "id-UL-NGU-UP-TNLInformation",
 }
 
 type GNB struct {
@@ -167,16 +173,8 @@ func (gnb *GNB) Decode(pdu *[]byte) {
 	length, _ := per.DecLengthDeterminant(pdu, 0)
 	gnb.dprint("PDU Length: %d", length)
 
-	num, _ := gnb.decProtocolIEContainer(pdu)
-	gnb.dprint("Protocol IEs: %d items", num)
+	gnb.decProtocolIEContainer(pdu)
 
-	for idx := 0; idx < num; idx++ {
-		gnb.indent++
-		gnb.dprint("Item %d", idx)
-		gnb.indent++
-		gnb.decProtocolIE(pdu)
-		gnb.indent -= 2
-	}
 	return
 }
 
@@ -487,20 +485,25 @@ func encProtocolIEContainer(num uint) (container []byte) {
 	return
 }
 
-func (gnb *GNB) decProtocolIEContainer(pdu *[]byte) (num int, err error) {
+func (gnb *GNB) decProtocolIEContainer(pdu *[]byte) (err error) {
 
 	if len(*pdu) < 3 {
 		err = fmt.Errorf("remaining pdu length(%d) is too short. expect > %d",
 			len(*pdu), 3)
 		return
 	}
-	offset := 0
-	offset += 1 // skip Sequence
 
-	num = int(binary.BigEndian.Uint16((*pdu)[offset:]))
-	offset += 2
+	readPduByte(pdu) // skip sequence
+	num := int(readPduUint16(pdu))
+	gnb.dprint("Protocol IEs: %d items", num)
 
-	*pdu = (*pdu)[offset:]
+	for idx := 0; idx < num; idx++ {
+		gnb.indent++
+		gnb.dprint("Item %d", idx)
+		gnb.indent++
+		gnb.decProtocolIE(pdu)
+		gnb.indent -= 2
+	}
 	return
 }
 
@@ -1109,6 +1112,12 @@ PDUSessionResourceSetupRequestTransferIEs NGAP-PROTOCOL-IES ::= {
 }
 */
 func (gnb *GNB) decPDUSessionResourceSetupRequestTransfer(pdu *[]byte) {
+
+	gnb.dprint("PDU Session Resource Setup Request Transfer")
+	length, _ := per.DecLengthDeterminant(pdu, 0)
+	pdu2 := readPduByteSlice(pdu, length)
+	gnb.decProtocolIEContainer(&pdu2)
+
 	return
 }
 
