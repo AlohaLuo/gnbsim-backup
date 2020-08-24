@@ -18,6 +18,7 @@ import (
 	"io/ioutil"
 	"log"
 	"math/bits"
+	"net"
 	"strconv"
 	"strings"
 
@@ -125,6 +126,8 @@ type GNB struct {
 
 	dbgLevel int
 	indent   int // indent for debug print.
+
+	per per.PER
 }
 
 func NewNGAP(filename string) (p *GNB) {
@@ -557,6 +560,8 @@ func (gnb *GNB) decProtocolIE(pdu *[]byte) (err error) {
 		gnb.decNASPDU(pdu)
 	case idPDUSessionResourceSetupListSUReq: // 74
 		gnb.decPDUSessionResourceSetupListSUReq(pdu, length)
+	case idULNGUUPTNLInformation: // 139
+		gnb.decUPTransportLayerInformation(pdu, length)
 	default:
 		gnb.dprint("decoding id(%d) not supported yet.", id)
 		gnb.dprint("dump: %02x", (*pdu)[:length])
@@ -810,6 +815,70 @@ func (gnb *GNB) encPagingDRX(drx string) (v []byte, err error) {
 
 	return
 }
+
+// 9.3.2.2 UP Transport Layer Information
+/*
+UPTransportLayerInformation ::= CHOICE {
+    gTPTunnel               GTPTunnel,
+    choice-Extensions       ProtocolIE-SingleContainer { {UPTransportLayerInformation-ExtIEs} }
+}
+
+GTPTunnel ::= SEQUENCE {
+    transportLayerAddress       TransportLayerAddress,
+    gTP-TEID                    GTP-TEID,
+    iE-Extensions       ProtocolExtensionContainer { {GTPTunnel-ExtIEs} } OPTIONAL,
+    ...
+}
+*/
+func (gnb *GNB) decUPTransportLayerInformation(pdu *[]byte, length int) {
+
+	tli := readPduByteSlice(pdu, length)
+	gnb.dprint("dump: %02x", tli)
+
+	// TODO: generic per decoder.
+	// 0000 0000
+	// ^         choice
+	//  ^        seq extension marker
+	//   ^       option
+	per.ShiftLeft(tli, 3) // skip the above bits
+	gnb.per.Plen += 3
+
+	gnb.decTransportLayerAddress(&tli)
+
+	return
+}
+
+// 9.3.2.4 Transport Layer Address
+/*
+TransportLayerAddress ::= BIT STRING (SIZE(1..160, ...))
+*/
+func (gnb *GNB) decTransportLayerAddress(pdu *[]byte) {
+
+	gnb.dprint("Transport Layer Address")
+
+	// TODO: generic per decoder.
+	// 0 0000 0000
+	// ^           bit string extension marker
+	//   ^^^^ ^^^^ bit string length
+	per.ShiftLeft(*pdu, 1) // skip extension marker
+	gnb.per.Plen += 1
+	length := readPduByte(pdu) + 1 // bit string size starts from 1.
+	gnb.dprinti("bit string length: %d", length)
+
+	per.ShiftLeft(*pdu, gnb.per.Plen%8) // skip remaining preamble
+
+	var addr net.IP
+	octLen := int((length-1)/8 + 1)
+	addr = readPduByteSlice(pdu, octLen)
+	gnb.dprinti("address: %v", addr)
+
+	return
+}
+
+//9.3.2.5 GTP-TEID
+/*
+GTP-TEID ::= OCTET STRING (SIZE(4))
+*/
 
 // 9.3.3.5 PLMN Identity
 /*
