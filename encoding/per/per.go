@@ -13,6 +13,10 @@ import (
 	"math/bits"
 )
 
+type PER struct {
+	Plen int
+}
+
 // MergeBitField is utility function for merging bit-field.
 // e.g. preamble or short integer value is not octet alined value, so
 // those fields need to be packed in same octets.
