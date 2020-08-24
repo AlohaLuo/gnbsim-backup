@@ -844,6 +844,7 @@ func (gnb *GNB) decUPTransportLayerInformation(pdu *[]byte, length int) {
 	gnb.per.Plen += 3
 
 	gnb.decTransportLayerAddress(&tli)
+	gnb.decGTPTEID(&tli)
 
 	return
 }
@@ -866,6 +867,7 @@ func (gnb *GNB) decTransportLayerAddress(pdu *[]byte) {
 	gnb.dprinti("bit string length: %d", length)
 
 	per.ShiftLeft(*pdu, gnb.per.Plen%8) // skip remaining preamble
+	gnb.per.Plen = 0
 
 	var addr net.IP
 	octLen := int((length-1)/8 + 1)
@@ -879,6 +881,13 @@ func (gnb *GNB) decTransportLayerAddress(pdu *[]byte) {
 /*
 GTP-TEID ::= OCTET STRING (SIZE(4))
 */
+func (gnb *GNB) decGTPTEID(pdu *[]byte) {
+
+	id := readPduUint32(pdu)
+	gnb.dprint("GTP TEID: %d", id)
+
+	return
+}
 
 // 9.3.3.5 PLMN Identity
 /*
@@ -1309,6 +1318,12 @@ func readPduByte(pdu *[]byte) (val byte) {
 func readPduUint16(pdu *[]byte) (val uint16) {
 	val = binary.BigEndian.Uint16(*pdu)
 	*pdu = (*pdu)[2:]
+	return
+}
+
+func readPduUint32(pdu *[]byte) (val uint32) {
+	val = binary.BigEndian.Uint32(*pdu)
+	*pdu = (*pdu)[4:]
 	return
 }
 
