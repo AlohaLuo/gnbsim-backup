@@ -506,14 +506,9 @@ func decNgapPdu(pdu *[]byte) (
 		return
 	}
 
-	offset := 0
-	offset += 1 // skip pduType
-
-	procCode = int((*pdu)[offset])
-	offset += 1
-	offset += 1 // skip criticality
-
-	*pdu = (*pdu)[offset:]
+	readPduByte(pdu) // skip pduType
+	procCode = int(readPduByte(pdu))
+	readPduByte(pdu) // skip criticality
 
 	return
 }
@@ -581,9 +576,8 @@ func (gnb *GNB) decProtocolIE(pdu *[]byte) (err error) {
 			len(*pdu), 2)
 		return
 	}
-	offset := 0
-	id := int(binary.BigEndian.Uint16((*pdu)[offset:]))
-	offset += 2
+
+	id := int(readPduUint16(pdu))
 	if ieID[id] == "" {
 		log.Printf("unsupported Protocol IE: %d", id)
 	}
@@ -591,13 +585,11 @@ func (gnb *GNB) decProtocolIE(pdu *[]byte) (err error) {
 	gnb.dprint("Protocol IE: %s (%d)", ieID[id], id)
 	gnb.indent++
 
-	offset += 1 // skip ciritcality
+	readPduByte(pdu) // skip ciritcality
 
-	length := int((*pdu)[offset])
+	length := int(readPduByte(pdu))
 	gnb.dprint("IE length: %d", length)
 	gnb.indent++
-	offset += 1
-	*pdu = (*pdu)[offset:]
 
 	switch id {
 	case idAMFUENGAPID: //10
@@ -609,9 +601,9 @@ func (gnb *GNB) decProtocolIE(pdu *[]byte) (err error) {
 	case idULNGUUPTNLInformation: // 139
 		gnb.decUPTransportLayerInformation(pdu, length)
 	default:
+		dump := readPduByteSlice(pdu, length)
 		gnb.dprint("decoding id(%d) not supported yet.", id)
-		gnb.dprint("dump: %02x", (*pdu)[:length])
-		*pdu = (*pdu)[length:]
+		gnb.dprint("dump: %02x", dump)
 	}
 	gnb.indent -= 2
 	return
@@ -1127,8 +1119,7 @@ func (gnb *GNB) encAMFUENGAPID() (v []byte) {
 
 func (gnb *GNB) decAMFUENGAPID(pdu *[]byte, length int) {
 	// just storing the received value for now.
-	gnb.recv.AMFUENGAPID = (*pdu)[:length]
-	*pdu = (*pdu)[length:]
+	gnb.recv.AMFUENGAPID = readPduByteSlice(pdu, length)
 	return
 }
 
