@@ -33,31 +33,6 @@ const (
 )
 
 const (
-	initiatingMessage = iota
-	successfulOutcome
-	unsuccessfulOutcome
-)
-
-// Elementary Procedures constants
-const (
-	idDownlinkNASTransport    = 4
-	idInitialContextSetup     = 14
-	idInitialUEMessage        = 15
-	idNGSetup                 = 21
-	idPDUSessionResourceSetup = 29
-	idUplinkNASTransport      = 46
-)
-
-var procID = map[int]string{
-	idDownlinkNASTransport:    "id-DownlinkNASTransport",
-	idInitialContextSetup:     "id-InitialContextSetup",
-	idInitialUEMessage:        "id-InitialUEMessage",
-	idNGSetup:                 "id-NGSetup",
-	idPDUSessionResourceSetup: "id-PDUSessionResourceSetup",
-	idUplinkNASTransport:      "id-UplinkNASTransport",
-}
-
-const (
 	idAllowedNSSAI                     = 0
 	idAMFName                          = 1
 	idAMFUENGAPID                      = 10
@@ -167,11 +142,11 @@ func (gnb *GNB) Decode(pdu *[]byte) {
 
 	_, procCode, _, _ := decNgapPdu(pdu)
 
-	procIdStr := procID[procCode]
-	if procIdStr == "" {
+	str := procCodeStr[procCode]
+	if str == "" {
 		log.Printf("unsupported procedure: %d", procCode)
 	}
-	gnb.dprint("Procedure Code: %s (%d)", procID[procCode], procCode)
+	gnb.dprint("Procedure Code: %s (%d)", str, procCode)
 
 	length, _ := per.DecLengthDeterminant(pdu, 0)
 	gnb.dprint("PDU Length: %d", length)
@@ -233,8 +208,42 @@ func (gnb *GNB) decPDUSessionResourceSetupListSUReq(pdu *[]byte, length int) {
 		gnb.decSNSSAI(pdu)
 		gnb.decPDUSessionResourceSetupRequestTransfer(pdu)
 	}
+
 	return
 }
+
+// 9.2.1.2 PDU SESSION RESOURCE SETUP RESPONSE
+/*
+PDUSessionResourceSetupResponse ::= SEQUENCE {
+    protocolIEs     ProtocolIE-Container        { {PDUSessionResourceSetupResponseIEs} },
+    ...
+}
+
+PDUSessionResourceSetupResponseIEs NGAP-PROTOCOL-IES ::= {
+    { ID id-AMF-UE-NGAP-ID                              CRITICALITY ignore  TYPE AMF-UE-NGAP-ID                                         PRESENCE mandatory  }|
+    { ID id-RAN-UE-NGAP-ID                              CRITICALITY ignore  TYPE RAN-UE-NGAP-ID                                         PRESENCE mandatory  }|
+    { ID id-PDUSessionResourceSetupListSURes            CRITICALITY ignore  TYPE PDUSessionResourceSetupListSURes               PRESENCE optional       }|
+    { ID id-PDUSessionResourceFailedToSetupListSURes    CRITICALITY ignore  TYPE PDUSessionResourceFailedToSetupListSURes       PRESENCE optional       }|
+    { ID id-CriticalityDiagnostics                      CRITICALITY ignore  TYPE CriticalityDiagnostics                             PRESENCE optional       },
+    ...
+}
+*/
+/*
+func (gnb *GNB) MakePDUSessionResourceSetupResponse() (pdu []byte) {
+
+	pdu = encNgapPdu(successfulOutcome, idPDUSessionResourceSetup, reject)
+
+	v := encProtocolIEContainer(2)
+
+	tmp := gnb.encAMFUENGAPID()
+	v = append(v, tmp...)
+
+	tmp = gnb.encRANUENGAPID()
+	v = append(v, tmp...)
+
+	return
+}
+*/
 
 // 9.2.2.2 INITIAL CONTEXT SETUP RESPONSE
 /*
@@ -423,14 +432,17 @@ func (gnb *GNB) MakeNGSetupRequest() (pdu []byte) {
 	return
 }
 
+// 9.3.1.1 Message Type
 /*
+ProcedureCode ::= INTEGER (0..255)
+
 NGAP-PDU ::= CHOICE {
     initiatingMessage           InitiatingMessage,
     successfulOutcome           SuccessfulOutcome,
     unsuccessfulOutcome         UnsuccessfulOutcome,
     ...
 }
-ProcedureCode ::= INTEGER (0..255)
+
 Criticality   ::= ENUMERATED { reject, ignore, notify }
 
 InitiatingMessage ::= SEQUENCE {
@@ -438,7 +450,44 @@ InitiatingMessage ::= SEQUENCE {
     criticality     NGAP-ELEMENTARY-PROCEDURE.&criticality       ({NGAP-ELEMENTARY-PROCEDURES}{@procedureCode}),
     value           NGAP-ELEMENTARY-PROCEDURE.&InitiatingMessage ({NGAP-ELEMENTARY-PROCEDURES}{@procedureCode})
 }
+
+SuccessfulOutcome ::= SEQUENCE {
+    procedureCode   NGAP-ELEMENTARY-PROCEDURE.&procedureCode        ({NGAP-ELEMENTARY-PROCEDURES}),
+    criticality     NGAP-ELEMENTARY-PROCEDURE.&criticality          ({NGAP-ELEMENTARY-PROCEDURES}{@procedureCode}),
+    value           NGAP-ELEMENTARY-PROCEDURE.&SuccessfulOutcome    ({NGAP-ELEMENTARY-PROCEDURES}{@procedureCode})
+}
+
+UnsuccessfulOutcome ::= SEQUENCE {
+    procedureCode   NGAP-ELEMENTARY-PROCEDURE.&procedureCode        ({NGAP-ELEMENTARY-PROCEDURES}),
+    criticality     NGAP-ELEMENTARY-PROCEDURE.&criticality          ({NGAP-ELEMENTARY-PROCEDURES}{@procedureCode}),
+    value           NGAP-ELEMENTARY-PROCEDURE.&UnsuccessfulOutcome  ({NGAP-ELEMENTARY-PROCEDURES}{@procedureCode})
+}
 */
+
+const (
+	idDownlinkNASTransport    = 4
+	idInitialContextSetup     = 14
+	idInitialUEMessage        = 15
+	idNGSetup                 = 21
+	idPDUSessionResourceSetup = 29
+	idUplinkNASTransport      = 46
+)
+
+var procCodeStr = map[int]string{
+	idDownlinkNASTransport:    "id-DownlinkNASTransport",
+	idInitialContextSetup:     "id-InitialContextSetup",
+	idInitialUEMessage:        "id-InitialUEMessage",
+	idNGSetup:                 "id-NGSetup",
+	idPDUSessionResourceSetup: "id-PDUSessionResourceSetup",
+	idUplinkNASTransport:      "id-UplinkNASTransport",
+}
+
+const (
+	initiatingMessage = iota
+	successfulOutcome
+	unsuccessfulOutcome
+)
+
 func encNgapPdu(pduType int, procCode int, criticality int) (pdu []byte) {
 	pdu, _, _ = per.EncChoice(pduType, 0, 2, true)
 	v, _, _ := per.EncInteger(int64(procCode), 0, 255, false)
@@ -465,14 +514,11 @@ func decNgapPdu(pdu *[]byte) (
 	offset += 1 // skip criticality
 
 	*pdu = (*pdu)[offset:]
+
 	return
 }
 
 /*
-NGSetupRequest ::= SEQUENCE {
-    protocolIEs     ProtocolIE-Container        { {NGSetupRequestIEs} },
-    ...
-}
 ProtocolIE-Container {NGAP-PROTOCOL-IES : IEsSetParam} ::=
     SEQUENCE (SIZE (0..maxProtocolIEs)) OF
     ProtocolIE-Field {{IEsSetParam}}
@@ -1198,6 +1244,8 @@ func (gnb *GNB) decPDUSessionResourceSetupRequestTransfer(pdu *[]byte) {
 
 	return
 }
+
+// 9.3.4.2 PDU Session Resource Setup Response Transfer
 
 /*
  * following IEs/Group Names are defined in each message definitions in 9.2.
