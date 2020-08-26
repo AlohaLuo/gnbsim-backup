@@ -12,6 +12,7 @@ These instructions will get you a copy of the project up and running on your loc
   - gnbsim can complete 'Initial Registration'.
   - gnbsim cannot complete 'PDU Session Establishment' for now.
   - I will try to update my code step by step...
+
 * running free5gc somewhere.
   - subscriber has been registered by free5gc web console.
   - change 'ngapIPList' to external ip address in 'amfcfg.conf' 
@@ -22,18 +23,20 @@ These instructions will get you a copy of the project up and running on your loc
 
 ```shell
 $ git clone https://github.com/hhorai/gnbsim.git
+$ cd gnbsim
 ```
 
 * Build example binary.
 
 ```shell
-$ cd gnbsim/example
-$ go build
+$ make test		# test for each libary.
+$ make			# building example binary.
 ```
 
 * Edit the configuration file. In case of free5gc with default configuration, it might not be needed to edit, excluding 'msin' parameter.
 
 ```shell
+$ cd example
 $ vi example.json
 ```
 
