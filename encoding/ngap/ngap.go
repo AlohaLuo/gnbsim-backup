@@ -43,6 +43,7 @@ const (
 	idMobilityRestrictionList          = 36
 	idNASPDU                           = 38
 	idPDUSessionResourceSetupListSUReq = 74
+	idPDUSessionResourceSetupListSURes = 75
 	idPLMNSupportList                  = 80
 	idRANUENGAPID                      = 85
 	idRelativeAMFCapacity              = 86
@@ -69,6 +70,7 @@ var ieID = map[int]string{
 	idMobilityRestrictionList:          "id-MobilityRestrictionList",
 	idNASPDU:                           "id-NAS-PDU",
 	idPDUSessionResourceSetupListSUReq: "id-PDUSessionResourceSetupListSUReq",
+	idPDUSessionResourceSetupListSURes: "id-PDUSessionResourceSetupListSURes",
 	idPLMNSupportList:                  "id-PLMNSupportList",
 	idRANUENGAPID:                      "id-RAN-UE-NGAP-ID",
 	idRelativeAMFCapacity:              "id-RelativeAMFCapacity",
@@ -93,7 +95,8 @@ type GNB struct {
 	ULInfoNR        UserLocationInformationNR
 
 	recv struct {
-		AMFUENGAPID []byte
+		AMFUENGAPID  []byte
+		PDUSessionID uint8
 	}
 
 	SendNasMsg *[]byte
@@ -228,11 +231,9 @@ PDUSessionResourceSetupResponseIEs NGAP-PROTOCOL-IES ::= {
     ...
 }
 */
-/*
 func (gnb *GNB) MakePDUSessionResourceSetupResponse() (pdu []byte) {
 
 	pdu = encNgapPdu(successfulOutcome, idPDUSessionResourceSetup, reject)
-
 	v := encProtocolIEContainer(2)
 
 	tmp := gnb.encAMFUENGAPID()
@@ -241,9 +242,45 @@ func (gnb *GNB) MakePDUSessionResourceSetupResponse() (pdu []byte) {
 	tmp = gnb.encRANUENGAPID()
 	v = append(v, tmp...)
 
+	tmp = gnb.encPDUSessionResourceSetupResponse()
+	v = append(v, tmp...)
+
 	return
 }
+
+// PDU Session Resource Setup Response List is defined in
+// 9.2.1.2 PDU SESSION RESOURCE SETUP RESPONSE
+/*
+maxnoofPDUSessions                  INTEGER ::= 256
+
+PDUSessionResourceSetupListSURes ::= SEQUENCE (SIZE(1..maxnoofPDUSessions)) OF PDUSessionResourceSetupItemSURes
+
+PDUSessionResourceSetupItemSURes ::= SEQUENCE {
+    pDUSessionID                                            PDUSessionID,
+    pDUSessionResourceSetupResponseTransfer                 OCTET STRING (CONTAINING PDUSessionResourceSetupResponseTransfer),
+    iE-Extensions       ProtocolExtensionContainer { {PDUSessionResourceSetupItemSURes-ExtIEs} }    OPTIONAL,
+    ...
+}
 */
+func (gnb *GNB) encPDUSessionResourceSetupResponse() (v []byte, err error) {
+
+	head, err := encProtocolIE(idPDUSessionResourceSetupListSURes, ignore)
+
+	pv, plen, _ := per.EncSequenceOf(1, 1, 256, false)
+	pv2, plen2, _ := per.EncSequence(true, 1, 0)
+	pv, plen = per.MergeBitField(pv, plen, pv2, plen2)
+
+	v := gnb.encPDUSessionID()
+	v = append(pv, v...)
+
+	// encPDUSessionResourceSetupResponseTransfer
+
+	length, _, _ := per.EncLengthDeterminant(len(v), 0)
+	head = append(head, length...)
+	v = append(head, v...)
+
+	return
+}
 
 // 9.2.2.2 INITIAL CONTEXT SETUP RESPONSE
 /*
@@ -1050,9 +1087,14 @@ func (gnb *GNB) decSNSSAI(pdu *[]byte) {
 /*
 PDUSessionID ::= INTEGER (0..255)
 */
+func (gnb *GNB) encPDUSessionID() (pdu []byte) {
+	pdu = []byte{byte(gnb.recv.PDUSessionID)}
+	return
+}
 func (gnb *GNB) decPDUSessionID(pdu *[]byte) (val int) {
 	val = int(readPduByte(pdu))
 	gnb.dprinti("PDU Session ID: %d", val)
+	gnb.recv.PDUSessionID = uint8(val)
 	return
 }
 
