@@ -262,15 +262,15 @@ PDUSessionResourceSetupItemSURes ::= SEQUENCE {
     ...
 }
 */
-func (gnb *GNB) encPDUSessionResourceSetupResponse() (v []byte, err error) {
+func (gnb *GNB) encPDUSessionResourceSetupResponse() (v []byte) {
 
-	head, err := encProtocolIE(idPDUSessionResourceSetupListSURes, ignore)
+	head, _ := encProtocolIE(idPDUSessionResourceSetupListSURes, ignore)
 
 	pv, plen, _ := per.EncSequenceOf(1, 1, 256, false)
 	pv2, plen2, _ := per.EncSequence(true, 1, 0)
 	pv, plen = per.MergeBitField(pv, plen, pv2, plen2)
 
-	v := gnb.encPDUSessionID()
+	v = gnb.encPDUSessionID()
 	v = append(pv, v...)
 
 	// encPDUSessionResourceSetupResponseTransfer
