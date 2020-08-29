@@ -105,7 +105,7 @@ type GNB struct {
 	dbgLevel int
 	indent   int // indent for debug print.
 
-	per per.PER
+	preamble per.BitField
 }
 
 func NewNGAP(filename string) (p *GNB) {
@@ -266,14 +266,23 @@ func (gnb *GNB) encPDUSessionResourceSetupResponse() (v []byte) {
 
 	head, _ := encProtocolIE(idPDUSessionResourceSetupListSURes, ignore)
 
+	var p per.BitField
+	var p2 per.BitField
 	pv, plen, _ := per.EncSequenceOf(1, 1, 256, false)
-	pv2, plen2, _ := per.EncSequence(true, 1, 0)
-	pv, plen = per.MergeBitField(pv, plen, pv2, plen2)
+	p.Value = pv
+	p.Len = plen
+	pv, plen, _ = per.EncSequence(true, 1, 0)
+	p2.Value = pv
+	p2.Len = plen
+	p = per.MergeBitField(&p, &p2)
+	pv = p.Value
+	plen = p.Len
 
 	v = gnb.encPDUSessionID()
 	v = append(pv, v...)
 
-	// encPDUSessionResourceSetupResponseTransfer
+	v = gnb.encPDUSessionResourceSetupResponseTransfer()
+	v = append(pv, v...)
 
 	length, _, _ := per.EncLengthDeterminant(len(v), 0)
 	head = append(head, length...)
@@ -662,14 +671,22 @@ const (
 	globalN3IWF
 )
 
-func (gnb *GNB) encGlobalRANNodeID(p *GlobalGNBID) (v []byte, err error) {
+func (gnb *GNB) encGlobalRANNodeID(id *GlobalGNBID) (v []byte, err error) {
 
 	head, err := encProtocolIE(idGlobalRANNodeID, reject)
 
 	// NG-ENB and N3IWF are not implemented yet...
+	var p per.BitField
+	var p2 per.BitField
 	pv, plen, _ := per.EncChoice(globalGNB, 0, 2, false)
-	pv2, plen2, v2 := gnb.encGlobalGNBID(p)
-	pv, plen = per.MergeBitField(pv, plen, pv2, plen2)
+	p.Value = pv
+	p.Len = plen
+	pv, plen, v2 := gnb.encGlobalGNBID(id)
+	p2.Value = pv
+	p2.Len = plen
+	p = per.MergeBitField(&p, &p2)
+	pv = p.Value
+	plen = p.Len
 	pv = append(pv, v2...)
 
 	length, _, _ := per.EncLengthDeterminant(len(pv), 0)
@@ -722,14 +739,22 @@ func encGNBID(gnbid uint32) (pv []byte, plen int) {
 		bitlen = minGNBIDSize
 	}
 
+	var p per.BitField
+	var p2 per.BitField
 	pv, plen, _ = per.EncChoice(0, 0, 1, false)
+	p.Value = pv
+	p.Len = plen
 
 	tmp := make([]byte, 4)
 	binary.BigEndian.PutUint32(tmp, gnbid)
-	pv2, plen2, v, _ := per.EncBitString(tmp, bitlen,
+	pv, plen, v, _ := per.EncBitString(tmp, bitlen,
 		minGNBIDSize, maxGNBIDSize, false)
+	p2.Value = pv
+	p2.Len = plen
 
-	pv, plen = per.MergeBitField(pv, plen, pv2, plen2)
+	p = per.MergeBitField(&p, &p2)
+	pv = p.Value
+	plen = p.Len
 	pv = append(pv, v...)
 
 	return
@@ -781,14 +806,23 @@ func (gnb *GNB) encNRCellIdentity(cellid uint64) (v []byte, bitlen int) {
 
 	tmp := make([]byte, 4)
 	binary.BigEndian.PutUint32(tmp, gnbid)
+
+	var p per.BitField
+	var p2 per.BitField
 	pv, plen := per.ShiftLeftMost(tmp, gnbidlen)
+	p.Value = pv
+	p.Len = plen
 
 	cellidlen := nrCellIDSize - gnbidlen
 	tmp = make([]byte, 8)
 	binary.BigEndian.PutUint64(tmp, cellid)
-	pv2, plen2 := per.ShiftLeftMost(tmp, cellidlen)
+	pv, plen = per.ShiftLeftMost(tmp, cellidlen)
+	p2.Value = pv
+	p2.Len = plen
 
-	v, bitlen = per.MergeBitField(pv, plen, pv2, plen2)
+	p = per.MergeBitField(&p, &p2)
+	v = p.Value
+	bitlen = p.Len
 	return
 }
 
@@ -811,10 +845,18 @@ func (gnb *GNB) encUserLocationInformation() (v []byte, err error) {
 	head, err := encProtocolIE(idUserLocationInformation, reject)
 
 	// NG-ENB and N3IWF are not implemented yet...
+	var p per.BitField
+	var p2 per.BitField
 	pv, plen, _ := per.EncChoice(ULInfoNR, 0, 2, false)
+	p.Value = pv
+	p.Len = plen
 
-	pv2, plen2, v := gnb.encUserLocationInformationNR(&gnb.ULInfoNR)
-	pv, plen = per.MergeBitField(pv, plen, pv2, plen2)
+	pv, plen, v = gnb.encUserLocationInformationNR(&gnb.ULInfoNR)
+	p2.Value = pv
+	p2.Len = plen
+	p = per.MergeBitField(&p, &p2)
+	pv = p.Value
+	plen = p.Len
 
 	pv = append(pv, v...)
 
@@ -841,12 +883,30 @@ type UserLocationInformationNR struct {
 
 func (gnb *GNB) encUserLocationInformationNR(info *UserLocationInformationNR) (pv []byte, plen int, v []byte) {
 
+	var p per.BitField
+	var p2 per.BitField
+
 	pv, plen, _ = per.EncSequence(true, 2, 0)
-	pv2, plen2, v, bitlen, _ := gnb.encNRCGI(&info.NRCGI)
-	pv, plen = per.MergeBitField(pv, plen, pv2, plen2)
+	p.Value = pv
+	p.Len = plen
+
+	pv, plen, v, bitlen, _ := gnb.encNRCGI(&info.NRCGI)
+	p2.Value = pv
+	p2.Len = plen
+
+	p = per.MergeBitField(&p, &p2)
+	pv = p.Value
+	plen = p.Len
 
 	pv2, plen2, v2, _ := gnb.encTAI(&info.TAI)
-	v, bitlen = per.MergeBitField(v, bitlen, pv2, plen2)
+	p2.Value = pv2
+	p2.Len = plen2
+
+	p.Value = v
+	p.Len = bitlen
+	p = per.MergeBitField(&p, &p2)
+	v = p.Value
+	bitlen = p.Len
 
 	v = append(v, v2...)
 
@@ -916,7 +976,7 @@ func (gnb *GNB) decUPTransportLayerInformation(pdu *[]byte, length int) {
 	//  ^        seq extension marker
 	//   ^       option
 	per.ShiftLeft(tli, 3) // skip the above bits
-	gnb.per.Plen += 3
+	gnb.preamble.Len += 3
 
 	gnb.decTransportLayerAddress(&tli)
 	gnb.decGTPTEID(&tli)
@@ -937,12 +997,12 @@ func (gnb *GNB) decTransportLayerAddress(pdu *[]byte) {
 	// ^           bit string extension marker
 	//   ^^^^ ^^^^ bit string length
 	per.ShiftLeft(*pdu, 1) // skip extension marker
-	gnb.per.Plen += 1
+	gnb.preamble.Len += 1
 	length := readPduByte(pdu) + 1 // bit string size starts from 1.
 	gnb.dprinti("bit string length: %d", length)
 
-	per.ShiftLeft(*pdu, gnb.per.Plen%8) // skip remaining preamble
-	gnb.per.Plen = 0
+	per.ShiftLeft(*pdu, gnb.preamble.Len%8) // skip remaining preamble
+	gnb.preamble.Len = 0
 
 	var addr net.IP
 	octLen := int((length-1)/8 + 1)
@@ -961,6 +1021,19 @@ func (gnb *GNB) decGTPTEID(pdu *[]byte) {
 	id := readPduUint32(pdu)
 	gnb.dprint("GTP TEID: %d", id)
 
+	return
+}
+
+// 9.3.2.8 QoS Flow per TNL Information
+/*
+QosFlowPerTNLInformation ::= SEQUENCE {
+    uPTransportLayerInformation     UPTransportLayerInformation,
+    associatedQosFlowList           AssociatedQosFlowList,
+    iE-Extensions       ProtocolExtensionContainer { { QosFlowPerTNLInformation-ExtIEs} }   OPTIONAL,
+    ...
+}
+*/
+func (gnb *GNB) encQoSFlowPerTNLInformation() (pdu []byte) {
 	return
 }
 
@@ -1014,7 +1087,7 @@ type SliceSupport struct {
 	SD  string
 }
 
-func encSliceSupportItem(p *SliceSupport) (v []byte) {
+func encSliceSupportItem(ss *SliceSupport) (v []byte) {
 	/*
 		ex.1
 		    .    .   .          .    .   .    .   .    .   .
@@ -1029,10 +1102,19 @@ func encSliceSupportItem(p *SliceSupport) (v []byte) {
 		0001 0000 0000 1xxx 00000000 00000000 11101000
 		0x10 0x08 0x80 0x00 0x00 0x7b
 	*/
+	var p per.BitField
+	var p2 per.BitField
 	pv, plen, _ := per.EncSequence(true, 1, 0)
+	p.Value = pv
+	p.Len = plen
 
-	pv2, plen2, v := encSNSSAI(p.SST, p.SD)
-	pv, plen = per.MergeBitField(pv, plen, pv2, plen2)
+	pv, plen, v = encSNSSAI(ss.SST, ss.SD)
+	p2.Value = pv
+	p2.Len = plen
+	p = per.MergeBitField(&p, &p2)
+	pv = p.Value
+	plen = p.Len
+
 	v = append(pv, v...)
 	return
 }
@@ -1050,12 +1132,22 @@ SST ::= OCTET STRING (SIZE(1))
 SD ::= OCTET STRING (SIZE(3))
 */
 func encSNSSAI(sstInt uint8, sdString string) (pv []byte, plen int, v []byte) {
+
+	var p per.BitField
+	var p2 per.BitField
 	pv, plen, _ = per.EncSequence(true, 2, 0x02)
+	p.Value = pv
+	p.Len = plen
 
 	sst := []byte{byte(sstInt)}
-	pv2, plen2, _, _ := per.EncOctetString(sst, 1, 1, false)
+	pv, plen, _, _ = per.EncOctetString(sst, 1, 1, false)
+	p2.Value = pv
+	p2.Len = plen
 
-	pv, plen = per.MergeBitField(pv, plen, pv2, plen2)
+	p = per.MergeBitField(&p, &p2)
+	pv = p.Value
+	plen = p.Len
+
 	sd, _ := hex.DecodeString(sdString)
 	_, _, v, _ = per.EncOctetString(sd, 3, 3, false)
 	return
@@ -1279,6 +1371,22 @@ func (gnb *GNB) decPDUSessionResourceSetupRequestTransfer(pdu *[]byte) {
 }
 
 // 9.3.4.2 PDU Session Resource Setup Response Transfer
+/*
+PDUSessionResourceSetupResponseTransfer ::= SEQUENCE {
+    dLQosFlowPerTNLInformation              QosFlowPerTNLInformation,
+    additionalDLQosFlowPerTNLInformation    QosFlowPerTNLInformationList                                        OPTIONAL,
+    securityResult                          SecurityResult                                                      OPTIONAL,
+    qosFlowFailedToSetupList                QosFlowListWithCause                                                OPTIONAL,
+    iE-Extensions       ProtocolExtensionContainer { {PDUSessionResourceSetupResponseTransfer-ExtIEs} }     OPTIONAL,
+    ...
+}
+*/
+func (gnb *GNB) encPDUSessionResourceSetupResponseTransfer() (pdu []byte) {
+
+	//pv, plen, _ := per.EncSequence(true, 4, 0)
+
+	return
+}
 
 /*
  * following IEs/Group Names are defined in each message definitions in 9.2.
@@ -1290,14 +1398,24 @@ func (gnb *GNB) decPDUSessionResourceSetupRequestTransfer(pdu *[]byte) {
 BroadcastPLMNList ::= SEQUENCE (SIZE(1..maxnoofBPLMNs)) OF BroadcastPLMNItem
     maxnoofBPLMNs                       INTEGER ::= 12
 */
-func (gnb *GNB) encBroadcastPLMNList(p *[]BroadcastPLMN) (v []byte) {
-	const maxnoofBPLMNs = 12
-	pv, plen, _ := per.EncSequenceOf(1, 1, maxnoofBPLMNs, false)
+func (gnb *GNB) encBroadcastPLMNList(bplmn *[]BroadcastPLMN) (v []byte) {
 
-	for _, item := range *p {
-		pv2, plen2, v2 := gnb.encBroadcastPLMNItem(&item)
+	const maxnoofBPLMNs = 12
+
+	var p per.BitField
+	var p2 per.BitField
+	pv, plen, _ := per.EncSequenceOf(1, 1, maxnoofBPLMNs, false)
+	p.Value = pv
+	p.Len = plen
+
+	for _, item := range *bplmn {
+		pv, plen, v2 := gnb.encBroadcastPLMNItem(&item)
+		p2.Value = pv
+		p2.Len = plen
 		if plen != 0 {
-			pv, _ = per.MergeBitField(pv, plen, pv2, plen2)
+			p = per.MergeBitField(&p, &p2)
+			pv = p.Value
+			plen = p.Len
 		}
 		v = append(v, pv...)
 		v = append(v, v2...)

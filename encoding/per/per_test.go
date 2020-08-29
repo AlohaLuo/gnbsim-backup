@@ -21,25 +21,29 @@ func compareSlice(actual, expect []byte) bool {
 func TestMergeBitField(t *testing.T) {
 
 	pattern := []struct {
-		in1    []byte
-		inlen1 int
-		in2    []byte
-		inlen2 int
-		ev     []byte
-		elen   int
+		in1      *BitField
+		in2      *BitField
+		expected BitField
+		/*
+			in1    []byte
+			inlen1 int
+			in2    []byte
+			inlen2 int
+			ev     []byte
+			elen   int
+		*/
 	}{
-		{nil, 0, []byte{0x00, 0x11}, 8, []byte{0x11}, 8},
-		{[]byte{0x80, 0x80}, 9, []byte{0x08, 0x80}, 9, []byte{0x80, 0x84, 0x40}, 18},
+		{nil, &BitField{[]byte{0x00, 0x11}, 8}, BitField{[]byte{0x11}, 8}},
+		{&BitField{[]byte{0x80, 0x80}, 9}, &BitField{[]byte{0x08, 0x80}, 9}, BitField{[]byte{0x80, 0x84, 0x40}, 18}},
 	}
 
 	for _, p := range pattern {
 
-		out, outlen := MergeBitField(p.in1, p.inlen1, p.in2, p.inlen2)
+		out := MergeBitField(p.in1, p.in2)
 
-		if compareSlice(out, p.ev) == false || outlen != p.elen {
+		if compareSlice(out.Value, p.expected.Value) == false || out.Len != p.expected.Len {
 			t.Errorf("pattern = %v\n", p)
-			t.Errorf("expect value 0x%02x, got 0x%02x", p.ev, out)
-			t.Errorf("expect length %d, actual %d", p.elen, outlen)
+			t.Errorf("expect %v, got %v", p.expected, out)
 		}
 	}
 }

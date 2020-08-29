@@ -13,15 +13,15 @@ import (
 	"math/bits"
 )
 
-type PER struct {
-	Plen int
+type BitField struct {
+	Value []byte
+	Len   int
 }
 
 // MergeBitField is utility function for merging bit-field.
 // e.g. preamble or short integer value is not octet alined value, so
 // those fields need to be packed in same octets.
-func MergeBitField(in1 []byte, inlen1 int, in2 []byte, inlen2 int) (
-	out []byte, outlen int) {
+func MergeBitField(in1 *BitField, in2 *BitField) (out BitField) {
 	/*
 	   ex1.
 	   in1(len=4)  nil
@@ -35,20 +35,20 @@ func MergeBitField(in1 []byte, inlen1 int, in2 []byte, inlen2 int) (
 	*/
 
 	if in1 == nil {
-		out, outlen = ShiftLeftMost(in2, inlen2)
+		out.Value, out.Len = ShiftLeftMost(in2.Value, in2.Len)
 		return
 	}
 
-	out = make([]byte, len(in1), len(in1))
-	out = append(out, in2...)
-	out = ShiftLeft(out, len(in1)*8-inlen1)
-	for n := 0; n < len(in1); n++ {
-		out[n] |= in1[n]
+	out.Value = make([]byte, len(in1.Value), len(in1.Value))
+	out.Value = append(out.Value, in2.Value...)
+	out.Value = ShiftLeft(out.Value, len(in1.Value)*8-in1.Len)
+	for n := 0; n < len(in1.Value); n++ {
+		out.Value[n] |= in1.Value[n]
 	}
-	outlen = inlen1 + inlen2
+	out.Len = in1.Len + in2.Len
 
-	octetlen := (outlen-1)/8 + 1
-	out = out[:octetlen]
+	octetlen := (out.Len-1)/8 + 1
+	out.Value = out.Value[:octetlen]
 	return
 }
 
