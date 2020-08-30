@@ -72,20 +72,20 @@ func TestShiftLeft(t *testing.T) {
 func TestShiftRight(t *testing.T) {
 
 	pattern := []struct {
-		in    []byte
+		in    BitField
 		inlen int
 		ev    []byte
 	}{
-		{[]byte{0x00, 0x11, 0x22}, 4, []byte{0x00, 0x01, 0x12}},
+		{BitField{[]byte{0x00, 0x11, 0x22}, 16}, 4, []byte{0x00, 0x01, 0x12}},
 	}
 
 	for _, p := range pattern {
 
 		out := ShiftRight(p.in, p.inlen)
 
-		if compareSlice(out, p.ev) == false {
+		if compareSlice(out.Value, p.ev) == false {
 			t.Errorf("pattern = %v\n", p)
-			t.Errorf("expect value 0x%02x, got 0x%02x", p.ev, out)
+			t.Errorf("expect value 0x%02x, got 0x%02x", p.ev, out.Value)
 		}
 	}
 }

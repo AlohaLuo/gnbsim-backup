@@ -68,22 +68,22 @@ func ShiftLeft(in BitField, shiftlen int) (out BitField) {
 }
 
 // ShiftRight is utility function to right shift the octet values.
-func ShiftRight(in []byte, shiftlen int) (out []byte) {
+func ShiftRight(in BitField, shiftlen int) (out BitField) {
 	out = in
 	for n := 0; n < shiftlen; n++ {
 		underflow := false
-		for m := 0; m < len(out); m++ {
+		for m := 0; m < len(out.Value); m++ {
 			do := false
 			if underflow == true {
 				do = true
 				underflow = false
 			}
-			if out[m]&0x1 == 0x1 {
+			if out.Value[m]&0x1 == 0x1 {
 				underflow = true
 			}
-			out[m] >>= 1
+			out.Value[m] >>= 1
 			if do == true {
-				out[m] |= 0x80
+				out.Value[m] |= 0x80
 			}
 		}
 	}
