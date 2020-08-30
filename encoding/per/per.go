@@ -183,30 +183,24 @@ func DecLengthDeterminant(pdu *[]byte, max int) (length int, err error) {
 }
 
 func encConstrainedWholeNumberWithExtmark(input, min, max int64, extmark bool) (
-	v []byte, bitlen int, err error) {
+	bf BitField, err error) {
 
-	bf, err := EncConstrainedWholeNumber(input, min, max)
-	v = bf.Value
-	bitlen = bf.Len
-
+	bf, err = EncConstrainedWholeNumber(input, min, max)
 	if err != nil {
 		return
 	}
+
 	if extmark == true {
 		switch {
-		case bitlen%8 == 0:
-			bitlen += 8
-			v = append([]byte{0x00}, v...)
-		case bitlen < 8:
-			bitlen++
+		case bf.Len%8 == 0:
+			bf.Len += 8
+			bf.Value = append([]byte{0x00}, bf.Value...)
+		case bf.Len < 8:
+			bf.Len++
 		}
 	}
-	var in BitField
-	in.Value = v
-	in.Len = bitlen
-	out := ShiftLeftMost(in)
-	v = out.Value
-	bitlen = out.Len
+
+	bf = ShiftLeftMost(bf)
 	return
 }
 
@@ -242,27 +236,25 @@ func EncInteger(input, min, max int64, extmark bool) (
 	}
 
 	// 13.2.2 constrained whole number
-	v, bitlen, err = encConstrainedWholeNumberWithExtmark(input,
-		min, max, extmark)
+	bf, err := encConstrainedWholeNumberWithExtmark(input, min, max, extmark)
+	v = bf.Value
+	bitlen = bf.Len
 	return
 }
 
 // EncEnumerated is the implementation for
 // 14. Encoding the enumerated type
 func EncEnumerated(input, min, max uint, extmark bool) (
-	b BitField, err error) {
-	v, bitlen, err :=
-		encConstrainedWholeNumberWithExtmark(int64(input),
-			int64(min), int64(max), extmark)
-	b.Value = v
-	b.Len = bitlen
+	bf BitField, err error) {
+	bf, err = encConstrainedWholeNumberWithExtmark(int64(input),
+		int64(min), int64(max), extmark)
 	return
 }
 
 // EncBitString returns multi-byte BIT STRING
 // 16. Encoding the bitstering type
 func EncBitString(input []byte, inputlen, min, max int, extmark bool) (
-	b BitField, v []byte, err error) {
+	bf BitField, v []byte, err error) {
 
 	if inputlen < min || inputlen > max {
 		err = fmt.Errorf("EncBitString: "+
@@ -293,10 +285,8 @@ func EncBitString(input []byte, inputlen, min, max int, extmark bool) (
 	}
 
 	// range is constrained whole number.
-	pv, plen, _ := encConstrainedWholeNumberWithExtmark(int64(inputlen),
+	bf, _ = encConstrainedWholeNumberWithExtmark(int64(inputlen),
 		int64(min), int64(max), extmark)
-	b.Value = pv
-	b.Len = plen
 
 	return
 }
@@ -319,8 +309,6 @@ func EncOctetString(input []byte, min, max int, extmark bool) (
 		return
 	}
 
-	var pv []byte
-	var plen int
 	if min == max && min != 0 {
 		switch {
 		case min < 3:
@@ -350,11 +338,8 @@ func EncOctetString(input []byte, min, max int, extmark bool) (
 	}
 
 	// lower bound and upper bound are specified.
-	pv, plen, err =
-		encConstrainedWholeNumberWithExtmark(int64(inputlen),
-			int64(min), int64(max), extmark)
-	pre.Value = pv
-	pre.Len = plen
+	pre, err = encConstrainedWholeNumberWithExtmark(int64(inputlen),
+		int64(min), int64(max), extmark)
 	return
 }
 
