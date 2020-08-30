@@ -268,7 +268,7 @@ func (gnb *GNB) encPDUSessionResourceSetupResponse() (v []byte) {
 
 	b, _ := per.EncSequenceOf(1, 1, 256, false)
 	b2, _ := per.EncSequence(true, 1, 0)
-	b = per.MergeBitField(&b, &b2)
+	b = per.MergeBitField(b, b2)
 
 	v = gnb.encPDUSessionID()
 	pv := append(b.Value, v...)
@@ -671,7 +671,7 @@ func (gnb *GNB) encGlobalRANNodeID(id *GlobalGNBID) (v []byte, err error) {
 	// NG-ENB and N3IWF are not implemented yet...
 	b, _ := per.EncChoice(globalGNB, 0, 2, false)
 	b2, v2 := gnb.encGlobalGNBID(id)
-	b = per.MergeBitField(&b, &b2)
+	b = per.MergeBitField(b, b2)
 	pv := b.Value
 	pv = append(pv, v2...)
 
@@ -733,7 +733,7 @@ func encGNBID(gnbid uint32) (v []byte) {
 	pre, cont, _ := per.EncBitString(tmp, bitlen,
 		minGNBIDSize, maxGNBIDSize, false)
 
-	b = per.MergeBitField(&b, &pre)
+	b = per.MergeBitField(b, pre)
 	v = append(b.Value, cont...)
 
 	return
@@ -801,7 +801,7 @@ func (gnb *GNB) encNRCellIdentity(cellid uint64) (b per.BitField) {
 	b2.Len = cellidlen
 	b2 = per.ShiftLeftMost(b2)
 
-	b = per.MergeBitField(&b, &b2)
+	b = per.MergeBitField(b, b2)
 	return
 }
 
@@ -827,7 +827,7 @@ func (gnb *GNB) encUserLocationInformation() (v []byte, err error) {
 	b, _ := per.EncChoice(ULInfoNR, 0, 2, false)
 
 	b2, v := gnb.encUserLocationInformationNR(&gnb.ULInfoNR)
-	b = per.MergeBitField(&b, &b2)
+	b = per.MergeBitField(b, b2)
 	pv := b.Value
 	pv = append(pv, v...)
 
@@ -858,10 +858,10 @@ func (gnb *GNB) encUserLocationInformationNR(info *UserLocationInformationNR) (
 	b, _ = per.EncSequence(true, 2, 0)
 
 	pre, cont, _ := gnb.encNRCGI(&info.NRCGI)
-	b = per.MergeBitField(&b, &pre)
+	b = per.MergeBitField(b, pre)
 
 	b2, v2, _ := gnb.encTAI(&info.TAI)
-	cont = per.MergeBitField(&cont, &b2)
+	cont = per.MergeBitField(cont, b2)
 
 	v = cont.Value
 	v = append(v, v2...)
@@ -924,19 +924,21 @@ GTPTunnel ::= SEQUENCE {
 */
 func (gnb *GNB) decUPTransportLayerInformation(pdu *[]byte, length int) {
 
-	tli := readPduByteSlice(pdu, length)
-	gnb.dprint("dump: %02x", tli)
+	var tli per.BitField
+	tli.Value = readPduByteSlice(pdu, length)
+	tli.Len = len(tli.Value) * 8
+	gnb.dprint("dump: %02x", tli.Value)
 
 	// TODO: generic per decoder.
 	// 0000 0000
 	// ^         choice
 	//  ^        seq extension marker
 	//   ^       option
-	per.ShiftLeft(tli, 3) // skip the above bits
-	gnb.preamble.Len += 3
+	tli = per.ShiftLeft(tli, 3) // skip the above bits
+	tli.Len -= 3
 
 	gnb.decTransportLayerAddress(&tli)
-	gnb.decGTPTEID(&tli)
+	gnb.decGTPTEID(&tli.Value)
 
 	return
 }
@@ -945,7 +947,7 @@ func (gnb *GNB) decUPTransportLayerInformation(pdu *[]byte, length int) {
 /*
 TransportLayerAddress ::= BIT STRING (SIZE(1..160, ...))
 */
-func (gnb *GNB) decTransportLayerAddress(pdu *[]byte) {
+func (gnb *GNB) decTransportLayerAddress(tla *per.BitField) {
 
 	gnb.dprint("Transport Layer Address")
 
@@ -953,17 +955,16 @@ func (gnb *GNB) decTransportLayerAddress(pdu *[]byte) {
 	// 0 0000 0000
 	// ^           bit string extension marker
 	//   ^^^^ ^^^^ bit string length
-	per.ShiftLeft(*pdu, 1) // skip extension marker
-	gnb.preamble.Len += 1
-	length := readPduByte(pdu) + 1 // bit string size starts from 1.
+	*tla = per.ShiftLeft(*tla, 1) // skip extension marker
+	tla.Len -= 1
+	length := readPduByte(&tla.Value) + 1 // bit string size starts from 1.
 	gnb.dprinti("bit string length: %d", length)
 
-	per.ShiftLeft(*pdu, gnb.preamble.Len%8) // skip remaining preamble
-	gnb.preamble.Len = 0
+	*tla = per.ShiftLeft(*tla, tla.Len%8) // skip remaining preamble
 
 	var addr net.IP
 	octLen := int((length-1)/8 + 1)
-	addr = readPduByteSlice(pdu, octLen)
+	addr = readPduByteSlice(&tla.Value, octLen)
 	gnb.dprinti("address: %v", addr)
 
 	return
@@ -1063,7 +1064,7 @@ func encSliceSupportItem(ss *SliceSupport) (v []byte) {
 	b, _ := per.EncSequence(true, 1, 0)
 
 	b2, v := encSNSSAI(ss.SST, ss.SD)
-	b = per.MergeBitField(&b, &b2)
+	b = per.MergeBitField(b, b2)
 	pv := b.Value
 
 	v = append(pv, v...)
@@ -1089,7 +1090,7 @@ func encSNSSAI(sstInt uint8, sdString string) (b per.BitField, v []byte) {
 	sst := []byte{byte(sstInt)}
 	b2, _, _ := per.EncOctetString(sst, 1, 1, false)
 
-	b = per.MergeBitField(&b, &b2)
+	b = per.MergeBitField(b, b2)
 
 	sd, _ := hex.DecodeString(sdString)
 	_, v, _ = per.EncOctetString(sd, 3, 3, false)
@@ -1099,15 +1100,16 @@ func encSNSSAI(sstInt uint8, sdString string) (b per.BitField, v []byte) {
 func (gnb *GNB) decSNSSAI(pdu *[]byte) {
 
 	gnb.dprint("S-NSSAI")
-	seq := readPduByteSlice(pdu, 2)
 
+	var seq per.BitField
+	seq.Value = readPduByteSlice(pdu, 2)
 	per.ShiftLeft(seq, 1) // skip extension marker
 
 	option := false
-	option = (seq[0] & 0x80) != 0
+	option = (seq.Value[0] & 0x80) != 0
 
 	per.ShiftLeft(seq, 2) // skip 2 optionss
-	sst := int(seq[0])
+	sst := int(seq.Value[0])
 
 	gnb.dprinti("SST: %d", sst)
 
@@ -1351,7 +1353,7 @@ func (gnb *GNB) encBroadcastPLMNList(bplmn *[]BroadcastPLMN) (v []byte) {
 	for _, item := range *bplmn {
 		b2, v2 := gnb.encBroadcastPLMNItem(&item)
 		if b2.Len != 0 {
-			b = per.MergeBitField(&b, &b2)
+			b = per.MergeBitField(b, b2)
 		}
 		v = append(v, b.Value...)
 		v = append(v, v2...)
