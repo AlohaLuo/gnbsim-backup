@@ -266,18 +266,12 @@ func (gnb *GNB) encPDUSessionResourceSetupResponse() (v []byte) {
 
 	head, _ := encProtocolIE(idPDUSessionResourceSetupListSURes, ignore)
 
-	var p per.BitField
-	pv, plen, _ := per.EncSequenceOf(1, 1, 256, false)
-	p.Value = pv
-	p.Len = plen
-
+	b, _ := per.EncSequenceOf(1, 1, 256, false)
 	b2, _ := per.EncSequence(true, 1, 0)
-	p = per.MergeBitField(&p, &b2)
-	pv = p.Value
-	plen = p.Len
+	b = per.MergeBitField(&b, &b2)
 
 	v = gnb.encPDUSessionID()
-	v = append(pv, v...)
+	pv := append(b.Value, v...)
 
 	v = gnb.encPDUSessionResourceSetupResponseTransfer()
 	v = append(pv, v...)
@@ -536,8 +530,8 @@ func encNgapPdu(pduType int, procCode int, criticality int) (pdu []byte) {
 	b, _ := per.EncChoice(pduType, 0, 2, true)
 	v, _, _ := per.EncInteger(int64(procCode), 0, 255, false)
 	pdu = append(b.Value, v...)
-	v, _, _ = per.EncEnumerated(uint(criticality), 0, 2, false)
-	pdu = append(pdu, v...)
+	b, _ = per.EncEnumerated(uint(criticality), 0, 2, false)
+	pdu = append(pdu, b.Value...)
 
 	return
 }
@@ -567,8 +561,9 @@ maxProtocolIEs                          INTEGER ::= 65535
 func encProtocolIEContainer(num uint) (container []byte) {
 	const maxProtocolIEs = 65535
 	b, _ := per.EncSequence(true, 0, 0)
-	v, _, _ := per.EncSequenceOf(num, 0, maxProtocolIEs, false)
-	container = append(b.Value, v...)
+	b2, _ := per.EncSequenceOf(num, 0, maxProtocolIEs, false)
+
+	container = append(b.Value, b2.Value...)
 
 	return
 }
@@ -607,8 +602,8 @@ ProtocolIE-Field {NGAP-PROTOCOL-IES : IEsSetParam} ::= SEQUENCE {
 func encProtocolIE(id int64, criticality uint) (v []byte, err error) {
 
 	v1, _, _ := per.EncInteger(id, 0, 65535, false)
-	v2, _, _ := per.EncEnumerated(criticality, 0, 2, false)
-	v = append(v1, v2...)
+	b2, _ := per.EncEnumerated(criticality, 0, 2, false)
+	v = append(v1, b2.Value...)
 
 	return
 }
@@ -934,11 +929,12 @@ func (gnb *GNB) encPagingDRX(drx string) (v []byte, err error) {
 		gnb.dprint("encPagingDRX: no such DRX value(%s)", drx)
 		return
 	}
-	pv, _, _ := per.EncEnumerated(n, 0, 3, true)
 
-	length, _, _ := per.EncLengthDeterminant(len(pv), 0)
+	b, _ := per.EncEnumerated(n, 0, 3, true)
+	v = b.Value
+	length, _, _ := per.EncLengthDeterminant(len(v), 0)
 	head = append(head, length...)
-	v = append(head, pv...)
+	v = append(head, v...)
 
 	return
 }
@@ -1060,7 +1056,8 @@ SliceSupportList ::= SEQUENCE (SIZE(1..maxnoofSliceItems)) OF SliceSupportItem
     maxnoofSliceItems                   INTEGER ::= 1024
 */
 func encSliceSupportList(p *[]SliceSupport) (v []byte) {
-	v, _, _ = per.EncSequenceOf(1, 1, 1024, false)
+	b, _ := per.EncSequenceOf(1, 1, 1024, false)
+	v = b.Value
 	for _, item := range *p {
 		v = append(v, encSliceSupportItem(&item)...)
 	}
@@ -1215,7 +1212,8 @@ func (gnb *GNB) encRRCEstablishmentCause(cause uint) (v []byte, err error) {
 	 * Wireshark does parse it as 4 bit field. It means that the number is
 	 * from 7 to 14.
 	 */
-	v, _, _ = per.EncEnumerated(cause, 0, 14, true)
+	b, _ := per.EncEnumerated(cause, 0, 14, true)
+	v = b.Value
 
 	length, _, _ := per.EncLengthDeterminant(len(v), 0)
 	head = append(head, length...)
@@ -1390,20 +1388,17 @@ func (gnb *GNB) encBroadcastPLMNList(bplmn *[]BroadcastPLMN) (v []byte) {
 
 	const maxnoofBPLMNs = 12
 
-	var p per.BitField
 	var p2 per.BitField
-	pv, plen, _ := per.EncSequenceOf(1, 1, maxnoofBPLMNs, false)
-	p.Value = pv
-	p.Len = plen
+	b, _ := per.EncSequenceOf(1, 1, maxnoofBPLMNs, false)
 
 	for _, item := range *bplmn {
 		pv, plen, v2 := gnb.encBroadcastPLMNItem(&item)
 		p2.Value = pv
 		p2.Len = plen
 		if plen != 0 {
-			p = per.MergeBitField(&p, &p2)
-			pv = p.Value
-			plen = p.Len
+			b = per.MergeBitField(&b, &p2)
+			pv = b.Value
+			plen = b.Len
 		}
 		v = append(v, pv...)
 		v = append(v, v2...)
@@ -1446,7 +1441,8 @@ func (gnb *GNB) encSupportedTAList(p *[]SupportedTA) (v []byte, err error) {
 	head, err := encProtocolIE(idSupportedTAList, reject)
 
 	const maxnoofTACs = 256
-	v, _, _ = per.EncSequenceOf(1, 1, maxnoofTACs, false)
+	b, _ := per.EncSequenceOf(1, 1, maxnoofTACs, false)
+	v = b.Value
 
 	for _, item := range *p {
 		v = append(v, gnb.encSupportedTAItem(&item)...)
@@ -1489,7 +1485,8 @@ func (gnb *GNB) encUEContextRequest() (v []byte, err error) {
 
 	head, err := encProtocolIE(idUEContextRequest, ignore)
 
-	v, _, _ = per.EncEnumerated(0, 0, 0, true)
+	b, _ := per.EncEnumerated(0, 0, 0, true)
+	v = b.Value
 
 	length, _, _ := per.EncLengthDeterminant(len(v), 0)
 	head = append(head, length...)

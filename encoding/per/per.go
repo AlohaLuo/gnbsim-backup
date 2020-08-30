@@ -254,10 +254,12 @@ func EncInteger(input, min, max int64, extmark bool) (
 // EncEnumerated is the implementation for
 // 14. Encoding the enumerated type
 func EncEnumerated(input, min, max uint, extmark bool) (
-	v []byte, bitlen int, err error) {
-	v, bitlen, err =
+	b BitField, err error) {
+	v, bitlen, err :=
 		encConstrainedWholeNumberWithExtmark(int64(input),
 			int64(min), int64(max), extmark)
+	b.Value = v
+	b.Len = bitlen
 	return
 }
 
