@@ -703,8 +703,8 @@ func (gnb *GNB) encGlobalGNBID(id *GlobalGNBID) (
 	b, _ = per.EncSequence(true, 1, 0)
 	v = append(v, gnb.encPLMNIdentity(id.MCC, id.MNC)...)
 
-	pv2, _ := encGNBID(id.GNBID)
-	v = append(v, pv2...)
+	v2 := encGNBID(id.GNBID)
+	v = append(v, v2...)
 	return
 }
 
@@ -719,27 +719,25 @@ const (
 	maxGNBIDSize = 32
 )
 
-func encGNBID(gnbid uint32) (pv []byte, plen int) {
+func encGNBID(gnbid uint32) (v []byte) {
 
 	bitlen := bits.Len32(gnbid)
 	if bitlen < minGNBIDSize {
 		bitlen = minGNBIDSize
 	}
 
-	var p2 per.BitField
+	var b2 per.BitField
 	b, _ := per.EncChoice(0, 0, 1, false)
 
 	tmp := make([]byte, 4)
 	binary.BigEndian.PutUint32(tmp, gnbid)
-	pv, plen, v, _ := per.EncBitString(tmp, bitlen,
+	pv, plen, cont, _ := per.EncBitString(tmp, bitlen,
 		minGNBIDSize, maxGNBIDSize, false)
-	p2.Value = pv
-	p2.Len = plen
+	b2.Value = pv
+	b2.Len = plen
 
-	b = per.MergeBitField(&b, &p2)
-	pv = b.Value
-	plen = b.Len
-	pv = append(pv, v...)
+	b = per.MergeBitField(&b, &b2)
+	v = append(b.Value, cont...)
 
 	return
 }
