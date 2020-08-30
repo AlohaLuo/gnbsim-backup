@@ -225,20 +225,18 @@ func EncNonNegativeBinaryInteger(input uint) (v []byte, err error) {
 // 13. Encoding the integer type
 // but it is only for the case of single value and constrained whole nuber.
 func EncInteger(input, min, max int64, extmark bool) (
-	v []byte, bitlen int, err error) {
+	bf BitField, err error) {
 
 	if min == max { // 12.2.1 single value
 		if extmark == true {
-			bitlen = 1
-			v = make([]byte, 1, 1)
+			bf.Value = make([]byte, 1, 1)
+			bf.Len = 1
 		}
 		return
 	}
 
 	// 13.2.2 constrained whole number
-	bf, err := encConstrainedWholeNumberWithExtmark(input, min, max, extmark)
-	v = bf.Value
-	bitlen = bf.Len
+	bf, err = encConstrainedWholeNumberWithExtmark(input, min, max, extmark)
 	return
 }
 
@@ -371,9 +369,7 @@ var EncSequenceOf = EncEnumerated
 // EncChoice is the implementation for
 // 23. Encoding the choice type
 func EncChoice(input, min, max int, extmark bool) (
-	b BitField, err error) {
-	pv, plen, err := EncInteger(int64(input), int64(min), int64(max), extmark)
-	b.Value = pv
-	b.Len = plen
+	bf BitField, err error) {
+	bf, err = EncInteger(int64(input), int64(min), int64(max), extmark)
 	return
 }

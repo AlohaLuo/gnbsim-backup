@@ -528,8 +528,8 @@ const (
 
 func encNgapPdu(pduType int, procCode int, criticality int) (pdu []byte) {
 	b, _ := per.EncChoice(pduType, 0, 2, true)
-	v, _, _ := per.EncInteger(int64(procCode), 0, 255, false)
-	pdu = append(b.Value, v...)
+	bf, _ := per.EncInteger(int64(procCode), 0, 255, false)
+	pdu = append(b.Value, bf.Value...)
 	b, _ = per.EncEnumerated(uint(criticality), 0, 2, false)
 	pdu = append(pdu, b.Value...)
 
@@ -601,9 +601,9 @@ ProtocolIE-Field {NGAP-PROTOCOL-IES : IEsSetParam} ::= SEQUENCE {
 */
 func encProtocolIE(id int64, criticality uint) (v []byte, err error) {
 
-	v1, _, _ := per.EncInteger(id, 0, 65535, false)
-	b2, _ := per.EncEnumerated(criticality, 0, 2, false)
-	v = append(v1, b2.Value...)
+	bf, _ := per.EncInteger(id, 0, 65535, false)
+	bf2, _ := per.EncEnumerated(criticality, 0, 2, false)
+	v = append(bf.Value, bf2.Value...)
 
 	return
 }
@@ -1208,12 +1208,13 @@ func (gnb *GNB) decAMFUENGAPID(pdu *[]byte, length int) {
 RAN-UE-NGAP-ID ::= INTEGER (0..4294967295)
 */
 func (gnb *GNB) encRANUENGAPID() (v []byte) {
-	head, _ := encProtocolIE(idRANUENGAPID, reject)
-	v, _, _ = per.EncInteger(int64(gnb.RANUENGAPID), 0, 4294967295, false)
 
-	bf, _ := per.EncLengthDeterminant(len(v), 0)
-	head = append(head, bf.Value...)
-	v = append(head, v...)
+	head, _ := encProtocolIE(idRANUENGAPID, reject)
+	bf, _ := per.EncInteger(int64(gnb.RANUENGAPID), 0, 4294967295, false)
+	bf2, _ := per.EncLengthDeterminant(len(bf.Value), 0)
+	head = append(head, bf2.Value...)
+	v = append(head, bf.Value...)
+
 	return
 }
 

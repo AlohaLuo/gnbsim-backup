@@ -185,35 +185,35 @@ func TestDecLengthDeterminant(t *testing.T) {
 func TestEncInteger(t *testing.T) {
 
 	pattern := []struct {
-		in     int64
-		min    int64
-		max    int64
-		ext    bool
-		v      []byte
-		bitlen int
-		err    bool
+		in       int64
+		min      int64
+		max      int64
+		ext      bool
+		expected BitField
+		eerr     bool
 	}{
-		{3, 0, 2, true, []byte{}, 0, true},
-		{2, 2, 2, false, []byte{}, 0, false},
-		{2, 2, 2, true, []byte{0x00}, 1, false},
-		{128, 0, 255, false, []byte{128}, 8, false},
-		{1, 0, 7, true, []byte{0x08}, 5, false},
-		{128, 0, 255, true, []byte{0x00, 128}, 16, false},
-		{256, 0, 65535, false, []byte{1, 0}, 16, false},
-		{1, 0, 4294967295, false, []byte{0, 1}, 16, false},
+		{3, 0, 2, true, BitField{[]byte{}, 0}, true},
+		{2, 2, 2, false, BitField{[]byte{}, 0}, false},
+		{2, 2, 2, true, BitField{[]byte{0x00}, 1}, false},
+		{128, 0, 255, false, BitField{[]byte{128}, 8}, false},
+		{1, 0, 7, true, BitField{[]byte{0x08}, 5}, false},
+		{128, 0, 255, true, BitField{[]byte{0x00, 128}, 16}, false},
+		{256, 0, 65535, false, BitField{[]byte{1, 0}, 16}, false},
+		{1, 0, 4294967295, false, BitField{[]byte{0, 1}, 16}, false},
 	}
 
 	for _, p := range pattern {
 
-		v, bitlen, err := EncInteger(p.in, p.min, p.max, p.ext)
+		bf, err := EncInteger(p.in, p.min, p.max, p.ext)
 
-		if compareSlice(v, p.v) == false || bitlen != p.bitlen ||
-			(p.err == true && err == nil) || (p.err == false && err != nil) {
+		e := p.expected
+		eerr := p.eerr
+		if compareSlice(bf.Value, e.Value) == false || bf.Len != e.Len ||
+			(eerr == true && err == nil) || (eerr == false && err != nil) {
 
 			t.Errorf("pattern = %v\n", p)
-			t.Errorf("expect value 0x%02x, got 0x%02x", p.v, v)
-			t.Errorf("expect length %d, got %d", p.bitlen, bitlen)
-			t.Errorf("expect error: %v, got %v", p.err, err)
+			t.Errorf("expect %v, got %v", e, bf)
+			t.Errorf("expect error: %v, got %v", eerr, err)
 		}
 	}
 }
