@@ -1063,15 +1063,11 @@ func encSliceSupportItem(ss *SliceSupport) (v []byte) {
 		0001 0000 0000 1xxx 00000000 00000000 11101000
 		0x10 0x08 0x80 0x00 0x00 0x7b
 	*/
-	var p2 per.BitField
 	b, _ := per.EncSequence(true, 1, 0)
 
-	pv, plen, v := encSNSSAI(ss.SST, ss.SD)
-	p2.Value = pv
-	p2.Len = plen
-	b = per.MergeBitField(&b, &p2)
-	pv = b.Value
-	plen = b.Len
+	b2, v := encSNSSAI(ss.SST, ss.SD)
+	b = per.MergeBitField(&b, &b2)
+	pv := b.Value
 
 	v = append(pv, v...)
 	return
@@ -1089,19 +1085,17 @@ S-NSSAI ::= SEQUENCE {
 SST ::= OCTET STRING (SIZE(1))
 SD ::= OCTET STRING (SIZE(3))
 */
-func encSNSSAI(sstInt uint8, sdString string) (pv []byte, plen int, v []byte) {
+func encSNSSAI(sstInt uint8, sdString string) (b per.BitField, v []byte) {
 
 	var p2 per.BitField
-	b, _ := per.EncSequence(true, 2, 0x02)
+	b, _ = per.EncSequence(true, 2, 0x02)
 
 	sst := []byte{byte(sstInt)}
-	pv, plen, _, _ = per.EncOctetString(sst, 1, 1, false)
+	pv, plen, _, _ := per.EncOctetString(sst, 1, 1, false)
 	p2.Value = pv
 	p2.Len = plen
 
 	b = per.MergeBitField(&b, &p2)
-	pv = b.Value
-	plen = b.Len
 
 	sd, _ := hex.DecodeString(sdString)
 	_, _, v, _ = per.EncOctetString(sd, 3, 3, false)
