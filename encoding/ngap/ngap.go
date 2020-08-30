@@ -768,16 +768,16 @@ func (gnb *GNB) encNRCGI(nrcgi *NRCGI) (
 
 	v := gnb.encPLMNIdentity(nrcgi.PLMN.MCC, nrcgi.PLMN.MNC)
 	bitlen := len(v) * 8
-	v2, bitlen2 := gnb.encNRCellIdentity(nrcgi.NRCellID)
+	b2 := gnb.encNRCellIdentity(nrcgi.NRCellID)
 
-	v = append(v, v2...)
+	v = append(v, b2.Value...)
 	content.Value = v
-	content.Len = bitlen + bitlen2
+	content.Len = bitlen + b2.Len
 
 	return
 }
 
-func (gnb *GNB) encNRCellIdentity(cellid uint64) (v []byte, bitlen int) {
+func (gnb *GNB) encNRCellIdentity(cellid uint64) (b per.BitField) {
 
 	// The leftmost bits of the NR Cell Identity IE correspond to the gNB ID
 	// (defined in subclause 9.3.1.6).
@@ -804,9 +804,7 @@ func (gnb *GNB) encNRCellIdentity(cellid uint64) (v []byte, bitlen int) {
 	p2.Value = pv
 	p2.Len = plen
 
-	p = per.MergeBitField(&p, &p2)
-	v = p.Value
-	bitlen = p.Len
+	b = per.MergeBitField(&p, &p2)
 	return
 }
 
