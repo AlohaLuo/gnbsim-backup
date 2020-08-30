@@ -21,27 +21,16 @@ type BitField struct {
 // MergeBitField is utility function for merging bit-field.
 // e.g. preamble or short integer value is not octet alined value, so
 // those fields need to be packed in same octets.
-func MergeBitField(in1 *BitField, in2 *BitField) (out BitField) {
+func MergeBitField(in1 BitField, in2 BitField) (out BitField) {
 	/*
-	   ex1.
-	   in1(len=4)  nil
-	   in2(len=14) bxx11 1010 1111 0000
-	   out(len=18) b1110 1011 1100 00xx
-
-	   ex2.
+	   ex.
 	   in1(len=4)  b1010 xxxx
 	   in2(len=14) b1110 1011 1100 00xx
 	   out(len=18) b1010 1110 1011 1100 00xx
 	*/
-
-	if in1 == nil {
-		out = ShiftLeftMost(*in2)
-		return
-	}
-
 	out.Value = make([]byte, len(in1.Value), len(in1.Value))
 	out.Value = append(out.Value, in2.Value...)
-	out.Value = ShiftLeft(out.Value, len(in1.Value)*8-in1.Len)
+	out = ShiftLeft(out, len(in1.Value)*8-in1.Len)
 	for n := 0; n < len(in1.Value); n++ {
 		out.Value[n] |= in1.Value[n]
 	}
@@ -53,27 +42,27 @@ func MergeBitField(in1 *BitField, in2 *BitField) (out BitField) {
 }
 
 // ShiftLeft is utility function to left shift the octet values.
-func ShiftLeft(in []byte, shiftlen int) (out []byte) {
+func ShiftLeft(in BitField, shiftlen int) (out BitField) {
 	out = in
 	for n := 0; n < shiftlen; n++ {
 		overflow := false
-		for m := len(out) - 1; m >= 0; m-- {
+		for m := len(out.Value) - 1; m >= 0; m-- {
 			do := false
 			if overflow == true {
 				do = true
 				overflow = false
 			}
-			if out[m]&0x80 == 0x80 {
+			if out.Value[m]&0x80 == 0x80 {
 				overflow = true
 			}
-			out[m] <<= 1
+			out.Value[m] <<= 1
 			if do == true {
-				out[m] |= 0x01
+				out.Value[m] |= 0x01
 			}
 		}
 	}
 	for n := 0; n < (shiftlen / 8); n++ {
-		out = out[:len(out)-1]
+		out.Value = out.Value[:len(out.Value)-1]
 	}
 	return
 }
@@ -104,7 +93,7 @@ func ShiftRight(in []byte, shiftlen int) (out []byte) {
 // ShiftLeftMost is utility function to shift the octet values to the leftmost.
 func ShiftLeftMost(in BitField) (out BitField) {
 	out = in
-	out.Value = ShiftLeft(out.Value, len(in.Value)*8-in.Len)
+	out = ShiftLeft(out, len(in.Value)*8-in.Len)
 	return
 }
 

@@ -21,8 +21,8 @@ func compareSlice(actual, expect []byte) bool {
 func TestMergeBitField(t *testing.T) {
 
 	pattern := []struct {
-		in1      *BitField
-		in2      *BitField
+		in1      BitField
+		in2      BitField
 		expected BitField
 		/*
 			in1    []byte
@@ -33,8 +33,7 @@ func TestMergeBitField(t *testing.T) {
 			elen   int
 		*/
 	}{
-		{nil, &BitField{[]byte{0x00, 0x11}, 8}, BitField{[]byte{0x11}, 8}},
-		{&BitField{[]byte{0x80, 0x80}, 9}, &BitField{[]byte{0x08, 0x80}, 9}, BitField{[]byte{0x80, 0x84, 0x40}, 18}},
+		{BitField{[]byte{0x80, 0x80}, 9}, BitField{[]byte{0x08, 0x80}, 9}, BitField{[]byte{0x80, 0x84, 0x40}, 18}},
 	}
 
 	for _, p := range pattern {
@@ -51,20 +50,21 @@ func TestMergeBitField(t *testing.T) {
 func TestShiftLeft(t *testing.T) {
 
 	pattern := []struct {
-		in    []byte
-		inlen int
-		ev    []byte
+		in       BitField
+		shiftlen int
+		ev       []byte
 	}{
-		{[]byte{0x00, 0x11, 0x22}, 4, []byte{0x01, 0x12, 0x20}},
+		{BitField{[]byte{0x00, 0x11, 0x22}, 16}, 4, []byte{0x01, 0x12, 0x20}},
+		{BitField{[]byte{0x00, 0x11, 0x22}, 16}, 8, []byte{0x11, 0x22}},
 	}
 
 	for _, p := range pattern {
 
-		out := ShiftLeft(p.in, p.inlen)
+		out := ShiftLeft(p.in, p.shiftlen)
 
-		if compareSlice(out, p.ev) == false {
+		if compareSlice(out.Value, p.ev) == false {
 			t.Errorf("pattern = %v\n", p)
-			t.Errorf("expect value 0x%02x, got 0x%02x", p.ev, out)
+			t.Errorf("expect value 0x%02x, got 0x%02x", p.ev, out.Value)
 		}
 	}
 }
