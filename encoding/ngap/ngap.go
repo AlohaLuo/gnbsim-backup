@@ -763,19 +763,18 @@ const (
 	nrCellIDSize = 36
 )
 
-func (gnb *GNB) encNRCGI(nrcgi *NRCGI) (pv []byte, plen int,
-	v []byte, bitlen int, err error) {
+func (gnb *GNB) encNRCGI(nrcgi *NRCGI) (
+	preamble per.BitField, content per.BitField, err error) {
 
-	b, _ := per.EncSequence(true, 1, 0)
-	pv = b.Value
-	plen = b.Len
+	preamble, _ = per.EncSequence(true, 1, 0)
 
-	v = gnb.encPLMNIdentity(nrcgi.PLMN.MCC, nrcgi.PLMN.MNC)
-	bitlen = len(v) * 8
+	v := gnb.encPLMNIdentity(nrcgi.PLMN.MCC, nrcgi.PLMN.MNC)
+	bitlen := len(v) * 8
 	v2, bitlen2 := gnb.encNRCellIdentity(nrcgi.NRCellID)
 
 	v = append(v, v2...)
-	bitlen += bitlen2
+	content.Value = v
+	content.Len = bitlen + bitlen2
 
 	return
 }
@@ -871,11 +870,9 @@ func (gnb *GNB) encUserLocationInformationNR(info *UserLocationInformationNR) (p
 
 	b, _ := per.EncSequence(true, 2, 0)
 
-	pv, plen, v, bitlen, _ := gnb.encNRCGI(&info.NRCGI)
-	p2.Value = pv
-	p2.Len = plen
+	pre, cont, _ := gnb.encNRCGI(&info.NRCGI)
 
-	b = per.MergeBitField(&b, &p2)
+	b = per.MergeBitField(&b, &pre)
 	pv = b.Value
 	plen = b.Len
 
@@ -883,12 +880,8 @@ func (gnb *GNB) encUserLocationInformationNR(info *UserLocationInformationNR) (p
 	p2.Value = pv2
 	p2.Len = plen2
 
-	b.Value = v
-	b.Len = bitlen
-	b = per.MergeBitField(&b, &p2)
-	v = b.Value
-	bitlen = b.Len
-
+	cont = per.MergeBitField(&cont, &p2)
+	v = cont.Value
 	v = append(v, v2...)
 
 	return
