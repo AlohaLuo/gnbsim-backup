@@ -535,9 +535,9 @@ const (
 )
 
 func encNgapPdu(pduType int, procCode int, criticality int) (pdu []byte) {
-	pdu, _, _ = per.EncChoice(pduType, 0, 2, true)
+	b, _ := per.EncChoice(pduType, 0, 2, true)
 	v, _, _ := per.EncInteger(int64(procCode), 0, 255, false)
-	pdu = append(pdu, v...)
+	pdu = append(b.Value, v...)
 	v, _, _ = per.EncEnumerated(uint(criticality), 0, 2, false)
 	pdu = append(pdu, v...)
 
@@ -676,17 +676,14 @@ func (gnb *GNB) encGlobalRANNodeID(id *GlobalGNBID) (v []byte, err error) {
 	head, err := encProtocolIE(idGlobalRANNodeID, reject)
 
 	// NG-ENB and N3IWF are not implemented yet...
-	var p per.BitField
 	var p2 per.BitField
-	pv, plen, _ := per.EncChoice(globalGNB, 0, 2, false)
-	p.Value = pv
-	p.Len = plen
+	b, _ := per.EncChoice(globalGNB, 0, 2, false)
 	pv, plen, v2 := gnb.encGlobalGNBID(id)
 	p2.Value = pv
 	p2.Len = plen
-	p = per.MergeBitField(&p, &p2)
-	pv = p.Value
-	plen = p.Len
+	b = per.MergeBitField(&b, &p2)
+	pv = b.Value
+	plen = b.Len
 	pv = append(pv, v2...)
 
 	length, _, _ := per.EncLengthDeterminant(len(pv), 0)
@@ -739,11 +736,8 @@ func encGNBID(gnbid uint32) (pv []byte, plen int) {
 		bitlen = minGNBIDSize
 	}
 
-	var p per.BitField
 	var p2 per.BitField
-	pv, plen, _ = per.EncChoice(0, 0, 1, false)
-	p.Value = pv
-	p.Len = plen
+	b, _ := per.EncChoice(0, 0, 1, false)
 
 	tmp := make([]byte, 4)
 	binary.BigEndian.PutUint32(tmp, gnbid)
@@ -752,9 +746,9 @@ func encGNBID(gnbid uint32) (pv []byte, plen int) {
 	p2.Value = pv
 	p2.Len = plen
 
-	p = per.MergeBitField(&p, &p2)
-	pv = p.Value
-	plen = p.Len
+	b = per.MergeBitField(&b, &p2)
+	pv = b.Value
+	plen = b.Len
 	pv = append(pv, v...)
 
 	return
@@ -845,18 +839,15 @@ func (gnb *GNB) encUserLocationInformation() (v []byte, err error) {
 	head, err := encProtocolIE(idUserLocationInformation, reject)
 
 	// NG-ENB and N3IWF are not implemented yet...
-	var p per.BitField
 	var p2 per.BitField
-	pv, plen, _ := per.EncChoice(ULInfoNR, 0, 2, false)
-	p.Value = pv
-	p.Len = plen
+	b, _ := per.EncChoice(ULInfoNR, 0, 2, false)
 
-	pv, plen, v = gnb.encUserLocationInformationNR(&gnb.ULInfoNR)
+	pv, plen, v := gnb.encUserLocationInformationNR(&gnb.ULInfoNR)
 	p2.Value = pv
 	p2.Len = plen
-	p = per.MergeBitField(&p, &p2)
-	pv = p.Value
-	plen = p.Len
+	b = per.MergeBitField(&b, &p2)
+	pv = b.Value
+	plen = b.Len
 
 	pv = append(pv, v...)
 

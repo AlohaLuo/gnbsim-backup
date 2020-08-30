@@ -379,7 +379,9 @@ var EncSequenceOf = EncEnumerated
 // EncChoice is the implementation for
 // 23. Encoding the choice type
 func EncChoice(input, min, max int, extmark bool) (
-	pv []byte, plen int, err error) {
-	pv, plen, err = EncInteger(int64(input), int64(min), int64(max), extmark)
+	b BitField, err error) {
+	pv, plen, err := EncInteger(int64(input), int64(min), int64(max), extmark)
+	b.Value = pv
+	b.Len = plen
 	return
 }

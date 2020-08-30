@@ -357,27 +357,26 @@ func TestOctetString(t *testing.T) {
 func TestChoice(t *testing.T) {
 
 	pattern := []struct {
-		input int
-		min   int
-		max   int
-		mark  bool
-		epv   []byte
-		eplen int
-		eerr  error
+		input    int
+		min      int
+		max      int
+		mark     bool
+		expected BitField
+		eerr     error
 	}{
-		{0, 0, 0, false, []byte{}, 0, nil},
-		{1, 0, 2, false, []byte{0x40}, 2, nil},
+		{0, 0, 0, false, BitField{[]byte{}, 0}, nil},
+		{1, 0, 2, false, BitField{[]byte{0x40}, 2}, nil},
 	}
 
 	for _, p := range pattern {
 
-		pv, plen, err := EncChoice(p.input, p.min, p.max, p.mark)
+		b, err := EncChoice(p.input, p.min, p.max, p.mark)
 
-		if compareSlice(pv, p.epv) == false ||
-			plen != p.eplen || err != p.eerr {
+		e := p.expected
+		if compareSlice(b.Value, e.Value) == false ||
+			b.Len != e.Len || err != p.eerr {
 			t.Errorf("pattern = %v\n", p)
-			t.Errorf("expect value 0x%02x, got 0x%02x", p.epv, pv)
-			t.Errorf("expect length %d, got %d", p.eplen, plen)
+			t.Errorf("expect %v, got %v", e, b)
 			t.Errorf("expect error: %v, got %v", p.eerr, err)
 		}
 	}
