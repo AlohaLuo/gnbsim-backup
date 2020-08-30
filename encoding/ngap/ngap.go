@@ -276,8 +276,8 @@ func (gnb *GNB) encPDUSessionResourceSetupResponse() (v []byte) {
 	v = gnb.encPDUSessionResourceSetupResponseTransfer()
 	v = append(pv, v...)
 
-	length, _, _ := per.EncLengthDeterminant(len(v), 0)
-	head = append(head, length...)
+	bf, _ := per.EncLengthDeterminant(len(v), 0)
+	head = append(head, bf.Value...)
 	v = append(head, v...)
 
 	return
@@ -311,9 +311,9 @@ func (gnb *GNB) MakeInitialContextSetupResponse() (pdu []byte) {
 	tmp = gnb.encRANUENGAPID()
 	v = append(v, tmp...)
 
-	length, _, _ := per.EncLengthDeterminant(len(v), 0)
+	bf, _ := per.EncLengthDeterminant(len(v), 0)
 
-	pdu = append(pdu, length...)
+	pdu = append(pdu, bf.Value...)
 	pdu = append(pdu, v...)
 
 	return
@@ -359,9 +359,9 @@ func (gnb *GNB) MakeInitialUEMessage() (pdu []byte) {
 	tmp, _ = gnb.encUEContextRequest()
 	v = append(v, tmp...)
 
-	length, _, _ := per.EncLengthDeterminant(len(v), 0)
+	bf, _ := per.EncLengthDeterminant(len(v), 0)
 
-	pdu = append(pdu, length...)
+	pdu = append(pdu, bf.Value...)
 	pdu = append(pdu, v...)
 
 	return
@@ -423,9 +423,9 @@ func (gnb *GNB) MakeUplinkNASTransport() (pdu []byte) {
 	tmp, _ = gnb.encUserLocationInformation()
 	v = append(v, tmp...)
 
-	length, _, _ := per.EncLengthDeterminant(len(v), 0)
+	bf, _ := per.EncLengthDeterminant(len(v), 0)
 
-	pdu = append(pdu, length...)
+	pdu = append(pdu, bf.Value...)
 	pdu = append(pdu, v...)
 
 	return
@@ -462,9 +462,9 @@ func (gnb *GNB) MakeNGSetupRequest() (pdu []byte) {
 	tmp, _ = gnb.encPagingDRX(gnb.PagingDRX)
 	v = append(v, tmp...)
 
-	length, _, _ := per.EncLengthDeterminant(len(v), 0)
+	bf, _ := per.EncLengthDeterminant(len(v), 0)
 
-	pdu = append(pdu, length...)
+	pdu = append(pdu, bf.Value...)
 	pdu = append(pdu, v...)
 
 	return
@@ -675,8 +675,8 @@ func (gnb *GNB) encGlobalRANNodeID(id *GlobalGNBID) (v []byte, err error) {
 	pv := b.Value
 	pv = append(pv, v2...)
 
-	length, _, _ := per.EncLengthDeterminant(len(pv), 0)
-	head = append(head, length...)
+	bf, _ := per.EncLengthDeterminant(len(pv), 0)
+	head = append(head, bf.Value...)
 	v = append(head, pv...)
 
 	return
@@ -831,8 +831,8 @@ func (gnb *GNB) encUserLocationInformation() (v []byte, err error) {
 	pv := b.Value
 	pv = append(pv, v...)
 
-	length, _, _ := per.EncLengthDeterminant(len(pv), 0)
-	head = append(head, length...)
+	bf, _ := per.EncLengthDeterminant(len(pv), 0)
+	head = append(head, bf.Value...)
 	v = append(head, pv...)
 
 	return
@@ -901,8 +901,8 @@ func (gnb *GNB) encPagingDRX(drx string) (v []byte, err error) {
 
 	b, _ := per.EncEnumerated(n, 0, 3, true)
 	v = b.Value
-	length, _, _ := per.EncLengthDeterminant(len(v), 0)
-	head = append(head, length...)
+	bf, _ := per.EncLengthDeterminant(len(v), 0)
+	head = append(head, bf.Value...)
 	v = append(head, v...)
 
 	return
@@ -1177,8 +1177,8 @@ func (gnb *GNB) encRRCEstablishmentCause(cause uint) (v []byte, err error) {
 	b, _ := per.EncEnumerated(cause, 0, 14, true)
 	v = b.Value
 
-	length, _, _ := per.EncLengthDeterminant(len(v), 0)
-	head = append(head, length...)
+	bf, _ := per.EncLengthDeterminant(len(v), 0)
+	head = append(head, bf.Value...)
 	v = append(head, v...)
 	return
 }
@@ -1191,8 +1191,8 @@ func (gnb *GNB) encAMFUENGAPID() (v []byte) {
 	head, _ := encProtocolIE(idAMFUENGAPID, reject)
 	v = gnb.recv.AMFUENGAPID
 
-	length, _, _ := per.EncLengthDeterminant(len(v), 0)
-	head = append(head, length...)
+	bf, _ := per.EncLengthDeterminant(len(v), 0)
+	head = append(head, bf.Value...)
 	v = append(head, v...)
 	return
 }
@@ -1211,8 +1211,8 @@ func (gnb *GNB) encRANUENGAPID() (v []byte) {
 	head, _ := encProtocolIE(idRANUENGAPID, reject)
 	v, _, _ = per.EncInteger(int64(gnb.RANUENGAPID), 0, 4294967295, false)
 
-	length, _, _ := per.EncLengthDeterminant(len(v), 0)
-	head = append(head, length...)
+	bf, _ := per.EncLengthDeterminant(len(v), 0)
+	head = append(head, bf.Value...)
 	v = append(head, v...)
 	return
 }
@@ -1233,8 +1233,8 @@ func (gnb *GNB) encNASPDU() (v []byte) {
 	pre, v, _ := per.EncOctetString(pdu, 0, 0, false)
 	v = append(pre.Value, v...)
 
-	length, _, _ := per.EncLengthDeterminant(len(v), 0)
-	head = append(head, length...)
+	bf, _ := per.EncLengthDeterminant(len(v), 0)
+	head = append(head, bf.Value...)
 	v = append(head, v...)
 	gnb.RecvNasMsg = nil
 
@@ -1401,8 +1401,8 @@ func (gnb *GNB) encSupportedTAList(p *[]SupportedTA) (v []byte, err error) {
 		v = append(v, gnb.encSupportedTAItem(&item)...)
 	}
 
-	length, _, _ := per.EncLengthDeterminant(len(v), 0)
-	head = append(head, length...)
+	bf, _ := per.EncLengthDeterminant(len(v), 0)
+	head = append(head, bf.Value...)
 	v = append(head, v...)
 
 	return
@@ -1441,8 +1441,8 @@ func (gnb *GNB) encUEContextRequest() (v []byte, err error) {
 	b, _ := per.EncEnumerated(0, 0, 0, true)
 	v = b.Value
 
-	length, _, _ := per.EncLengthDeterminant(len(v), 0)
-	head = append(head, length...)
+	bf, _ := per.EncLengthDeterminant(len(v), 0)
+	head = append(head, bf.Value...)
 	v = append(head, v...)
 	return
 }

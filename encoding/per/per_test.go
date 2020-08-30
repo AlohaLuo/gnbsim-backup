@@ -129,29 +129,29 @@ func TestEncConstrainedWholeNumber(t *testing.T) {
 func TestEncLengthDeterminant(t *testing.T) {
 
 	pattern := []struct {
-		in     int
-		max    int
-		v      []byte
-		bitlen int
-		err    bool
+		in       int
+		max      int
+		expected BitField
+		eerr     bool
 	}{
-		{1, 255, []byte{1}, 8, false},
-		{1, 0, []byte{1}, 8, false},
-		{16383, 0, []byte{0xbf, 0xff}, 16, false},
-		{16384, 0, []byte{}, 0, true},
+		{1, 255, BitField{[]byte{1}, 8}, false},
+		{1, 0, BitField{[]byte{1}, 8}, false},
+		{16383, 0, BitField{[]byte{0xbf, 0xff}, 16}, false},
+		{16384, 0, BitField{[]byte{}, 0}, true},
 	}
 
 	for _, p := range pattern {
 
-		v, bitlen, err := EncLengthDeterminant(p.in, p.max)
+		bf, err := EncLengthDeterminant(p.in, p.max)
 
-		if compareSlice(v, p.v) == false || bitlen != p.bitlen ||
-			(p.err == true && err == nil) || (p.err == false && err != nil) {
+		e := p.expected
+		eerr := p.eerr
+		if compareSlice(bf.Value, e.Value) == false || bf.Len != e.Len ||
+			(eerr == true && err == nil) || (eerr == false && err != nil) {
 
 			t.Errorf("pattern = %v\n", p)
-			t.Errorf("expect value 0x%02x, got 0x%02x", p.v, v)
-			t.Errorf("expect length %d, got %d", p.bitlen, bitlen)
-			t.Errorf("expect error: %v, got %v", p.err, err)
+			t.Errorf("expect %v, got %v", e, bf)
+			t.Errorf("expect error: %v, got %v", eerr, err)
 		}
 	}
 }

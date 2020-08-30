@@ -99,8 +99,7 @@ func ShiftLeftMost(in BitField) (out BitField) {
 
 // EncConstrainedWholeNumber is the implementation for
 // 11.5 Encoding of constrained whole number.
-func EncConstrainedWholeNumber(input, min, max int64) (
-	bf BitField, err error) {
+func EncConstrainedWholeNumber(input, min, max int64) (bf BitField, err error) {
 
 	if input < min || input > max {
 		err = fmt.Errorf("EncConstrainedWholeNumber: "+
@@ -138,27 +137,23 @@ func EncConstrainedWholeNumber(input, min, max int64) (
 
 // EncLengthDeterminant is the implementation for
 // 11.9 General rules for encoding a length determinant
-func EncLengthDeterminant(input, max int) (
-	v []byte, bitlen int, err error) {
+func EncLengthDeterminant(input, max int) (bf BitField, err error) {
 
 	if max != 0 && max < 65536 {
-		var bf BitField
 		bf, err = EncConstrainedWholeNumber(int64(input), 0, int64(max))
-		v = bf.Value
-		bitlen = bf.Len
 		return
 	}
 
 	switch {
 	case input < 128:
-		v = append(v, byte(input))
-		bitlen = 8
+		bf.Value = []byte{byte(input)}
+		bf.Len = 8
 		return
 	case input < 16384:
-		v = append(v, byte((input>>8)&0xff))
-		v = append(v, byte(input&0xff))
-		v[0] |= 0x80
-		bitlen = 16
+		bf.Value = []byte{byte((input >> 8) & 0xff)}
+		bf.Value = append(bf.Value, byte(input&0xff))
+		bf.Value[0] |= 0x80
+		bf.Len = 16
 		return
 	}
 	err = fmt.Errorf("EncLengthDeterminant: "+
@@ -350,9 +345,7 @@ func EncOctetString(input []byte, min, max int, extmark bool) (
 	v = input
 	if max == 0 {
 		// infinite upper bound case.
-		pv, plen, err = EncLengthDeterminant(inputlen, max)
-		pre.Value = pv
-		pre.Len = plen
+		pre, err = EncLengthDeterminant(inputlen, max)
 		return
 	}
 
