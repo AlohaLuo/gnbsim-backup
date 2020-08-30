@@ -1352,21 +1352,15 @@ func (gnb *GNB) encBroadcastPLMNList(bplmn *[]BroadcastPLMN) (v []byte) {
 
 	const maxnoofBPLMNs = 12
 
-	var p2 per.BitField
 	b, _ := per.EncSequenceOf(1, 1, maxnoofBPLMNs, false)
 
 	for _, item := range *bplmn {
-		pv, plen, v2 := gnb.encBroadcastPLMNItem(&item)
-		p2.Value = pv
-		p2.Len = plen
-		if plen != 0 {
-			b = per.MergeBitField(&b, &p2)
-			pv = b.Value
-			plen = b.Len
+		b2, v2 := gnb.encBroadcastPLMNItem(&item)
+		if b2.Len != 0 {
+			b = per.MergeBitField(&b, &b2)
 		}
-		v = append(v, pv...)
+		v = append(v, b.Value...)
 		v = append(v, v2...)
-		plen = 0
 	}
 	return
 }
@@ -1386,12 +1380,11 @@ type BroadcastPLMN struct {
 	SliceSupportList []SliceSupport
 }
 
-func (gnb *GNB) encBroadcastPLMNItem(p *BroadcastPLMN) (pv []byte, plen int, v []byte) {
-	b, _ := per.EncSequence(true, 1, 0)
-	pv = b.Value
-	plen = b.Len
-	v = append(v, gnb.encPLMNIdentity(p.MCC, p.MNC)...)
-	v = append(v, encSliceSupportList(&p.SliceSupportList)...)
+func (gnb *GNB) encBroadcastPLMNItem(bplmn *BroadcastPLMN) (
+	b per.BitField, v []byte) {
+	b, _ = per.EncSequence(true, 1, 0)
+	v = append(v, gnb.encPLMNIdentity(bplmn.MCC, bplmn.MNC)...)
+	v = append(v, encSliceSupportList(&bplmn.SliceSupportList)...)
 	return
 }
 
