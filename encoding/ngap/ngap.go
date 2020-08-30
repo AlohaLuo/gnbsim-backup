@@ -669,14 +669,10 @@ func (gnb *GNB) encGlobalRANNodeID(id *GlobalGNBID) (v []byte, err error) {
 	head, err := encProtocolIE(idGlobalRANNodeID, reject)
 
 	// NG-ENB and N3IWF are not implemented yet...
-	var p2 per.BitField
 	b, _ := per.EncChoice(globalGNB, 0, 2, false)
-	pv, plen, v2 := gnb.encGlobalGNBID(id)
-	p2.Value = pv
-	p2.Len = plen
-	b = per.MergeBitField(&b, &p2)
-	pv = b.Value
-	plen = b.Len
+	b2, v2 := gnb.encGlobalGNBID(id)
+	b = per.MergeBitField(&b, &b2)
+	pv := b.Value
 	pv = append(pv, v2...)
 
 	length, _, _ := per.EncLengthDeterminant(len(pv), 0)
@@ -702,11 +698,9 @@ type GlobalGNBID struct {
 }
 
 func (gnb *GNB) encGlobalGNBID(id *GlobalGNBID) (
-	pv []byte, plen int, v []byte) {
+	b per.BitField, v []byte) {
 
-	b, _ := per.EncSequence(true, 1, 0)
-	pv = b.Value
-	plen = b.Len
+	b, _ = per.EncSequence(true, 1, 0)
 	v = append(v, gnb.encPLMNIdentity(id.MCC, id.MNC)...)
 
 	pv2, _ := encGNBID(id.GNBID)
