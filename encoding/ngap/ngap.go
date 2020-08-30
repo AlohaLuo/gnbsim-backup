@@ -726,17 +726,14 @@ func encGNBID(gnbid uint32) (v []byte) {
 		bitlen = minGNBIDSize
 	}
 
-	var b2 per.BitField
 	b, _ := per.EncChoice(0, 0, 1, false)
 
 	tmp := make([]byte, 4)
 	binary.BigEndian.PutUint32(tmp, gnbid)
-	pv, plen, cont, _ := per.EncBitString(tmp, bitlen,
+	pre, cont, _ := per.EncBitString(tmp, bitlen,
 		minGNBIDSize, maxGNBIDSize, false)
-	b2.Value = pv
-	b2.Len = plen
 
-	b = per.MergeBitField(&b, &b2)
+	b = per.MergeBitField(&b, &pre)
 	v = append(b.Value, cont...)
 
 	return

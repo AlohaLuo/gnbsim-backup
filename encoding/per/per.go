@@ -270,7 +270,7 @@ func EncEnumerated(input, min, max uint, extmark bool) (
 // EncBitString returns multi-byte BIT STRING
 // 16. Encoding the bitstering type
 func EncBitString(input []byte, inputlen, min, max int, extmark bool) (
-	pv []byte, plen int, v []byte, err error) {
+	b BitField, v []byte, err error) {
 
 	if inputlen < min || inputlen > max {
 		err = fmt.Errorf("EncBitString: "+
@@ -301,8 +301,10 @@ func EncBitString(input []byte, inputlen, min, max int, extmark bool) (
 	}
 
 	// range is constrained whole number.
-	pv, plen, _ = encConstrainedWholeNumberWithExtmark(int64(inputlen),
+	pv, plen, _ := encConstrainedWholeNumberWithExtmark(int64(inputlen),
 		int64(min), int64(max), extmark)
+	b.Value = pv
+	b.Len = plen
 
 	return
 }
