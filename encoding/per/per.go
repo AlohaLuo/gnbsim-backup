@@ -317,7 +317,7 @@ func EncBitString(input []byte, inputlen, min, max int, extmark bool) (
 //   fixed length and the lenght is less than 3. And then the octet string is
 //   encoded as bit field.
 func EncOctetString(input []byte, min, max int, extmark bool) (
-	pv []byte, plen int, v []byte, err error) {
+	pre BitField, v []byte, err error) {
 
 	inputlen := len(input)
 	if max != 0 && (inputlen < min || inputlen > max) {
@@ -327,32 +327,24 @@ func EncOctetString(input []byte, min, max int, extmark bool) (
 		return
 	}
 
+	var pv []byte
+	var plen int
 	if min == max && min != 0 {
 		switch {
 		case min < 3:
-			pv = input
-			plen = inputlen * 8
+			pre.Value = input
+			pre.Len = inputlen * 8
 			if extmark == true {
-				pv = append([]byte{0x00}, pv...)
-				plen++
+				pre.Value = append([]byte{0x00}, pre.Value...)
+				pre.Len++
 			}
-			var in BitField
-			in.Value = pv
-			in.Len = plen
-			in = ShiftLeftMost(in)
-			pv = in.Value
-			plen = in.Len
+			pre = ShiftLeftMost(pre)
 		case min < 65537:
 			v = input
 			if extmark == true {
-				pv = []byte{0x00}
-				plen = 1
-				var in BitField
-				in.Value = pv
-				in.Len = plen
-				in = ShiftLeftMost(in)
-				pv = in.Value
-				plen = in.Len
+				pre.Value = []byte{0x00}
+				pre.Len = 1
+				pre = ShiftLeftMost(pre)
 			}
 		}
 		return
@@ -362,6 +354,8 @@ func EncOctetString(input []byte, min, max int, extmark bool) (
 	if max == 0 {
 		// infinite upper bound case.
 		pv, plen, err = EncLengthDeterminant(inputlen, max)
+		pre.Value = pv
+		pre.Len = plen
 		return
 	}
 
@@ -369,6 +363,8 @@ func EncOctetString(input []byte, min, max int, extmark bool) (
 	pv, plen, err =
 		encConstrainedWholeNumberWithExtmark(int64(inputlen),
 			int64(min), int64(max), extmark)
+	pre.Value = pv
+	pre.Len = plen
 	return
 }
 

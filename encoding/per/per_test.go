@@ -323,32 +323,32 @@ func TestOctetString(t *testing.T) {
 		min  int
 		max  int
 		ext  bool
-		pv   []byte
-		plen int
-		v    []byte
-		err  bool
+		epv  BitField
+		ev   []byte
+		eerr bool
 	}{
-		{[]byte{0}, 16, 64, false, []byte{}, 0, []byte{}, true},
-		{make([]byte, 8, 8), 8, 8, false, []byte{}, 0, make([]byte, 8, 8), false},
-		{[]byte{0x01, 0x80}, 2, 2, true, []byte{0x00, 0xc0, 0x00}, 17, []byte{}, false},
-		{make([]byte, 8, 8), 8, 8, true, []byte{0x00}, 1, make([]byte, 8, 8), false},
-		{make([]byte, 3, 3), 0, 0, false, []byte{3}, 8, make([]byte, 3, 3), false},
-		{make([]byte, 3, 3), 0, 7, true, []byte{0x18}, 5, make([]byte, 3, 3), false},
+		{[]byte{0}, 16, 64, false, BitField{[]byte{}, 0}, []byte{}, true},
+		{make([]byte, 8, 8), 8, 8, false, BitField{[]byte{}, 0}, make([]byte, 8, 8), false},
+		{[]byte{0x01, 0x80}, 2, 2, true, BitField{[]byte{0x00, 0xc0, 0x00}, 17}, []byte{}, false},
+		{make([]byte, 8, 8), 8, 8, true, BitField{[]byte{0x00}, 1}, make([]byte, 8, 8), false},
+		{make([]byte, 3, 3), 0, 0, false, BitField{[]byte{3}, 8}, make([]byte, 3, 3), false},
+		{make([]byte, 3, 3), 0, 7, true, BitField{[]byte{0x18}, 5}, make([]byte, 3, 3), false},
 	}
 
 	for _, p := range pattern {
 
-		pv, plen, v, err := EncOctetString(p.in, p.min, p.max, p.ext)
+		pv, v, err := EncOctetString(p.in, p.min, p.max, p.ext)
 
-		if compareSlice(pv, p.pv) == false || plen != p.plen ||
-			compareSlice(v, p.v) == false ||
-			(p.err == true && err == nil) || (p.err == false && err != nil) {
+		epv := p.epv
+		ev := p.ev
+		eerr := p.eerr
+		if compareSlice(pv.Value, epv.Value) == false || pv.Len != epv.Len ||
+			compareSlice(v, ev) == false ||
+			(eerr == true && err == nil) || (eerr == false && err != nil) {
 
 			t.Errorf("pattern = %v\n", p)
-			t.Errorf("expect value 0x%02x, got 0x%02x", p.pv, pv)
-			t.Errorf("expect length %d, got %d", p.plen, plen)
-			t.Errorf("expect value 0x%02x, got 0x%02x", p.v, v)
-			t.Errorf("expect error: %v, got %v", p.err, err)
+			t.Errorf("expect preamble %v, got %v", epv, pv)
+			t.Errorf("expect error: %v, got %v", eerr, err)
 		}
 	}
 }

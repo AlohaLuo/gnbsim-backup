@@ -1015,7 +1015,7 @@ func (gnb *GNB) encPLMNIdentity(mcc, mnc uint16) (v []byte) {
 	v[2] = byte(mnc % 100 / 10)
 	v[2] |= byte(mnc%10) << 4
 
-	_, _, v, _ = per.EncOctetString(v, 3, 3, false)
+	_, v, _ = per.EncOctetString(v, 3, 3, false)
 
 	return
 }
@@ -1084,18 +1084,15 @@ SD ::= OCTET STRING (SIZE(3))
 */
 func encSNSSAI(sstInt uint8, sdString string) (b per.BitField, v []byte) {
 
-	var p2 per.BitField
 	b, _ = per.EncSequence(true, 2, 0x02)
 
 	sst := []byte{byte(sstInt)}
-	pv, plen, _, _ := per.EncOctetString(sst, 1, 1, false)
-	p2.Value = pv
-	p2.Len = plen
+	b2, _, _ := per.EncOctetString(sst, 1, 1, false)
 
-	b = per.MergeBitField(&b, &p2)
+	b = per.MergeBitField(&b, &b2)
 
 	sd, _ := hex.DecodeString(sdString)
-	_, _, v, _ = per.EncOctetString(sd, 3, 3, false)
+	_, v, _ = per.EncOctetString(sd, 3, 3, false)
 	return
 }
 
@@ -1231,8 +1228,8 @@ func (gnb *GNB) encNASPDU() (v []byte) {
 	head, _ := encProtocolIE(idNASPDU, reject)
 
 	pdu := *gnb.RecvNasMsg
-	pv, _, v, _ := per.EncOctetString(pdu, 0, 0, false)
-	v = append(pv, v...)
+	pre, v, _ := per.EncOctetString(pdu, 0, 0, false)
+	v = append(pre.Value, v...)
 
 	length, _, _ := per.EncLengthDeterminant(len(v), 0)
 	head = append(head, length...)
@@ -1262,7 +1259,7 @@ func (gnb *GNB) encTAC(tacString string) (v []byte) {
 	binary.BigEndian.PutUint64(tac, tmp)
 	tac = tac[len(tac)-3:]
 
-	_, _, v, _ = per.EncOctetString(tac, tacSize, tacSize, false)
+	_, v, _ = per.EncOctetString(tac, tacSize, tacSize, false)
 	return
 }
 
