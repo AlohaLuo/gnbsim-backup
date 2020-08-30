@@ -827,16 +827,11 @@ func (gnb *GNB) encUserLocationInformation() (v []byte, err error) {
 	head, err := encProtocolIE(idUserLocationInformation, reject)
 
 	// NG-ENB and N3IWF are not implemented yet...
-	var p2 per.BitField
 	b, _ := per.EncChoice(ULInfoNR, 0, 2, false)
 
-	pv, plen, v := gnb.encUserLocationInformationNR(&gnb.ULInfoNR)
-	p2.Value = pv
-	p2.Len = plen
-	b = per.MergeBitField(&b, &p2)
-	pv = b.Value
-	plen = b.Len
-
+	b2, v := gnb.encUserLocationInformationNR(&gnb.ULInfoNR)
+	b = per.MergeBitField(&b, &b2)
+	pv := b.Value
 	pv = append(pv, v...)
 
 	length, _, _ := per.EncLengthDeterminant(len(pv), 0)
@@ -860,17 +855,15 @@ type UserLocationInformationNR struct {
 	TAI   TAI
 }
 
-func (gnb *GNB) encUserLocationInformationNR(info *UserLocationInformationNR) (pv []byte, plen int, v []byte) {
+func (gnb *GNB) encUserLocationInformationNR(info *UserLocationInformationNR) (
+	b per.BitField, v []byte) {
 
 	var p2 per.BitField
 
-	b, _ := per.EncSequence(true, 2, 0)
+	b, _ = per.EncSequence(true, 2, 0)
 
 	pre, cont, _ := gnb.encNRCGI(&info.NRCGI)
-
 	b = per.MergeBitField(&b, &pre)
-	pv = b.Value
-	plen = b.Len
 
 	pv2, plen2, v2, _ := gnb.encTAI(&info.TAI)
 	p2.Value = pv2
