@@ -267,14 +267,12 @@ func (gnb *GNB) encPDUSessionResourceSetupResponse() (v []byte) {
 	head, _ := encProtocolIE(idPDUSessionResourceSetupListSURes, ignore)
 
 	var p per.BitField
-	var p2 per.BitField
 	pv, plen, _ := per.EncSequenceOf(1, 1, 256, false)
 	p.Value = pv
 	p.Len = plen
-	pv, plen, _ = per.EncSequence(true, 1, 0)
-	p2.Value = pv
-	p2.Len = plen
-	p = per.MergeBitField(&p, &p2)
+
+	b2, _ := per.EncSequence(true, 1, 0)
+	p = per.MergeBitField(&p, &b2)
 	pv = p.Value
 	plen = p.Len
 
@@ -568,9 +566,9 @@ maxProtocolIEs                          INTEGER ::= 65535
 */
 func encProtocolIEContainer(num uint) (container []byte) {
 	const maxProtocolIEs = 65535
-	container, _, _ = per.EncSequence(true, 0, 0)
+	b, _ := per.EncSequence(true, 0, 0)
 	v, _, _ := per.EncSequenceOf(num, 0, maxProtocolIEs, false)
-	container = append(container, v...)
+	container = append(b.Value, v...)
 
 	return
 }
@@ -708,12 +706,15 @@ type GlobalGNBID struct {
 	GNBID uint32
 }
 
-func (gnb *GNB) encGlobalGNBID(p *GlobalGNBID) (pv []byte, plen int, v []byte) {
+func (gnb *GNB) encGlobalGNBID(id *GlobalGNBID) (
+	pv []byte, plen int, v []byte) {
 
-	pv, plen, _ = per.EncSequence(true, 1, 0)
-	v = append(v, gnb.encPLMNIdentity(p.MCC, p.MNC)...)
+	b, _ := per.EncSequence(true, 1, 0)
+	pv = b.Value
+	plen = b.Len
+	v = append(v, gnb.encPLMNIdentity(id.MCC, id.MNC)...)
 
-	pv2, _ := encGNBID(p.GNBID)
+	pv2, _ := encGNBID(id.GNBID)
 	v = append(v, pv2...)
 	return
 }
@@ -776,7 +777,10 @@ const (
 func (gnb *GNB) encNRCGI(nrcgi *NRCGI) (pv []byte, plen int,
 	v []byte, bitlen int, err error) {
 
-	pv, plen, _ = per.EncSequence(true, 1, 0)
+	b, _ := per.EncSequence(true, 1, 0)
+	pv = b.Value
+	plen = b.Len
+
 	v = gnb.encPLMNIdentity(nrcgi.PLMN.MCC, nrcgi.PLMN.MNC)
 	bitlen = len(v) * 8
 	v2, bitlen2 := gnb.encNRCellIdentity(nrcgi.NRCellID)
@@ -874,30 +878,27 @@ type UserLocationInformationNR struct {
 
 func (gnb *GNB) encUserLocationInformationNR(info *UserLocationInformationNR) (pv []byte, plen int, v []byte) {
 
-	var p per.BitField
 	var p2 per.BitField
 
-	pv, plen, _ = per.EncSequence(true, 2, 0)
-	p.Value = pv
-	p.Len = plen
+	b, _ := per.EncSequence(true, 2, 0)
 
 	pv, plen, v, bitlen, _ := gnb.encNRCGI(&info.NRCGI)
 	p2.Value = pv
 	p2.Len = plen
 
-	p = per.MergeBitField(&p, &p2)
-	pv = p.Value
-	plen = p.Len
+	b = per.MergeBitField(&b, &p2)
+	pv = b.Value
+	plen = b.Len
 
 	pv2, plen2, v2, _ := gnb.encTAI(&info.TAI)
 	p2.Value = pv2
 	p2.Len = plen2
 
-	p.Value = v
-	p.Len = bitlen
-	p = per.MergeBitField(&p, &p2)
-	v = p.Value
-	bitlen = p.Len
+	b.Value = v
+	b.Len = bitlen
+	b = per.MergeBitField(&b, &p2)
+	v = b.Value
+	bitlen = b.Len
 
 	v = append(v, v2...)
 
@@ -1093,18 +1094,15 @@ func encSliceSupportItem(ss *SliceSupport) (v []byte) {
 		0001 0000 0000 1xxx 00000000 00000000 11101000
 		0x10 0x08 0x80 0x00 0x00 0x7b
 	*/
-	var p per.BitField
 	var p2 per.BitField
-	pv, plen, _ := per.EncSequence(true, 1, 0)
-	p.Value = pv
-	p.Len = plen
+	b, _ := per.EncSequence(true, 1, 0)
 
-	pv, plen, v = encSNSSAI(ss.SST, ss.SD)
+	pv, plen, v := encSNSSAI(ss.SST, ss.SD)
 	p2.Value = pv
 	p2.Len = plen
-	p = per.MergeBitField(&p, &p2)
-	pv = p.Value
-	plen = p.Len
+	b = per.MergeBitField(&b, &p2)
+	pv = b.Value
+	plen = b.Len
 
 	v = append(pv, v...)
 	return
@@ -1124,20 +1122,17 @@ SD ::= OCTET STRING (SIZE(3))
 */
 func encSNSSAI(sstInt uint8, sdString string) (pv []byte, plen int, v []byte) {
 
-	var p per.BitField
 	var p2 per.BitField
-	pv, plen, _ = per.EncSequence(true, 2, 0x02)
-	p.Value = pv
-	p.Len = plen
+	b, _ := per.EncSequence(true, 2, 0x02)
 
 	sst := []byte{byte(sstInt)}
 	pv, plen, _, _ = per.EncOctetString(sst, 1, 1, false)
 	p2.Value = pv
 	p2.Len = plen
 
-	p = per.MergeBitField(&p, &p2)
-	pv = p.Value
-	plen = p.Len
+	b = per.MergeBitField(&b, &p2)
+	pv = b.Value
+	plen = b.Len
 
 	sd, _ := hex.DecodeString(sdString)
 	_, _, v, _ = per.EncOctetString(sd, 3, 3, false)
@@ -1325,7 +1320,9 @@ type TAI struct {
 }
 
 func (gnb *GNB) encTAI(tai *TAI) (pv []byte, plen int, v []byte, err error) {
-	pv, plen, _ = per.EncSequence(true, 1, 0)
+	b, _ := per.EncSequence(true, 1, 0)
+	pv = b.Value
+	plen = b.Len
 	v = gnb.encPLMNIdentity(tai.PLMN.MCC, tai.PLMN.MNC)
 	v = append(v, gnb.encTAC(tai.TAC)...)
 	return
@@ -1431,7 +1428,9 @@ type BroadcastPLMN struct {
 }
 
 func (gnb *GNB) encBroadcastPLMNItem(p *BroadcastPLMN) (pv []byte, plen int, v []byte) {
-	pv, plen, _ = per.EncSequence(true, 1, 0)
+	b, _ := per.EncSequence(true, 1, 0)
+	pv = b.Value
+	plen = b.Len
 	v = append(v, gnb.encPLMNIdentity(p.MCC, p.MNC)...)
 	v = append(v, encSliceSupportList(&p.SliceSupportList)...)
 	return
@@ -1476,8 +1475,8 @@ type SupportedTA struct {
 
 func (gnb *GNB) encSupportedTAItem(p *SupportedTA) (v []byte) {
 
-	pv, _, _ := per.EncSequence(true, 1, 0)
-	v = append(pv, gnb.encTAC(p.TAC)...)
+	b, _ := per.EncSequence(true, 1, 0)
+	v = append(b.Value, gnb.encTAC(p.TAC)...)
 	v = append(v, gnb.encBroadcastPLMNList(&p.BroadcastPLMNList)...)
 	return
 }

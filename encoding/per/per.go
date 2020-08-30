@@ -353,7 +353,7 @@ func EncOctetString(input []byte, min, max int, extmark bool) (
 // EncSequence return Sequence Preamble but it just returns 0x00 for now.
 // 19. Encoding the sequence type
 func EncSequence(extmark bool, optnum int, optflag uint) (
-	pv []byte, plen int, err error) {
+	b BitField, err error) {
 	if optnum > 7 {
 		err = fmt.Errorf("EncSequence: "+
 			"optnum=%d is not implemented yet. (should be < 8)",
@@ -361,14 +361,15 @@ func EncSequence(extmark bool, optnum int, optflag uint) (
 		return
 	}
 	if extmark == true {
-		plen++
+		b.Len++
 	}
 
-	pv = make([]byte, 1, 1)
-	plen += optnum
-	pv = make([]byte, 1, 1)
-	pv[0] |= byte(optflag)
-	pv, plen = ShiftLeftMost(pv, plen)
+	b.Len += optnum
+	b.Value = make([]byte, 1, 1)
+	b.Value[0] |= byte(optflag)
+	pv, plen := ShiftLeftMost(b.Value, b.Len)
+	b.Value = pv
+	b.Len = plen
 	return
 }
 

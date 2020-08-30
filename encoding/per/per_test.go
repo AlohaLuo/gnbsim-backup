@@ -252,28 +252,27 @@ func TestEncEnumerated(t *testing.T) {
 func TestEncSequence(t *testing.T) {
 
 	pattern := []struct {
-		ext    bool
-		opt    int
-		flag   uint
-		v      []byte
-		bitlen int
-		err    bool
+		ext      bool
+		opt      int
+		flag     uint
+		expected BitField
+		eerr     bool
 	}{
-		{false, 8, 0x00, []byte{}, 0, true},
-		{true, 1, 0x00, []byte{0x00}, 2, false},
+		{false, 8, 0x00, BitField{[]byte{}, 0}, true},
+		{true, 1, 0x00, BitField{[]byte{0x00}, 2}, false},
 	}
 
 	for _, p := range pattern {
 
-		v, bitlen, err := EncSequence(p.ext, p.opt, p.flag)
+		b, err := EncSequence(p.ext, p.opt, p.flag)
 
-		if compareSlice(v, p.v) == false || bitlen != p.bitlen ||
-			(p.err == true && err == nil) || (p.err == false && err != nil) {
+		e := p.expected
+		if compareSlice(b.Value, e.Value) == false || b.Len != e.Len ||
+			(p.eerr == true && err == nil) || (p.eerr == false && err != nil) {
 
 			t.Errorf("pattern = %v\n", p)
-			t.Errorf("expect value 0x%02x, got 0x%02x", p.v, v)
-			t.Errorf("expect length %d, got %d", p.bitlen, bitlen)
-			t.Errorf("expect error: %v, got %v", p.err, err)
+			t.Errorf("expect %v, got %v", e, b)
+			t.Errorf("expect error: %v, got %v", p.eerr, err)
 		}
 	}
 }
