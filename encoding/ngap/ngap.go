@@ -759,17 +759,17 @@ const (
 )
 
 func (gnb *GNB) encNRCGI(nrcgi *NRCGI) (
-	preamble per.BitField, content per.BitField, err error) {
+	pre per.BitField, cont per.BitField, err error) {
 
-	preamble, _ = per.EncSequence(true, 1, 0)
+	pre, _ = per.EncSequence(true, 1, 0)
 
 	v := gnb.encPLMNIdentity(nrcgi.PLMN.MCC, nrcgi.PLMN.MNC)
 	bitlen := len(v) * 8
 	b2 := gnb.encNRCellIdentity(nrcgi.NRCellID)
 
 	v = append(v, b2.Value...)
-	content.Value = v
-	content.Len = bitlen + b2.Len
+	cont.Value = v
+	cont.Len = bitlen + b2.Len
 
 	return
 }
