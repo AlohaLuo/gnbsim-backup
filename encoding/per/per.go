@@ -100,7 +100,7 @@ func ShiftLeftMost(in BitField) (out BitField) {
 // EncConstrainedWholeNumber is the implementation for
 // 11.5 Encoding of constrained whole number.
 func EncConstrainedWholeNumber(input, min, max int64) (
-	v []byte, bitlen int, err error) {
+	bf BitField, err error) {
 
 	if input < min || input > max {
 		err = fmt.Errorf("EncConstrainedWholeNumber: "+
@@ -116,22 +116,23 @@ func EncConstrainedWholeNumber(input, min, max int64) (
 	case inputRange == 1: // empty bit-field
 		return
 	case inputRange < 256: // the bit-field case
-		bitlen = bits.Len(uint(inputRange))
-		v = []byte{byte(inputEnc)}
+		bf.Value = []byte{byte(inputEnc)}
+		bf.Len = bits.Len(uint(inputRange))
 		return
 	case inputRange == 256: // the one-octet case
-		bitlen = 8
-		v = []byte{byte(inputEnc)}
+		bf.Value = []byte{byte(inputEnc)}
+		bf.Len = 8
 		return
 	case inputRange <= 65536: // the two-octet case
-		bitlen = 16
-		v = make([]byte, 2)
-		binary.BigEndian.PutUint16(v, uint16(inputEnc))
+		bf.Value = make([]byte, 2)
+		binary.BigEndian.PutUint16(bf.Value, uint16(inputEnc))
+		bf.Len = 16
 		return
 	}
 	// case inputRange > 65536: // the indefinite length case
-	v, _ = EncNonNegativeBinaryInteger(uint(input))
-	bitlen = len(v) * 8
+	bf.Value, _ = EncNonNegativeBinaryInteger(uint(input))
+	bf.Len = len(bf.Value) * 8
+
 	return
 }
 
@@ -141,7 +142,10 @@ func EncLengthDeterminant(input, max int) (
 	v []byte, bitlen int, err error) {
 
 	if max != 0 && max < 65536 {
-		v, bitlen, err = EncConstrainedWholeNumber(int64(input), 0, int64(max))
+		var bf BitField
+		bf, err = EncConstrainedWholeNumber(int64(input), 0, int64(max))
+		v = bf.Value
+		bitlen = bf.Len
 		return
 	}
 
@@ -185,7 +189,11 @@ func DecLengthDeterminant(pdu *[]byte, max int) (length int, err error) {
 
 func encConstrainedWholeNumberWithExtmark(input, min, max int64, extmark bool) (
 	v []byte, bitlen int, err error) {
-	v, bitlen, err = EncConstrainedWholeNumber(input, min, max)
+
+	bf, err := EncConstrainedWholeNumber(input, min, max)
+	v = bf.Value
+	bitlen = bf.Len
+
 	if err != nil {
 		return
 	}

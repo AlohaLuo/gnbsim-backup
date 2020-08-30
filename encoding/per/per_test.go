@@ -93,35 +93,35 @@ func TestShiftRight(t *testing.T) {
 func TestEncConstrainedWholeNumber(t *testing.T) {
 
 	pattern := []struct {
-		in    int64
-		min   int64
-		max   int64
-		ev    []byte
-		evlen int
-		eerr  bool
+		in       int64
+		min      int64
+		max      int64
+		expected BitField
+		eerr     bool
 	}{
-		{256, 0, 255, []byte{}, 0, true},
-		{1, 0, 0, []byte{}, 0, true},
-		{1, 1, 1, []byte{}, 0, false},
-		{1, 0, 7, []byte{0x01}, 4, false},
-		{128, 0, 255, []byte{128}, 8, false},
-		{256, 0, 65535, []byte{1, 0}, 16, false},
-		{256, 0, 65536, []byte{1, 0}, 16, false},
-		{255, 0, 4294967295, []byte{0, 255}, 16, false},
-		{0x0fffffff, 0, 4294967295, []byte{0x0f, 0xff, 0xff, 0xff}, 32, false},
+		{256, 0, 255, BitField{[]byte{}, 0}, true},
+		{1, 0, 0, BitField{[]byte{}, 0}, true},
+		{1, 1, 1, BitField{[]byte{}, 0}, false},
+		{1, 0, 7, BitField{[]byte{0x01}, 4}, false},
+		{128, 0, 255, BitField{[]byte{128}, 8}, false},
+		{256, 0, 65535, BitField{[]byte{1, 0}, 16}, false},
+		{256, 0, 65536, BitField{[]byte{1, 0}, 16}, false},
+		{255, 0, 4294967295, BitField{[]byte{0, 255}, 16}, false},
+		{0x0fffffff, 0, 4294967295, BitField{[]byte{0x0f, 0xff, 0xff, 0xff}, 32}, false},
 	}
 
 	for _, p := range pattern {
 
-		out, outlen, err := EncConstrainedWholeNumber(p.in, p.min, p.max)
+		out, err := EncConstrainedWholeNumber(p.in, p.min, p.max)
 
-		if compareSlice(out, p.ev) == false || outlen != p.evlen ||
-			(p.eerr == true && err == nil) || (p.eerr == false && err != nil) {
+		e := p.expected
+		eerr := p.eerr
+		if compareSlice(out.Value, e.Value) == false || out.Len != e.Len ||
+			(eerr == true && err == nil) || (eerr == false && err != nil) {
 
 			t.Errorf("pattern = %v\n", p)
-			t.Errorf("expect value 0x%02x, got 0x%02x", p.ev, out)
-			t.Errorf("expect length %d, got %d", p.evlen, outlen)
-			t.Errorf("expect error: %v, got %v", p.eerr, err)
+			t.Errorf("expect %v, got %v", e, out)
+			t.Errorf("expect error: %v, got %v", eerr, err)
 		}
 	}
 }
