@@ -35,7 +35,7 @@ func MergeBitField(in1 *BitField, in2 *BitField) (out BitField) {
 	*/
 
 	if in1 == nil {
-		out.Value, out.Len = ShiftLeftMost(in2.Value, in2.Len)
+		out = ShiftLeftMost(*in2)
 		return
 	}
 
@@ -102,10 +102,9 @@ func ShiftRight(in []byte, shiftlen int) (out []byte) {
 }
 
 // ShiftLeftMost is utility function to shift the octet values to the leftmost.
-func ShiftLeftMost(in []byte, inlen int) (out []byte, outlen int) {
+func ShiftLeftMost(in BitField) (out BitField) {
 	out = in
-	outlen = inlen
-	out = ShiftLeft(out, len(in)*8-inlen)
+	out.Value = ShiftLeft(out.Value, len(in.Value)*8-in.Len)
 	return
 }
 
@@ -210,7 +209,12 @@ func encConstrainedWholeNumberWithExtmark(input, min, max int64, extmark bool) (
 			bitlen++
 		}
 	}
-	ShiftLeftMost(v, bitlen)
+	var in BitField
+	in.Value = v
+	in.Len = bitlen
+	out := ShiftLeftMost(in)
+	v = out.Value
+	bitlen = out.Len
 	return
 }
 
@@ -281,7 +285,11 @@ func EncBitString(input []byte, inputlen, min, max int, extmark bool) (
 		return
 	}
 
-	v, _ = ShiftLeftMost(input, inputlen)
+	var in BitField
+	in.Value = input
+	in.Len = inputlen
+	out := ShiftLeftMost(in)
+	v = out.Value
 
 	if min == max {
 		// fixed length case. not implemented yet.
@@ -326,13 +334,23 @@ func EncOctetString(input []byte, min, max int, extmark bool) (
 				pv = append([]byte{0x00}, pv...)
 				plen++
 			}
-			pv, plen = ShiftLeftMost(pv, plen)
+			var in BitField
+			in.Value = pv
+			in.Len = plen
+			in = ShiftLeftMost(in)
+			pv = in.Value
+			plen = in.Len
 		case min < 65537:
 			v = input
 			if extmark == true {
 				pv = []byte{0x00}
 				plen = 1
-				pv, plen = ShiftLeftMost(pv, plen)
+				var in BitField
+				in.Value = pv
+				in.Len = plen
+				in = ShiftLeftMost(in)
+				pv = in.Value
+				plen = in.Len
 			}
 		}
 		return
@@ -369,9 +387,7 @@ func EncSequence(extmark bool, optnum int, optflag uint) (
 	b.Len += optnum
 	b.Value = make([]byte, 1, 1)
 	b.Value[0] |= byte(optflag)
-	pv, plen := ShiftLeftMost(b.Value, b.Len)
-	b.Value = pv
-	b.Len = plen
+	b = ShiftLeftMost(b)
 	return
 }
 

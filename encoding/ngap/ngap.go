@@ -791,20 +791,20 @@ func (gnb *GNB) encNRCellIdentity(cellid uint64) (b per.BitField) {
 	tmp := make([]byte, 4)
 	binary.BigEndian.PutUint32(tmp, gnbid)
 
-	var p per.BitField
-	var p2 per.BitField
-	pv, plen := per.ShiftLeftMost(tmp, gnbidlen)
-	p.Value = pv
-	p.Len = plen
+	b.Value = tmp
+	b.Len = gnbidlen
+	b = per.ShiftLeftMost(b)
 
 	cellidlen := nrCellIDSize - gnbidlen
 	tmp = make([]byte, 8)
 	binary.BigEndian.PutUint64(tmp, cellid)
-	pv, plen = per.ShiftLeftMost(tmp, cellidlen)
-	p2.Value = pv
-	p2.Len = plen
 
-	b = per.MergeBitField(&p, &p2)
+	var b2 per.BitField
+	b2.Value = tmp
+	b2.Len = cellidlen
+	b2 = per.ShiftLeftMost(b2)
+
+	b = per.MergeBitField(&b, &b2)
 	return
 }
 
