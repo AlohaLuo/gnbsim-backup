@@ -858,18 +858,14 @@ type UserLocationInformationNR struct {
 func (gnb *GNB) encUserLocationInformationNR(info *UserLocationInformationNR) (
 	b per.BitField, v []byte) {
 
-	var p2 per.BitField
-
 	b, _ = per.EncSequence(true, 2, 0)
 
 	pre, cont, _ := gnb.encNRCGI(&info.NRCGI)
 	b = per.MergeBitField(&b, &pre)
 
-	pv2, plen2, v2, _ := gnb.encTAI(&info.TAI)
-	p2.Value = pv2
-	p2.Len = plen2
+	b2, v2, _ := gnb.encTAI(&info.TAI)
+	cont = per.MergeBitField(&cont, &b2)
 
-	cont = per.MergeBitField(&cont, &p2)
 	v = cont.Value
 	v = append(v, v2...)
 
@@ -1293,10 +1289,8 @@ type TAI struct {
 	TAC  string
 }
 
-func (gnb *GNB) encTAI(tai *TAI) (pv []byte, plen int, v []byte, err error) {
-	b, _ := per.EncSequence(true, 1, 0)
-	pv = b.Value
-	plen = b.Len
+func (gnb *GNB) encTAI(tai *TAI) (b per.BitField, v []byte, err error) {
+	b, _ = per.EncSequence(true, 1, 0)
 	v = gnb.encPLMNIdentity(tai.PLMN.MCC, tai.PLMN.MNC)
 	v = append(v, gnb.encTAC(tai.TAC)...)
 	return
