@@ -104,8 +104,6 @@ type GNB struct {
 
 	dbgLevel int
 	indent   int // indent for debug print.
-
-	preamble per.BitField
 }
 
 func NewNGAP(filename string) (p *GNB) {
