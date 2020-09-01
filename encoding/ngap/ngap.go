@@ -93,6 +93,7 @@ type GNB struct {
 	RANUENGAPID     uint32
 	UE              nas.UE
 	ULInfoNR        UserLocationInformationNR
+	GTPuAddr        string
 
 	recv struct {
 		AMFUENGAPID  []byte
@@ -232,7 +233,7 @@ PDUSessionResourceSetupResponseIEs NGAP-PROTOCOL-IES ::= {
 func (gnb *GNB) MakePDUSessionResourceSetupResponse() (pdu []byte) {
 
 	pdu = encNgapPdu(successfulOutcome, idPDUSessionResourceSetup, reject)
-	v := encProtocolIEContainer(2)
+	v := encProtocolIEContainer(3)
 
 	tmp := gnb.encAMFUENGAPID()
 	v = append(v, tmp...)
@@ -242,6 +243,11 @@ func (gnb *GNB) MakePDUSessionResourceSetupResponse() (pdu []byte) {
 
 	tmp = gnb.encPDUSessionResourceSetupResponse()
 	v = append(v, tmp...)
+
+	bf, _ := per.EncLengthDeterminant(len(v), 0)
+
+	pdu = append(pdu, bf.Value...)
+	pdu = append(pdu, v...)
 
 	return
 }
@@ -268,11 +274,11 @@ func (gnb *GNB) encPDUSessionResourceSetupResponse() (v []byte) {
 	b2, _ := per.EncSequence(true, 1, 0)
 	b = per.MergeBitField(b, b2)
 
-	v = gnb.encPDUSessionID()
-	pv := append(b.Value, v...)
+	tmp := gnb.encPDUSessionID()
+	v = append(b.Value, tmp...)
 
-	v = gnb.encPDUSessionResourceSetupResponseTransfer()
-	v = append(pv, v...)
+	tmp = gnb.encPDUSessionResourceSetupResponseTransfer()
+	v = append(v, tmp...)
 
 	bf, _ := per.EncLengthDeterminant(len(v), 0)
 	head = append(head, bf.Value...)
@@ -920,6 +926,24 @@ GTPTunnel ::= SEQUENCE {
     ...
 }
 */
+func (gnb *GNB) encUPTransportLayerInformation(pre *per.BitField) (pdu []byte) {
+
+	const gTPTunnel = 1
+	bf, _ := per.EncChoice(gTPTunnel, 0, 1, false)
+	if pre != nil { // has inherited preamble
+		bf = per.MergeBitField(*pre, bf)
+	}
+	pre = &bf
+
+	tmp := gnb.encTransportLayerAddress(pre)
+	pdu = append(pdu, tmp...)
+
+	tmp = gnb.encGTPTEID()
+	pdu = append(pdu, tmp...)
+
+	return
+}
+
 func (gnb *GNB) decUPTransportLayerInformation(pdu *[]byte, length int) {
 
 	var tli per.BitField
@@ -945,6 +969,25 @@ func (gnb *GNB) decUPTransportLayerInformation(pdu *[]byte, length int) {
 /*
 TransportLayerAddress ::= BIT STRING (SIZE(1..160, ...))
 */
+func (gnb *GNB) encTransportLayerAddress(pre *per.BitField) (pdu []byte) {
+
+	const min = 1
+	const max = 169
+	const extmark = false
+
+	addr := net.ParseIP(gnb.GTPuAddr)
+	ipv4addr := addr.To4()
+	bitlen := net.IPv4len * 8
+	bf, v, _ := per.EncBitString(ipv4addr, bitlen, min, max, extmark)
+
+	if pre != nil { // has inherited preamble
+		bf = per.MergeBitField(*pre, bf)
+	}
+	pdu = append(bf.Value, v...)
+
+	return
+}
+
 func (gnb *GNB) decTransportLayerAddress(tla *per.BitField) {
 
 	gnb.dprint("Transport Layer Address")
@@ -972,6 +1015,21 @@ func (gnb *GNB) decTransportLayerAddress(tla *per.BitField) {
 /*
 GTP-TEID ::= OCTET STRING (SIZE(4))
 */
+func (gnb *GNB) encGTPTEID() (pdu []byte) {
+
+	const min = 4
+	const max = 4
+	const extmark = false
+
+	teid := make([]byte, 4)
+	// 999 is for now, should be a random value.
+	binary.BigEndian.PutUint32(teid, 999)
+	_, pdu, _ = per.EncOctetString(teid, min, max, extmark)
+	gnb.dprint("enc GTPTEID: %v", pdu)
+
+	return
+}
+
 func (gnb *GNB) decGTPTEID(pdu *[]byte) {
 
 	id := readPduUint32(pdu)
@@ -989,7 +1047,20 @@ QosFlowPerTNLInformation ::= SEQUENCE {
     ...
 }
 */
-func (gnb *GNB) encQoSFlowPerTNLInformation() (pdu []byte) {
+func (gnb *GNB) encQosFlowPerTNLInformation(pre *per.BitField) (pdu []byte) {
+
+	bf, _ := per.EncSequence(true, 1, 0)
+	if pre != nil { // has inherited preamble
+		bf = per.MergeBitField(*pre, bf)
+	}
+	pre = &bf
+
+	tmp := gnb.encUPTransportLayerInformation(pre)
+	pdu = append(pdu, tmp...)
+
+	tmp = gnb.encAssociatedQosFlowList()
+	pdu = append(pdu, tmp...)
+
 	return
 }
 
@@ -1123,13 +1194,43 @@ func (gnb *GNB) decSNSSAI(pdu *[]byte) {
 PDUSessionID ::= INTEGER (0..255)
 */
 func (gnb *GNB) encPDUSessionID() (pdu []byte) {
-	pdu = []byte{byte(gnb.recv.PDUSessionID)}
+	bf, _ := per.EncInteger(int64(gnb.recv.PDUSessionID), 0, 255, false)
+	pdu = bf.Value
+	gnb.dprint("encPDUSessionID: pdu: %v", pdu)
 	return
 }
+
 func (gnb *GNB) decPDUSessionID(pdu *[]byte) (val int) {
 	val = int(readPduByte(pdu))
 	gnb.dprinti("PDU Session ID: %d", val)
 	gnb.recv.PDUSessionID = uint8(val)
+	return
+}
+
+// 9.3.1.99 Associated QoS Flow List
+/*
+maxnoofQosFlows                     INTEGER ::= 64
+
+AssociatedQosFlowList ::= SEQUENCE (SIZE(1..maxnoofQosFlows)) OF AssociatedQosFlowItem
+
+AssociatedQosFlowItem ::= SEQUENCE {
+    qosFlowIdentifier               QosFlowIdentifier,
+    qosFlowMappingIndication        ENUMERATED {ul, dl, ...}                            OPTIONAL,
+    iE-Extensions       ProtocolExtensionContainer { {AssociatedQosFlowItem-ExtIEs} }   OPTIONAL,
+    ...
+}
+*/
+func (gnb *GNB) encAssociatedQosFlowList() (pdu []byte) {
+
+	const min = 1
+	const max = 64
+	const extmark = true
+
+	bf, _ := per.EncSequenceOf(1, min, max, extmark)
+	gnb.dprint("encAssociatedQosFlowList bitfield: %v", bf)
+
+	// need QosFlowSetupRequestList decoder.
+
 	return
 }
 
@@ -1328,7 +1429,9 @@ PDUSessionResourceSetupResponseTransfer ::= SEQUENCE {
 */
 func (gnb *GNB) encPDUSessionResourceSetupResponseTransfer() (pdu []byte) {
 
-	//pv, plen, _ := per.EncSequence(true, 4, 0)
+	bf, _ := per.EncSequence(true, 4, 0)
+	pre := &bf
+	pdu = gnb.encQosFlowPerTNLInformation(pre)
 
 	return
 }

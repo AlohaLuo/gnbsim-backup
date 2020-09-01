@@ -14,6 +14,7 @@ var TestULAuthenticationResponse string = "002e403c000004000a0002000100550002000
 var TestULSecurityModeComplete string = "002e405c000004000a0002000100550002000000260036357e04a860200b007e005e7700090500000001000001f171001c7e004179000d0102f8392143000010325476981001202e0480a000000079000f4002f839000004001002f839000001"
 var TestInitialContextSetupResponse string = "200e000f000002000a00020001005500020000"
 var TestULRegistrationComplete string = "002e4031000004000a000200010055000200000026000b0a7e042cbd08cf017e00430079000f4002f839000004001002f839000001"
+var TestPDUSessionResourceSetupResponse string = ""
 
 // receive message
 var TestNGSetupResponse string = "20150031000004000100050100414d4600600008000002f839cafe0000564001ff005000100002f839000110080102031008112233"
@@ -26,6 +27,37 @@ func recvfromNW(gnb *GNB, msg string) {
 	in, _ := hex.DecodeString(msg)
 	gnb.Decode(&in)
 	fmt.Printf("")
+}
+
+func TestMakePDUSessionResourceSetupResponse(t *testing.T) {
+
+	pattern := []struct {
+		in_str string
+	}{
+		{TestNGSetupResponse},
+		{TestDLAuthenticationRequest},
+		{TestDLSecurityModeCommand},
+		{TestInitialContextSetupRequest},
+		{TestDLPDUSessionEstablishmentAccept},
+	}
+
+	gnb := NewNGAP("ngap_test.json")
+	gnb.UE.PowerON()
+
+	for _, p := range pattern {
+		recvfromNW(gnb, p.in_str)
+	}
+
+	gnb.SetDebugLevel(1)
+	gnb.UE.SetDebugLevel(1)
+	v := gnb.MakePDUSessionResourceSetupResponse()
+	expect_str := TestPDUSessionResourceSetupResponse
+	expect, _ := hex.DecodeString(expect_str)
+	if reflect.DeepEqual(expect, v) == false {
+		fmt.Printf("PDUSessionResourceSetupResponse test not implemented yet.\n")
+		//t.Errorf("PDUSessionResourceSetupResponse\nexpect: %x\nactual: %x", expect, v)
+	}
+
 }
 
 func TestInitialContestSetupResponse(t *testing.T) {
