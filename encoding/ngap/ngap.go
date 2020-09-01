@@ -641,6 +641,8 @@ func (gnb *GNB) decProtocolIE(pdu *[]byte) (err error) {
 		gnb.decNASPDU(pdu)
 	case idPDUSessionResourceSetupListSUReq: // 74
 		gnb.decPDUSessionResourceSetupListSUReq(pdu, length)
+	case idPDUSessionType: // 134
+		gnb.decPDUSessionType(pdu, length)
 	case idULNGUUPTNLInformation: // 139
 		gnb.decUPTransportLayerInformation(pdu, length)
 	default:
@@ -1204,6 +1206,49 @@ func (gnb *GNB) decPDUSessionID(pdu *[]byte) (val int) {
 	val = int(readPduByte(pdu))
 	gnb.dprinti("PDU Session ID: %d", val)
 	gnb.recv.PDUSessionID = uint8(val)
+	return
+}
+
+// 9.3.1.52 PDU Session Type
+/*
+PDUSessionType ::= ENUMERATED {
+    ipv4,
+    ipv6,
+    ipv4v6,
+    ethernet,
+    unstructured,
+    ...
+}
+*/
+const (
+	ipv4 = iota
+	ipv6
+	ipv4v6
+	ethernet
+	unstructured
+)
+
+var PDUSessionTypeStr = map[int]string{
+	ipv4:         "ipv4",
+	ipv6:         "ipv6",
+	ipv4v6:       "ipv4v6",
+	ethernet:     "ethernet",
+	unstructured: "unstructured",
+}
+
+func (gnb *GNB) decPDUSessionType(pdu *[]byte, length int) {
+
+	// TODO: generic per decoder.
+	// 0 000 0000
+	// ^          extension marker
+	//   ^^^      PDU Session Type
+
+	pdutype := int(readPduByte(pdu))
+	pdutype &= 0x70
+	pdutype >>= 4
+
+	gnb.dprint("PDU Session Type: %s (%d)", PDUSessionTypeStr[pdutype], pdutype)
+
 	return
 }
 
