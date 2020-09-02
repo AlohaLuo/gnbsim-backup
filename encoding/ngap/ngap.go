@@ -98,6 +98,7 @@ type GNB struct {
 	recv struct {
 		AMFUENGAPID  []byte
 		PDUSessionID uint8
+		QosFlowID    uint8
 	}
 
 	SendNasMsg *[]byte
@@ -825,6 +826,17 @@ QosFlowLevelQosParameters ::= SEQUENCE {
     ...
 }
 */
+func (gnb *GNB) decQosFlowLevelQosParameters(item *per.BitField) {
+	// 0000 0000
+	// ^         extension marker
+	//  ^^^ ^    optional bit
+	//
+	gnb.dprinti("Qos Flow Level Qos Prameters: not supported yet")
+	gnb.decQosCharacteristics(item)
+	gnb.decAllocationAndRetentionPriority(item)
+
+	return
+}
 
 // 9.3.1.16 User Location Information
 /*
@@ -887,6 +899,20 @@ func (gnb *GNB) encUserLocationInformationNR(info *UserLocationInformationNR) (
 	v = cont.Value
 	v = append(v, v2...)
 
+	return
+}
+
+// 9.3.1.19 Allocation and Retention Priority
+/*
+AllocationAndRetentionPriority ::= SEQUENCE {
+    priorityLevelARP                PriorityLevelARP,
+    pre-emptionCapability           Pre-emptionCapability,
+    pre-emptionVulnerability        Pre-emptionVulnerability,
+    iE-Extensions       ProtocolExtensionContainer { {AllocationAndRetentionPriority-ExtIEs} } OPTIONAL,
+    ...
+}
+*/
+func (gnb *GNB) decAllocationAndRetentionPriority(item *per.BitField) {
 	return
 }
 
@@ -1039,7 +1065,7 @@ func (gnb *GNB) encGTPTEID() (pdu []byte) {
 	const extmark = false
 
 	teid := make([]byte, 4)
-	// 999 is for now, should be a random value.
+	// 999 for now, should be a random value.
 	binary.BigEndian.PutUint32(teid, 999)
 	_, pdu, _ = per.EncOctetString(teid, min, max, extmark)
 	gnb.dprint("enc GTPTEID: %v", pdu)
@@ -1232,8 +1258,10 @@ func (gnb *GNB) encQosFlowIdentifier() (pdu []byte) {
 	const min = 0
 	const max = 63
 	const extmark = true
-	bf, _ := per.EncInteger(1, min, max, extmark)
+	bf, _ := per.EncInteger(int64(gnb.recv.QosFlowID), min, max, extmark)
 	gnb.dprinti("EncInteger(1, 0, 63, true): %v", bf)
+
+	pdu = bf.Value
 	return
 }
 
@@ -1241,7 +1269,9 @@ func (gnb *GNB) decQosFlowIdentifier(item *per.BitField) {
 	// TODO generic per decoder
 	// 0000
 	id := readPduByte(&item.Value)
+	item.Len -= 8
 	gnb.dprinti("Qos Flow Identifier: %d", id)
+	gnb.recv.QosFlowID = id
 	return
 }
 
@@ -1310,7 +1340,24 @@ func (gnb *GNB) encAssociatedQosFlowList() (pdu []byte) {
 	bf, _ := per.EncSequenceOf(1, min, max, extmark)
 	gnb.dprint("encAssociatedQosFlowList bitfield: %v", bf)
 
+	pdu = gnb.encAssociatedQosFlowItem(&bf)
 	// need QosFlowSetupRequestList decoder.
+
+	return
+}
+
+func (gnb *GNB) encAssociatedQosFlowItem(pre *per.BitField) (pdu []byte) {
+
+	const optnum = 0
+	const optflag = 0
+	const extmark = true
+
+	bf, _ := per.EncSequence(extmark, optnum, optflag)
+	if pre != nil {
+		bf = per.MergeBitField(*pre, bf)
+	}
+	pdu = gnb.encQosFlowIdentifier()
+	pdu = append(bf.Value, pdu...)
 
 	return
 }
@@ -1634,6 +1681,19 @@ func (gnb *GNB) encUEContextRequest() (v []byte, err error) {
  * following IEs/Group Names are defined in each message definitions in 9.3.
  * alphabetical order
  */
+
+// QoS Characteristics is defined in 9.3.1.12 QoS Flow Level QoS Parameters
+/*
+QosCharacteristics ::= CHOICE {
+    nonDynamic5QI       NonDynamic5QIDescriptor,
+    dynamic5QI          Dynamic5QIDescriptor,
+    choice-Extensions       ProtocolIE-SingleContainer { {QosCharacteristics-ExtIEs} }
+}
+*/
+func (gnb *GNB) decQosCharacteristics(item *per.BitField) {
+	return
+}
+
 // QoS Flow Setup Request List is defined in
 // 9.3.4.1 PDU Session Resource Setup Request Transfer
 /*
@@ -1676,6 +1736,7 @@ func (gnb *GNB) decQosFlowSetupRequestList(pdu *[]byte, length int) {
 	// qoslist.Len -= 7                        //
 
 	readPduByte(&qoslist.Value) // skip the above bits
+	qoslist.Len -= 8
 
 	for i := 0; i < itemNum; i++ {
 		gnb.dprint("Item %d", i)
@@ -1694,6 +1755,8 @@ func (gnb *GNB) decQosFlowSetupRequestItem(item *per.BitField) {
 	// somethins is wrong. see the comment above
 	// *item = per.ShiftLeft(*item, 3)
 	gnb.decQosFlowIdentifier(item)
+	gnb.decQosFlowLevelQosParameters(item)
+
 	return
 }
 
