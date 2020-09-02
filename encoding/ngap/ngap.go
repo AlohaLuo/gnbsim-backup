@@ -643,6 +643,8 @@ func (gnb *GNB) decProtocolIE(pdu *[]byte) (err error) {
 		gnb.decPDUSessionResourceSetupListSUReq(pdu, length)
 	case idPDUSessionType: // 134
 		gnb.decPDUSessionType(pdu, length)
+	case idQosFlowSetupRequestList: // 136
+		gnb.decQosFlowSetupRequestList(pdu, length)
 	case idULNGUUPTNLInformation: // 139
 		gnb.decUPTransportLayerInformation(pdu, length)
 	default:
@@ -810,6 +812,19 @@ func (gnb *GNB) encNRCellIdentity(cellid uint64) (b per.BitField) {
 	b = per.MergeBitField(b, b2)
 	return
 }
+
+// 9.3.1.12 QoS Flow Level QoS Parameters
+/*
+QosFlowLevelQosParameters ::= SEQUENCE {
+    qosCharacteristics                  QosCharacteristics,
+    allocationAndRetentionPriority      AllocationAndRetentionPriority,
+    gBR-QosInformation                  GBR-QosInformation                                  OPTIONAL,
+    reflectiveQosAttribute              ReflectiveQosAttribute                              OPTIONAL,
+    additionalQosFlowInformation        AdditionalQosFlowInformation                        OPTIONAL,
+    iE-Extensions       ProtocolExtensionContainer { {QosFlowLevelQosParameters-ExtIEs} }   OPTIONAL,
+    ...
+}
+*/
 
 // 9.3.1.16 User Location Information
 /*
@@ -1209,6 +1224,27 @@ func (gnb *GNB) decPDUSessionID(pdu *[]byte) (val int) {
 	return
 }
 
+// 9.3.1.51 QoS Flow Identifier
+/*
+QosFlowIdentifier ::= INTEGER (0..63, ...)
+*/
+func (gnb *GNB) encQosFlowIdentifier() (pdu []byte) {
+	const min = 0
+	const max = 63
+	const extmark = true
+	bf, _ := per.EncInteger(1, min, max, extmark)
+	gnb.dprinti("EncInteger(1, 0, 63, true): %v", bf)
+	return
+}
+
+func (gnb *GNB) decQosFlowIdentifier(item *per.BitField) {
+	// TODO generic per decoder
+	// 0000
+	id := readPduByte(&item.Value)
+	gnb.dprinti("Qos Flow Identifier: %d", id)
+	return
+}
+
 // 9.3.1.52 PDU Session Type
 /*
 PDUSessionType ::= ENUMERATED {
@@ -1591,6 +1627,73 @@ func (gnb *GNB) encUEContextRequest() (v []byte, err error) {
 	bf, _ := per.EncLengthDeterminant(len(v), 0)
 	head = append(head, bf.Value...)
 	v = append(head, v...)
+	return
+}
+
+/*
+ * following IEs/Group Names are defined in each message definitions in 9.3.
+ * alphabetical order
+ */
+// QoS Flow Setup Request List is defined in
+// 9.3.4.1 PDU Session Resource Setup Request Transfer
+/*
+maxnoofQosFlows                     INTEGER ::= 64
+
+QosFlowSetupRequestList ::= SEQUENCE (SIZE(1..maxnoofQosFlows)) OF QosFlowSetupRequestItem
+
+QosFlowSetupRequestItem ::= SEQUENCE {
+    qosFlowIdentifier               QosFlowIdentifier,
+    qosFlowLevelQosParameters       QosFlowLevelQosParameters,
+    e-RAB-ID                        E-RAB-ID                                            OPTIONAL,
+    iE-Extensions       ProtocolExtensionContainer { {QosFlowSetupRequestItem-ExtIEs} } OPTIONAL,
+    ...
+}
+*/
+func (gnb *GNB) decQosFlowSetupRequestList(pdu *[]byte, length int) {
+
+	var qoslist per.BitField
+	qoslist.Value = readPduByteSlice(pdu, length)
+	qoslist.Len = len(qoslist.Value) * 8
+	gnb.dprint("dump: %02x", qoslist.Value)
+
+	/*
+	 *  XXX: It is too complicated for me to decode this IE.
+	 * In my understanding, This SequenceOf needs 7 bit length. And the
+	 * ollowing Sequence needs 3 bit length because of the sequence has
+	 * extension marker and the two options. Now the total bit length is 10.
+	 * And futhermore `QosFlowIdentifier` is in range 0-63, so the length is 7,
+	 * and it has extension marker. Now the total length is 18. But, according
+	 * to the Wireshark decoder, the decoded area is just 2 octets. It is beyond
+	 * my understanding. I have to study more about aligned per encoding rule...
+	 */
+
+	// 0000 000 0
+	// ^^^^ ^^^   sequence of 1-64
+	itemNum := int(qoslist.Value[0])
+	itemNum >>= 1
+	itemNum += 1
+	// qoslist = per.ShiftLeft(qoslist, 7)     // something is wrong.
+	// qoslist.Len -= 7                        //
+
+	readPduByte(&qoslist.Value) // skip the above bits
+
+	for i := 0; i < itemNum; i++ {
+		gnb.dprint("Item %d", i)
+		gnb.decQosFlowSetupRequestItem(&qoslist)
+	}
+	return
+}
+
+func (gnb *GNB) decQosFlowSetupRequestItem(item *per.BitField) {
+
+	// TODO: generic per decoder.
+	// 0 000 0000
+	// ^          extension marker
+	//   ^^       options
+
+	// somethins is wrong. see the comment above
+	// *item = per.ShiftLeft(*item, 3)
+	gnb.decQosFlowIdentifier(item)
 	return
 }
 
