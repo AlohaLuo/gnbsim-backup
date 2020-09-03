@@ -116,7 +116,7 @@ func EncConstrainedWholeNumber(input, min, max int64) (bf BitField, err error) {
 		return
 	case inputRange < 256: // the bit-field case
 		bf.Value = []byte{byte(inputEnc)}
-		bf.Len = bits.Len(uint(inputRange))
+		bf.Len = bits.Len(uint(inputRange - 1))
 		return
 	case inputRange == 256: // the one-octet case
 		bf.Value = []byte{byte(inputEnc)}

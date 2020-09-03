@@ -102,7 +102,7 @@ func TestEncConstrainedWholeNumber(t *testing.T) {
 		{256, 0, 255, BitField{[]byte{}, 0}, true},
 		{1, 0, 0, BitField{[]byte{}, 0}, true},
 		{1, 1, 1, BitField{[]byte{}, 0}, false},
-		{1, 0, 7, BitField{[]byte{0x01}, 4}, false},
+		{1, 0, 7, BitField{[]byte{0x01}, 3}, false},
 		{128, 0, 255, BitField{[]byte{128}, 8}, false},
 		{256, 0, 65535, BitField{[]byte{1, 0}, 16}, false},
 		{256, 0, 65536, BitField{[]byte{1, 0}, 16}, false},
@@ -196,7 +196,7 @@ func TestEncInteger(t *testing.T) {
 		{2, 2, 2, false, BitField{[]byte{}, 0}, false},
 		{2, 2, 2, true, BitField{[]byte{0x00}, 1}, false},
 		{128, 0, 255, false, BitField{[]byte{128}, 8}, false},
-		{1, 0, 7, true, BitField{[]byte{0x08}, 5}, false},
+		{1, 0, 7, true, BitField{[]byte{0x10}, 4}, false},
 		{128, 0, 255, true, BitField{[]byte{0x00, 128}, 16}, false},
 		{256, 0, 65535, false, BitField{[]byte{1, 0}, 16}, false},
 		{1, 0, 4294967295, false, BitField{[]byte{0, 1}, 16}, false},
@@ -332,7 +332,7 @@ func TestOctetString(t *testing.T) {
 		{[]byte{0x01, 0x80}, 2, 2, true, BitField{[]byte{0x00, 0xc0, 0x00}, 17}, []byte{}, false},
 		{make([]byte, 8, 8), 8, 8, true, BitField{[]byte{0x00}, 1}, make([]byte, 8, 8), false},
 		{make([]byte, 3, 3), 0, 0, false, BitField{[]byte{3}, 8}, make([]byte, 3, 3), false},
-		{make([]byte, 3, 3), 0, 7, true, BitField{[]byte{0x18}, 5}, make([]byte, 3, 3), false},
+		{make([]byte, 3, 3), 0, 7, true, BitField{[]byte{0x30}, 4}, make([]byte, 3, 3), false},
 	}
 
 	for _, p := range pattern {
