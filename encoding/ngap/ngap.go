@@ -269,8 +269,6 @@ PDUSessionResourceSetupItemSURes ::= SEQUENCE {
 */
 func (gnb *GNB) encPDUSessionResourceSetupResponse() (v []byte) {
 
-	head, _ := encProtocolIE(idPDUSessionResourceSetupListSURes, ignore)
-
 	b, _ := per.EncSequenceOf(1, 1, 256, false)
 	b2, _ := per.EncSequence(true, 1, 0)
 	b = per.MergeBitField(b, b2)
@@ -280,10 +278,6 @@ func (gnb *GNB) encPDUSessionResourceSetupResponse() (v []byte) {
 
 	tmp = gnb.encPDUSessionResourceSetupResponseTransfer()
 	v = append(v, tmp...)
-
-	bf, _ := per.EncLengthDeterminant(len(v), 0)
-	head = append(head, bf.Value...)
-	v = append(head, v...)
 
 	return
 }
@@ -1266,10 +1260,14 @@ func (gnb *GNB) encQosFlowIdentifier() (pdu []byte) {
 }
 
 func (gnb *GNB) decQosFlowIdentifier(item *per.BitField) {
-	// TODO generic per decoder
-	// 0000
-	id := readPduByte(&item.Value)
-	item.Len -= 8
+
+	// TODO: generic per decoder.
+	// 000 0000
+	// ^        extension marker
+	//  ^^ ^^^^ integer
+	id := item.Value[0]
+	id >>= 1
+	item.Len -= 7
 	gnb.dprinti("Qos Flow Identifier: %d", id)
 	gnb.recv.QosFlowID = id
 	return
@@ -1716,44 +1714,32 @@ func (gnb *GNB) decQosFlowSetupRequestList(pdu *[]byte, length int) {
 	qoslist.Len = len(qoslist.Value) * 8
 	gnb.dprint("dump: %02x", qoslist.Value)
 
-	/*
-	 *  XXX: It is too complicated for me to decode this IE.
-	 * In my understanding, This SequenceOf needs 7 bit length. And the
-	 * ollowing Sequence needs 3 bit length because of the sequence has
-	 * extension marker and the two options. Now the total bit length is 10.
-	 * And futhermore `QosFlowIdentifier` is in range 0-63, so the length is 7,
-	 * and it has extension marker. Now the total length is 18. But, according
-	 * to the Wireshark decoder, the decoded area is just 2 octets. It is beyond
-	 * my understanding. I have to study more about aligned per encoding rule...
-	 */
-
-	// 0000 000 0
-	// ^^^^ ^^^   sequence of 1-64
+	// TODO: generic per decoder.
+	// 0000 00 00
+	// ^^^^ ^^    sequence of 1-64
 	itemNum := int(qoslist.Value[0])
-	itemNum >>= 1
+	itemNum >>= 2
 	itemNum += 1
-	// qoslist = per.ShiftLeft(qoslist, 7)     // something is wrong.
-	// qoslist.Len -= 7                        //
 
-	readPduByte(&qoslist.Value) // skip the above bits
-	qoslist.Len -= 8
+	qoslist = per.ShiftLeft(qoslist, 6)
+	qoslist.Len -= 6
 
 	for i := 0; i < itemNum; i++ {
 		gnb.dprint("Item %d", i)
 		gnb.decQosFlowSetupRequestItem(&qoslist)
 	}
+
 	return
 }
 
 func (gnb *GNB) decQosFlowSetupRequestItem(item *per.BitField) {
 
 	// TODO: generic per decoder.
-	// 0 000 0000
-	// ^          extension marker
-	//   ^^       options
-
-	// somethins is wrong. see the comment above
-	// *item = per.ShiftLeft(*item, 3)
+	// 00 0000 0000
+	// ^            extension marker
+	//  ^ ^         options
+	*item = per.ShiftLeft(*item, 3)
+	item.Len -= 3
 	gnb.decQosFlowIdentifier(item)
 	gnb.decQosFlowLevelQosParameters(item)
 
