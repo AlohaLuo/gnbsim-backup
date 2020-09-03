@@ -1,11 +1,14 @@
 all: build
 
-build:
+build: update
 
-test:
+update:
+	go get -u
+
+test: update
 	go test -v --cover
 	
-cover:
+cover: update
 	go test -v --cover -coverprofile=cover.out
 	go tool cover -html=cover.out -o cover.html
 	rm cover.out
