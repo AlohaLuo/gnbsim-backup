@@ -234,6 +234,7 @@ PDUSessionResourceSetupResponseIEs NGAP-PROTOCOL-IES ::= {
 func (gnb *GNB) MakePDUSessionResourceSetupResponse() (pdu []byte) {
 
 	pdu = encNgapPdu(successfulOutcome, idPDUSessionResourceSetup, reject)
+
 	v := encProtocolIEContainer(3)
 
 	tmp := gnb.encAMFUENGAPID()
@@ -242,7 +243,7 @@ func (gnb *GNB) MakePDUSessionResourceSetupResponse() (pdu []byte) {
 	tmp = gnb.encRANUENGAPID()
 	v = append(v, tmp...)
 
-	tmp = gnb.encPDUSessionResourceSetupResponse()
+	tmp = gnb.encPDUSessionResourceSetupListSURes()
 	v = append(v, tmp...)
 
 	bf, _ := per.EncLengthDeterminant(len(v), 0)
@@ -267,17 +268,26 @@ PDUSessionResourceSetupItemSURes ::= SEQUENCE {
     ...
 }
 */
-func (gnb *GNB) encPDUSessionResourceSetupResponse() (v []byte) {
+func (gnb *GNB) encPDUSessionResourceSetupListSURes() (v []byte) {
 
-	b, _ := per.EncSequenceOf(1, 1, 256, false)
-	b2, _ := per.EncSequence(true, 1, 0)
-	b = per.MergeBitField(b, b2)
+	head, _ := encProtocolIE(idPDUSessionResourceSetupListSURes, ignore)
+
+	bf, vx, _ := per.EncSequenceOf(1, 1, 256, false)
+	fmt.Printf("1-bf: %v, vx: %v\n", bf, vx)
+	bf2, _ := per.EncSequence(true, 1, 0)
+	bf = per.MergeBitField(bf, bf2)
 
 	tmp := gnb.encPDUSessionID()
-	v = append(b.Value, tmp...)
+	v = append(bf.Value, tmp...)
 
 	tmp = gnb.encPDUSessionResourceSetupResponseTransfer()
+	bf, tmp, _ = per.EncOctetString(tmp, 0, 0, false)
+	v = append(v, bf.Value...)
 	v = append(v, tmp...)
+
+	bf, _ = per.EncLengthDeterminant(len(v), 0)
+	head = append(head, bf.Value...)
+	v = append(head, v...)
 
 	return
 }
@@ -526,10 +536,10 @@ const (
 )
 
 func encNgapPdu(pduType int, procCode int, criticality int) (pdu []byte) {
-	b, _ := per.EncChoice(pduType, 0, 2, true)
-	bf, _ := per.EncInteger(int64(procCode), 0, 255, false)
-	pdu = append(b.Value, bf.Value...)
-	b, _ = per.EncEnumerated(uint(criticality), 0, 2, false)
+	b, _, _ := per.EncChoice(pduType, 0, 2, true)
+	_, v, _ := per.EncInteger(int64(procCode), 0, 255, false)
+	pdu = append(b.Value, v...)
+	b, _, _ = per.EncEnumerated(uint(criticality), 0, 2, false)
 	pdu = append(pdu, b.Value...)
 
 	return
@@ -560,9 +570,9 @@ maxProtocolIEs                          INTEGER ::= 65535
 func encProtocolIEContainer(num uint) (container []byte) {
 	const maxProtocolIEs = 65535
 	b, _ := per.EncSequence(true, 0, 0)
-	b2, _ := per.EncSequenceOf(num, 0, maxProtocolIEs, false)
+	_, v, _ := per.EncSequenceOf(num, 0, maxProtocolIEs, false)
 
-	container = append(b.Value, b2.Value...)
+	container = append(b.Value, v...)
 
 	return
 }
@@ -600,9 +610,9 @@ ProtocolIE-Field {NGAP-PROTOCOL-IES : IEsSetParam} ::= SEQUENCE {
 */
 func encProtocolIE(id int64, criticality uint) (v []byte, err error) {
 
-	bf, _ := per.EncInteger(id, 0, 65535, false)
-	bf2, _ := per.EncEnumerated(criticality, 0, 2, false)
-	v = append(bf.Value, bf2.Value...)
+	_, v, _ = per.EncInteger(id, 0, 65535, false)
+	bf, _, _ := per.EncEnumerated(criticality, 0, 2, false)
+	v = append(v, bf.Value...)
 
 	return
 }
@@ -672,7 +682,7 @@ func (gnb *GNB) encGlobalRANNodeID(id *GlobalGNBID) (v []byte, err error) {
 	head, err := encProtocolIE(idGlobalRANNodeID, reject)
 
 	// NG-ENB and N3IWF are not implemented yet...
-	b, _ := per.EncChoice(globalGNB, 0, 2, false)
+	b, _, _ := per.EncChoice(globalGNB, 0, 2, false)
 	b2, v2 := gnb.encGlobalGNBID(id)
 	b = per.MergeBitField(b, b2)
 	pv := b.Value
@@ -729,7 +739,7 @@ func encGNBID(gnbid uint32) (v []byte) {
 		bitlen = minGNBIDSize
 	}
 
-	b, _ := per.EncChoice(0, 0, 1, false)
+	b, _, _ := per.EncChoice(0, 0, 1, false)
 
 	tmp := make([]byte, 4)
 	binary.BigEndian.PutUint32(tmp, gnbid)
@@ -851,7 +861,7 @@ func (gnb *GNB) encUserLocationInformation() (v []byte, err error) {
 	head, err := encProtocolIE(idUserLocationInformation, reject)
 
 	// NG-ENB and N3IWF are not implemented yet...
-	b, _ := per.EncChoice(ULInfoNR, 0, 2, false)
+	b, _, _ := per.EncChoice(ULInfoNR, 0, 2, false)
 
 	b2, v := gnb.encUserLocationInformationNR(&gnb.ULInfoNR)
 	b = per.MergeBitField(b, b2)
@@ -940,7 +950,8 @@ func (gnb *GNB) encPagingDRX(drx string) (v []byte, err error) {
 		return
 	}
 
-	b, _ := per.EncEnumerated(n, 0, 3, true)
+	b, vx, _ := per.EncEnumerated(n, 0, 3, true)
+	fmt.Printf("11-b: %v, vx: %v\n", b, vx)
 	v = b.Value
 	bf, _ := per.EncLengthDeterminant(len(v), 0)
 	head = append(head, bf.Value...)
@@ -965,12 +976,19 @@ GTPTunnel ::= SEQUENCE {
 */
 func (gnb *GNB) encUPTransportLayerInformation(pre *per.BitField) (pdu []byte) {
 
-	const gTPTunnel = 1
-	bf, _ := per.EncChoice(gTPTunnel, 0, 1, false)
+	const gTPTunnel = 0
+	bf, vx, _ := per.EncChoice(gTPTunnel, 0, 1, false)
+	fmt.Printf("12-bf: %v, vx: %v\n", bf, vx)
 	if pre != nil { // has inherited preamble
 		bf = per.MergeBitField(*pre, bf)
 	}
-	pre = &bf
+	fmt.Printf("bitfield-3: %v\n", bf)
+	*pre = bf
+
+	bf, _ = per.EncSequence(true, 1, 0)
+	bf = per.MergeBitField(*pre, bf)
+	fmt.Printf("bitfield-4: %v\n", bf)
+	*pre = bf
 
 	tmp := gnb.encTransportLayerAddress(pre)
 	pdu = append(pdu, tmp...)
@@ -1009,17 +1027,19 @@ TransportLayerAddress ::= BIT STRING (SIZE(1..160, ...))
 func (gnb *GNB) encTransportLayerAddress(pre *per.BitField) (pdu []byte) {
 
 	const min = 1
-	const max = 169
-	const extmark = false
+	const max = 160
+	const extmark = true
 
 	addr := net.ParseIP(gnb.GTPuAddr)
 	ipv4addr := addr.To4()
 	bitlen := net.IPv4len * 8
 	bf, v, _ := per.EncBitString(ipv4addr, bitlen, min, max, extmark)
 
+	fmt.Printf("  bitfield-4: %v\n", bf)
 	if pre != nil { // has inherited preamble
 		bf = per.MergeBitField(*pre, bf)
 	}
+	fmt.Printf("bitfield-5: %v\n", bf)
 	pdu = append(bf.Value, v...)
 
 	return
@@ -1090,10 +1110,11 @@ func (gnb *GNB) encQosFlowPerTNLInformation(pre *per.BitField) (pdu []byte) {
 	if pre != nil { // has inherited preamble
 		bf = per.MergeBitField(*pre, bf)
 	}
+	fmt.Printf("bitfield-2: %v\n", bf)
 	pre = &bf
 
 	tmp := gnb.encUPTransportLayerInformation(pre)
-	pdu = append(pdu, tmp...)
+	pdu = append(pre.Value, tmp...)
 
 	tmp = gnb.encAssociatedQosFlowList()
 	pdu = append(pdu, tmp...)
@@ -1132,8 +1153,7 @@ SliceSupportList ::= SEQUENCE (SIZE(1..maxnoofSliceItems)) OF SliceSupportItem
     maxnoofSliceItems                   INTEGER ::= 1024
 */
 func encSliceSupportList(p *[]SliceSupport) (v []byte) {
-	b, _ := per.EncSequenceOf(1, 1, 1024, false)
-	v = b.Value
+	_, v, _ = per.EncSequenceOf(1, 1, 1024, false)
 	for _, item := range *p {
 		v = append(v, encSliceSupportItem(&item)...)
 	}
@@ -1231,7 +1251,8 @@ func (gnb *GNB) decSNSSAI(pdu *[]byte) {
 PDUSessionID ::= INTEGER (0..255)
 */
 func (gnb *GNB) encPDUSessionID() (pdu []byte) {
-	bf, _ := per.EncInteger(int64(gnb.recv.PDUSessionID), 0, 255, false)
+	bf, vx, _ := per.EncInteger(int64(gnb.recv.PDUSessionID), 0, 255, false)
+	fmt.Printf("14-bf: %v, vx: %v\n", bf, vx)
 	pdu = bf.Value
 	gnb.dprint("encPDUSessionID: pdu: %v", pdu)
 	return
@@ -1252,7 +1273,8 @@ func (gnb *GNB) encQosFlowIdentifier() (pdu []byte) {
 	const min = 0
 	const max = 63
 	const extmark = true
-	bf, _ := per.EncInteger(int64(gnb.recv.QosFlowID), min, max, extmark)
+	bf, vx, _ := per.EncInteger(int64(gnb.recv.QosFlowID), min, max, extmark)
+	fmt.Printf("15-bf: %v, vx: %v\n", bf, vx)
 	gnb.dprinti("EncInteger(1, 0, 63, true): %v", bf)
 
 	pdu = bf.Value
@@ -1335,7 +1357,8 @@ func (gnb *GNB) encAssociatedQosFlowList() (pdu []byte) {
 	const max = 64
 	const extmark = true
 
-	bf, _ := per.EncSequenceOf(1, min, max, extmark)
+	bf, vx, _ := per.EncSequenceOf(1, min, max, extmark)
+	fmt.Printf("16-bf: %v, vx: %v\n", bf, vx)
 	gnb.dprint("encAssociatedQosFlowList bitfield: %v", bf)
 
 	pdu = gnb.encAssociatedQosFlowItem(&bf)
@@ -1399,7 +1422,7 @@ func (gnb *GNB) encRRCEstablishmentCause(cause uint) (v []byte, err error) {
 	 * Wireshark does parse it as 4 bit field. It means that the number is
 	 * from 7 to 14.
 	 */
-	b, _ := per.EncEnumerated(cause, 0, 14, true)
+	b, _, _ := per.EncEnumerated(cause, 0, 14, true)
 	v = b.Value
 
 	bf, _ := per.EncLengthDeterminant(len(v), 0)
@@ -1435,11 +1458,18 @@ RAN-UE-NGAP-ID ::= INTEGER (0..4294967295)
 func (gnb *GNB) encRANUENGAPID() (v []byte) {
 
 	head, _ := encProtocolIE(idRANUENGAPID, reject)
-	bf, _ := per.EncInteger(int64(gnb.RANUENGAPID), 0, 4294967295, false)
+
+	_, v, _ = per.EncInteger(int64(gnb.RANUENGAPID), 0, 4294967295, false)
+	bf, _ := per.EncLengthDeterminant(len(v), 0)
+	head = append(head, bf.Value...)
+	v = append(head, v...)
+	return
+
+	bf, vx, _ := per.EncInteger(int64(gnb.RANUENGAPID), 0, 4294967295, false)
+	fmt.Printf("18-bf: %v, vx: %v\n", bf, vx)
 	bf2, _ := per.EncLengthDeterminant(len(bf.Value), 0)
 	head = append(head, bf2.Value...)
 	v = append(head, bf.Value...)
-
 	return
 }
 
@@ -1470,8 +1500,9 @@ func (gnb *GNB) encNASPDU() (v []byte) {
 func (gnb *GNB) decNASPDU(pdu *[]byte) (err error) {
 
 	gnb.dprint("pseudo DecOctetString")
-	readPduByte(pdu)
-	gnb.SendtoUE(pdu)
+	length := int(readPduByte(pdu))
+	naspdu := readPduByteSlice(pdu, length)
+	gnb.SendtoUE(&naspdu)
 
 	return
 }
@@ -1556,6 +1587,7 @@ PDUSessionResourceSetupResponseTransfer ::= SEQUENCE {
 func (gnb *GNB) encPDUSessionResourceSetupResponseTransfer() (pdu []byte) {
 
 	bf, _ := per.EncSequence(true, 4, 0)
+	fmt.Printf("bitfield-1: %v\n", bf)
 	pre := &bf
 	pdu = gnb.encQosFlowPerTNLInformation(pre)
 
@@ -1576,7 +1608,7 @@ func (gnb *GNB) encBroadcastPLMNList(bplmn *[]BroadcastPLMN) (v []byte) {
 
 	const maxnoofBPLMNs = 12
 
-	b, _ := per.EncSequenceOf(1, 1, maxnoofBPLMNs, false)
+	b, _, _ := per.EncSequenceOf(1, 1, maxnoofBPLMNs, false)
 
 	for _, item := range *bplmn {
 		b2, v2 := gnb.encBroadcastPLMNItem(&item)
@@ -1622,8 +1654,7 @@ func (gnb *GNB) encSupportedTAList(p *[]SupportedTA) (v []byte, err error) {
 	head, err := encProtocolIE(idSupportedTAList, reject)
 
 	const maxnoofTACs = 256
-	b, _ := per.EncSequenceOf(1, 1, maxnoofTACs, false)
-	v = b.Value
+	_, v, _ = per.EncSequenceOf(1, 1, maxnoofTACs, false)
 
 	for _, item := range *p {
 		v = append(v, gnb.encSupportedTAItem(&item)...)
@@ -1666,7 +1697,7 @@ func (gnb *GNB) encUEContextRequest() (v []byte, err error) {
 
 	head, err := encProtocolIE(idUEContextRequest, ignore)
 
-	b, _ := per.EncEnumerated(0, 0, 0, true)
+	b, _, _ := per.EncEnumerated(0, 0, 0, true)
 	v = b.Value
 
 	bf, _ := per.EncLengthDeterminant(len(v), 0)
