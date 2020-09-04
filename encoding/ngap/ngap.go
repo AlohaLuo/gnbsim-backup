@@ -272,13 +272,12 @@ func (gnb *GNB) encPDUSessionResourceSetupListSURes() (v []byte) {
 
 	head, _ := encProtocolIE(idPDUSessionResourceSetupListSURes, ignore)
 
-	bf, vx, _ := per.EncSequenceOf(1, 1, 256, false)
-	fmt.Printf("1-bf: %v, vx: %v\n", bf, vx)
-	bf2, _ := per.EncSequence(true, 1, 0)
-	bf = per.MergeBitField(bf, bf2)
+	_, v, _ = per.EncSequenceOf(1, 1, 256, false)
+	bf, _ := per.EncSequence(true, 1, 0)
+	v = append(v, bf.Value...)
 
 	tmp := gnb.encPDUSessionID()
-	v = append(bf.Value, tmp...)
+	v = append(v, tmp...)
 
 	tmp = gnb.encPDUSessionResourceSetupResponseTransfer()
 	bf, tmp, _ = per.EncOctetString(tmp, 0, 0, false)
@@ -950,8 +949,7 @@ func (gnb *GNB) encPagingDRX(drx string) (v []byte, err error) {
 		return
 	}
 
-	b, vx, _ := per.EncEnumerated(n, 0, 3, true)
-	fmt.Printf("11-b: %v, vx: %v\n", b, vx)
+	b, _, _ := per.EncEnumerated(n, 0, 3, true)
 	v = b.Value
 	bf, _ := per.EncLengthDeterminant(len(v), 0)
 	head = append(head, bf.Value...)
@@ -977,8 +975,7 @@ GTPTunnel ::= SEQUENCE {
 func (gnb *GNB) encUPTransportLayerInformation(pre *per.BitField) (pdu []byte) {
 
 	const gTPTunnel = 0
-	bf, vx, _ := per.EncChoice(gTPTunnel, 0, 1, false)
-	fmt.Printf("12-bf: %v, vx: %v\n", bf, vx)
+	bf, _, _ := per.EncChoice(gTPTunnel, 0, 1, false)
 	if pre != nil { // has inherited preamble
 		bf = per.MergeBitField(*pre, bf)
 	}
@@ -1251,9 +1248,7 @@ func (gnb *GNB) decSNSSAI(pdu *[]byte) {
 PDUSessionID ::= INTEGER (0..255)
 */
 func (gnb *GNB) encPDUSessionID() (pdu []byte) {
-	bf, vx, _ := per.EncInteger(int64(gnb.recv.PDUSessionID), 0, 255, false)
-	fmt.Printf("14-bf: %v, vx: %v\n", bf, vx)
-	pdu = bf.Value
+	_, pdu, _ = per.EncInteger(int64(gnb.recv.PDUSessionID), 0, 255, false)
 	gnb.dprint("encPDUSessionID: pdu: %v", pdu)
 	return
 }
@@ -1273,11 +1268,9 @@ func (gnb *GNB) encQosFlowIdentifier() (pdu []byte) {
 	const min = 0
 	const max = 63
 	const extmark = true
-	bf, vx, _ := per.EncInteger(int64(gnb.recv.QosFlowID), min, max, extmark)
-	fmt.Printf("15-bf: %v, vx: %v\n", bf, vx)
-	gnb.dprinti("EncInteger(1, 0, 63, true): %v", bf)
-
+	bf, _, _ := per.EncInteger(int64(gnb.recv.QosFlowID), min, max, extmark)
 	pdu = bf.Value
+
 	return
 }
 
@@ -1357,8 +1350,7 @@ func (gnb *GNB) encAssociatedQosFlowList() (pdu []byte) {
 	const max = 64
 	const extmark = true
 
-	bf, vx, _ := per.EncSequenceOf(1, min, max, extmark)
-	fmt.Printf("16-bf: %v, vx: %v\n", bf, vx)
+	bf, _, _ := per.EncSequenceOf(1, min, max, extmark)
 	gnb.dprint("encAssociatedQosFlowList bitfield: %v", bf)
 
 	pdu = gnb.encAssociatedQosFlowItem(&bf)
@@ -1463,13 +1455,6 @@ func (gnb *GNB) encRANUENGAPID() (v []byte) {
 	bf, _ := per.EncLengthDeterminant(len(v), 0)
 	head = append(head, bf.Value...)
 	v = append(head, v...)
-	return
-
-	bf, vx, _ := per.EncInteger(int64(gnb.RANUENGAPID), 0, 4294967295, false)
-	fmt.Printf("18-bf: %v, vx: %v\n", bf, vx)
-	bf2, _ := per.EncLengthDeterminant(len(bf.Value), 0)
-	head = append(head, bf2.Value...)
-	v = append(head, bf.Value...)
 	return
 }
 
