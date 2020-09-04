@@ -111,6 +111,7 @@ func EncConstrainedWholeNumber(input, min, max int64) (bf BitField, err error) {
 	inputRange := max - min + 1
 	inputEnc := input - min
 
+	bf.Len = 0 // default: octet aligned
 	switch {
 	case inputRange == 1: // empty bit-field
 		return
@@ -120,17 +121,14 @@ func EncConstrainedWholeNumber(input, min, max int64) (bf BitField, err error) {
 		return
 	case inputRange == 256: // the one-octet case
 		bf.Value = []byte{byte(inputEnc)}
-		bf.Len = 8
 		return
 	case inputRange <= 65536: // the two-octet case
 		bf.Value = make([]byte, 2)
 		binary.BigEndian.PutUint16(bf.Value, uint16(inputEnc))
-		bf.Len = 16
 		return
 	}
 	// case inputRange > 65536: // the indefinite length case
 	bf.Value, _ = EncNonNegativeBinaryInteger(uint(input))
-	bf.Len = len(bf.Value) * 8
 
 	return
 }
@@ -144,16 +142,15 @@ func EncLengthDeterminant(input, max int) (bf BitField, err error) {
 		return
 	}
 
+	bf.Len = 0 // default: octet aligned
 	switch {
 	case input < 128:
 		bf.Value = []byte{byte(input)}
-		bf.Len = 8
 		return
 	case input < 16384:
 		bf.Value = []byte{byte((input >> 8) & 0xff)}
 		bf.Value = append(bf.Value, byte(input&0xff))
 		bf.Value[0] |= 0x80
-		bf.Len = 16
 		return
 	}
 	err = fmt.Errorf("EncLengthDeterminant: "+
@@ -183,24 +180,27 @@ func DecLengthDeterminant(pdu *[]byte, max int) (length int, err error) {
 }
 
 func encConstrainedWholeNumberWithExtmark(input, min, max int64, extmark bool) (
-	bf BitField, err error) {
+	bf BitField, v []byte, err error) {
 
 	bf, err = EncConstrainedWholeNumber(input, min, max)
 	if err != nil {
 		return
 	}
 
-	if extmark == true {
-		switch {
-		case bf.Len%8 == 0:
-			bf.Len += 8
-			bf.Value = append([]byte{0x00}, bf.Value...)
-		case bf.Len < 8:
-			bf.Len++
-		}
+	// octet aligned
+	if bf.Len == 0 {
+		v = bf.Value
+		bf.Value = []byte{}
 	}
 
+	if extmark == true {
+		if bf.Len%8 == 0 {
+			bf.Value = append([]byte{0x00}, bf.Value...)
+		}
+		bf.Len++
+	}
 	bf = ShiftLeftMost(bf)
+
 	return
 }
 
@@ -225,7 +225,7 @@ func EncNonNegativeBinaryInteger(input uint) (v []byte, err error) {
 // 13. Encoding the integer type
 // but it is only for the case of single value and constrained whole nuber.
 func EncInteger(input, min, max int64, extmark bool) (
-	bf BitField, err error) {
+	bf BitField, v []byte, err error) {
 
 	if min == max { // 12.2.1 single value
 		if extmark == true {
@@ -236,15 +236,15 @@ func EncInteger(input, min, max int64, extmark bool) (
 	}
 
 	// 13.2.2 constrained whole number
-	bf, err = encConstrainedWholeNumberWithExtmark(input, min, max, extmark)
+	bf, v, err = encConstrainedWholeNumberWithExtmark(input, min, max, extmark)
 	return
 }
 
 // EncEnumerated is the implementation for
 // 14. Encoding the enumerated type
 func EncEnumerated(input, min, max uint, extmark bool) (
-	bf BitField, err error) {
-	bf, err = encConstrainedWholeNumberWithExtmark(int64(input),
+	bf BitField, v []byte, err error) {
+	bf, v, err = encConstrainedWholeNumberWithExtmark(int64(input),
 		int64(min), int64(max), extmark)
 	return
 }
@@ -283,8 +283,9 @@ func EncBitString(input []byte, inputlen, min, max int, extmark bool) (
 	}
 
 	// range is constrained whole number.
-	bf, _ = encConstrainedWholeNumberWithExtmark(int64(inputlen),
+	bf, v2, err := encConstrainedWholeNumberWithExtmark(int64(inputlen),
 		int64(min), int64(max), extmark)
+	v = append(v2, v...)
 
 	return
 }
@@ -332,12 +333,18 @@ func EncOctetString(input []byte, min, max int, extmark bool) (
 	if max == 0 {
 		// infinite upper bound case.
 		pre, err = EncLengthDeterminant(inputlen, max)
+		if pre.Len == 0 {
+			v = append(pre.Value, v...)
+			pre.Value = []byte{}
+		}
 		return
 	}
 
 	// lower bound and upper bound are specified.
-	pre, err = encConstrainedWholeNumberWithExtmark(int64(inputlen),
+	pre, v2, err := encConstrainedWholeNumberWithExtmark(int64(inputlen),
 		int64(min), int64(max), extmark)
+	v = append(v2, v...)
+
 	return
 }
 
@@ -369,7 +376,7 @@ var EncSequenceOf = EncEnumerated
 // EncChoice is the implementation for
 // 23. Encoding the choice type
 func EncChoice(input, min, max int, extmark bool) (
-	bf BitField, err error) {
-	bf, err = EncInteger(int64(input), int64(min), int64(max), extmark)
+	bf BitField, v []byte, err error) {
+	bf, v, err = EncInteger(int64(input), int64(min), int64(max), extmark)
 	return
 }
