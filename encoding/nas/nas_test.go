@@ -153,5 +153,8 @@ func TestDecode(t *testing.T) {
 	for _, p := range pattern {
 		fmt.Printf("---------- test decode: %s\n", p.desc)
 		receive(ue, p.in_str)
+		if ue.DecodeError != nil {
+			t.Errorf("%s: %v", p.desc, ue.DecodeError)
+		}
 	}
 }

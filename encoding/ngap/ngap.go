@@ -106,6 +106,8 @@ type GNB struct {
 
 	dbgLevel int
 	indent   int // indent for debug print.
+
+	DecodeError error
 }
 
 func NewNGAP(filename string) (p *GNB) {
@@ -143,6 +145,7 @@ func (gnb *GNB) RecvfromUE(pdu *[]byte) {
 
 func (gnb *GNB) Decode(pdu *[]byte) {
 
+	gnb.DecodeError = nil
 	_, procCode, _, _ := decNgapPdu(pdu)
 
 	str := procCodeStr[procCode]
@@ -156,6 +159,9 @@ func (gnb *GNB) Decode(pdu *[]byte) {
 
 	gnb.decProtocolIEContainer(pdu)
 
+	if gnb.UE.DecodeError != nil {
+		gnb.DecodeError = gnb.UE.DecodeError
+	}
 	return
 }
 
@@ -1484,8 +1490,8 @@ func (gnb *GNB) encNASPDU() (v []byte) {
 
 func (gnb *GNB) decNASPDU(pdu *[]byte) (err error) {
 
-	gnb.dprint("pseudo DecOctetString")
 	length := int(readPduByte(pdu))
+	fmt.Printf("NAS PDU Length: %d\n", length)
 	naspdu := readPduByteSlice(pdu, length)
 	gnb.SendtoUE(&naspdu)
 

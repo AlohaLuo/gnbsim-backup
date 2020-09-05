@@ -142,19 +142,31 @@ func TestDecode(t *testing.T) {
 
 	pattern := []struct {
 		in_str string
+		desc   string
 	}{
-		{TestNGSetupResponse},
-		{TestDLAuthenticationRequest},
-		{TestDLSecurityModeCommand},
-		{TestInitialContextSetupRequest},
-		{TestDLPDUSessionEstablishmentAccept},
+		{TestNGSetupResponse,
+			"NG Setup Response"},
+		{TestDLAuthenticationRequest,
+			"DL Authentication Request"},
+		{TestDLSecurityModeCommand,
+			"DL Security Mode Command"},
+		{TestInitialContextSetupRequest,
+			"Initial Context Setup Request"},
+		{TestDLPDUSessionEstablishmentAccept,
+			"PDU Session Establishment Accept"},
 	}
 
 	gnb := NewNGAP("ngap_test.json")
 
 	for _, p := range pattern {
+		fmt.Printf("---------- test decode: %s\n", p.desc)
+
 		gnb.SetDebugLevel(1)
 		gnb.UE.SetDebugLevel(1)
 		recvfromNW(gnb, p.in_str)
+
+		if gnb.DecodeError != nil {
+			t.Errorf("%s: %v", p.desc, gnb.DecodeError)
+		}
 	}
 }

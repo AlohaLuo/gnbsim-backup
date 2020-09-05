@@ -68,6 +68,8 @@ type UE struct {
 
 	dbgLevel int
 	indent   int // indent for debug print.
+
+	DecodeError error
 }
 
 // 5.1.3 5GMM sublayer states
@@ -251,6 +253,8 @@ func (ue *UE) MakeNasPdu() (pdu []byte) {
 
 func (ue *UE) Decode(pdu *[]byte) (msgType int) {
 
+	ue.DecodeError = nil
+
 	epd := readPduByte(pdu)
 	ue.dprint("EPD: %s (0x%x)", epdStr[epd], epd)
 
@@ -277,6 +281,7 @@ func (ue *UE) Decode5GMM(pdu *[]byte) (msgType int) {
 
 		macCalc := ue.ComputeMAC(1, pdu)
 		if reflect.DeepEqual(mac, macCalc) == false {
+			ue.DecodeError = fmt.Errorf("nas: integrity checking failed")
 			ue.dprint("***** Integrity check failed...")
 			ue.dprint("Received  : %x", mac)
 			ue.dprint("Calculated: %x", macCalc)
