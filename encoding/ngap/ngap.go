@@ -252,7 +252,7 @@ func (gnb *GNB) MakePDUSessionResourceSetupResponse() (pdu []byte) {
 	tmp = gnb.encPDUSessionResourceSetupListSURes()
 	v = append(v, tmp...)
 
-	bf, _ := per.EncLengthDeterminant(len(v), 0)
+	bf, _ := per.EncLengthDeterminant(len(v), 0, 0)
 
 	pdu = append(pdu, bf.Value...)
 	pdu = append(pdu, v...)
@@ -290,7 +290,7 @@ func (gnb *GNB) encPDUSessionResourceSetupListSURes() (v []byte) {
 	v = append(v, bf.Value...)
 	v = append(v, tmp...)
 
-	bf, _ = per.EncLengthDeterminant(len(v), 0)
+	bf, _ = per.EncLengthDeterminant(len(v), 0, 0)
 	head = append(head, bf.Value...)
 	v = append(head, v...)
 
@@ -325,7 +325,7 @@ func (gnb *GNB) MakeInitialContextSetupResponse() (pdu []byte) {
 	tmp = gnb.encRANUENGAPID()
 	v = append(v, tmp...)
 
-	bf, _ := per.EncLengthDeterminant(len(v), 0)
+	bf, _ := per.EncLengthDeterminant(len(v), 0, 0)
 
 	pdu = append(pdu, bf.Value...)
 	pdu = append(pdu, v...)
@@ -373,7 +373,7 @@ func (gnb *GNB) MakeInitialUEMessage() (pdu []byte) {
 	tmp, _ = gnb.encUEContextRequest()
 	v = append(v, tmp...)
 
-	bf, _ := per.EncLengthDeterminant(len(v), 0)
+	bf, _ := per.EncLengthDeterminant(len(v), 0, 0)
 
 	pdu = append(pdu, bf.Value...)
 	pdu = append(pdu, v...)
@@ -437,7 +437,7 @@ func (gnb *GNB) MakeUplinkNASTransport() (pdu []byte) {
 	tmp, _ = gnb.encUserLocationInformation()
 	v = append(v, tmp...)
 
-	bf, _ := per.EncLengthDeterminant(len(v), 0)
+	bf, _ := per.EncLengthDeterminant(len(v), 0, 0)
 
 	pdu = append(pdu, bf.Value...)
 	pdu = append(pdu, v...)
@@ -476,7 +476,7 @@ func (gnb *GNB) MakeNGSetupRequest() (pdu []byte) {
 	tmp, _ = gnb.encPagingDRX(gnb.PagingDRX)
 	v = append(v, tmp...)
 
-	bf, _ := per.EncLengthDeterminant(len(v), 0)
+	bf, _ := per.EncLengthDeterminant(len(v), 0, 0)
 
 	pdu = append(pdu, bf.Value...)
 	pdu = append(pdu, v...)
@@ -659,6 +659,7 @@ func (gnb *GNB) decProtocolIE(pdu *[]byte) (err error) {
 		gnb.decUPTransportLayerInformation(pdu, length)
 	default:
 		dump := readPduByteSlice(pdu, length)
+		// gnb.DecodeError = fmt.Errorf("ngap: docoding id(%d) not supported yet.", id)
 		gnb.dprint("decoding id(%d) not supported yet.", id)
 		gnb.dprint("dump: %02x", dump)
 	}
@@ -693,7 +694,7 @@ func (gnb *GNB) encGlobalRANNodeID(id *GlobalGNBID) (v []byte, err error) {
 	pv := b.Value
 	pv = append(pv, v2...)
 
-	bf, _ := per.EncLengthDeterminant(len(pv), 0)
+	bf, _ := per.EncLengthDeterminant(len(pv), 0, 0)
 	head = append(head, bf.Value...)
 	v = append(head, pv...)
 
@@ -739,17 +740,21 @@ const (
 
 func encGNBID(gnbid uint32) (v []byte) {
 
+	const min = minGNBIDSize
+	const max = maxGNBIDSize
+	const extmark = false
+
 	bitlen := bits.Len32(gnbid)
-	if bitlen < minGNBIDSize {
-		bitlen = minGNBIDSize
+	if bitlen < min {
+		bitlen = min
 	}
 
 	b, _, _ := per.EncChoice(0, 0, 1, false)
 
 	tmp := make([]byte, 4)
 	binary.BigEndian.PutUint32(tmp, gnbid)
-	pre, cont, _ := per.EncBitString(tmp, bitlen,
-		minGNBIDSize, maxGNBIDSize, false)
+
+	pre, cont, _ := per.EncBitString(tmp, bitlen, min, max, extmark)
 
 	b = per.MergeBitField(b, pre)
 	v = append(b.Value, cont...)
@@ -873,7 +878,7 @@ func (gnb *GNB) encUserLocationInformation() (v []byte, err error) {
 	pv := b.Value
 	pv = append(pv, v...)
 
-	bf, _ := per.EncLengthDeterminant(len(pv), 0)
+	bf, _ := per.EncLengthDeterminant(len(pv), 0, 0)
 	head = append(head, bf.Value...)
 	v = append(head, pv...)
 
@@ -957,7 +962,7 @@ func (gnb *GNB) encPagingDRX(drx string) (v []byte, err error) {
 
 	b, _, _ := per.EncEnumerated(n, 0, 3, true)
 	v = b.Value
-	bf, _ := per.EncLengthDeterminant(len(v), 0)
+	bf, _ := per.EncLengthDeterminant(len(v), 0, 0)
 	head = append(head, bf.Value...)
 	v = append(head, v...)
 
@@ -985,12 +990,10 @@ func (gnb *GNB) encUPTransportLayerInformation(pre *per.BitField) (pdu []byte) {
 	if pre != nil { // has inherited preamble
 		bf = per.MergeBitField(*pre, bf)
 	}
-	fmt.Printf("bitfield-3: %v\n", bf)
 	*pre = bf
 
 	bf, _ = per.EncSequence(true, 1, 0)
 	bf = per.MergeBitField(*pre, bf)
-	fmt.Printf("bitfield-4: %v\n", bf)
 	*pre = bf
 
 	tmp := gnb.encTransportLayerAddress(pre)
@@ -1038,11 +1041,9 @@ func (gnb *GNB) encTransportLayerAddress(pre *per.BitField) (pdu []byte) {
 	bitlen := net.IPv4len * 8
 	bf, v, _ := per.EncBitString(ipv4addr, bitlen, min, max, extmark)
 
-	fmt.Printf("  bitfield-4: %v\n", bf)
 	if pre != nil { // has inherited preamble
 		bf = per.MergeBitField(*pre, bf)
 	}
-	fmt.Printf("bitfield-5: %v\n", bf)
 	pdu = append(bf.Value, v...)
 
 	return
@@ -1113,11 +1114,10 @@ func (gnb *GNB) encQosFlowPerTNLInformation(pre *per.BitField) (pdu []byte) {
 	if pre != nil { // has inherited preamble
 		bf = per.MergeBitField(*pre, bf)
 	}
-	fmt.Printf("bitfield-2: %v\n", bf)
 	pre = &bf
 
 	tmp := gnb.encUPTransportLayerInformation(pre)
-	pdu = append(pre.Value, tmp...)
+	pdu = append(pdu, tmp...)
 
 	tmp = gnb.encAssociatedQosFlowList()
 	pdu = append(pdu, tmp...)
@@ -1423,7 +1423,7 @@ func (gnb *GNB) encRRCEstablishmentCause(cause uint) (v []byte, err error) {
 	b, _, _ := per.EncEnumerated(cause, 0, 14, true)
 	v = b.Value
 
-	bf, _ := per.EncLengthDeterminant(len(v), 0)
+	bf, _ := per.EncLengthDeterminant(len(v), 0, 0)
 	head = append(head, bf.Value...)
 	v = append(head, v...)
 	return
@@ -1437,7 +1437,7 @@ func (gnb *GNB) encAMFUENGAPID() (v []byte) {
 	head, _ := encProtocolIE(idAMFUENGAPID, reject)
 	v = gnb.recv.AMFUENGAPID
 
-	bf, _ := per.EncLengthDeterminant(len(v), 0)
+	bf, _ := per.EncLengthDeterminant(len(v), 0, 0)
 	head = append(head, bf.Value...)
 	v = append(head, v...)
 	return
@@ -1458,7 +1458,7 @@ func (gnb *GNB) encRANUENGAPID() (v []byte) {
 	head, _ := encProtocolIE(idRANUENGAPID, reject)
 
 	_, v, _ = per.EncInteger(int64(gnb.RANUENGAPID), 0, 4294967295, false)
-	bf, _ := per.EncLengthDeterminant(len(v), 0)
+	bf, _ := per.EncLengthDeterminant(len(v), 0, 0)
 	head = append(head, bf.Value...)
 	v = append(head, v...)
 	return
@@ -1480,7 +1480,7 @@ func (gnb *GNB) encNASPDU() (v []byte) {
 	pre, v, _ := per.EncOctetString(pdu, 0, 0, false)
 	v = append(pre.Value, v...)
 
-	bf, _ := per.EncLengthDeterminant(len(v), 0)
+	bf, _ := per.EncLengthDeterminant(len(v), 0, 0)
 	head = append(head, bf.Value...)
 	v = append(head, v...)
 	gnb.RecvNasMsg = nil
@@ -1491,7 +1491,6 @@ func (gnb *GNB) encNASPDU() (v []byte) {
 func (gnb *GNB) decNASPDU(pdu *[]byte) (err error) {
 
 	length := int(readPduByte(pdu))
-	fmt.Printf("NAS PDU Length: %d\n", length)
 	naspdu := readPduByteSlice(pdu, length)
 	gnb.SendtoUE(&naspdu)
 
@@ -1578,7 +1577,6 @@ PDUSessionResourceSetupResponseTransfer ::= SEQUENCE {
 func (gnb *GNB) encPDUSessionResourceSetupResponseTransfer() (pdu []byte) {
 
 	bf, _ := per.EncSequence(true, 4, 0)
-	fmt.Printf("bitfield-1: %v\n", bf)
 	pre := &bf
 	pdu = gnb.encQosFlowPerTNLInformation(pre)
 
@@ -1651,7 +1649,7 @@ func (gnb *GNB) encSupportedTAList(p *[]SupportedTA) (v []byte, err error) {
 		v = append(v, gnb.encSupportedTAItem(&item)...)
 	}
 
-	bf, _ := per.EncLengthDeterminant(len(v), 0)
+	bf, _ := per.EncLengthDeterminant(len(v), 0, 0)
 	head = append(head, bf.Value...)
 	v = append(head, v...)
 
@@ -1691,7 +1689,7 @@ func (gnb *GNB) encUEContextRequest() (v []byte, err error) {
 	b, _, _ := per.EncEnumerated(0, 0, 0, true)
 	v = b.Value
 
-	bf, _ := per.EncLengthDeterminant(len(v), 0)
+	bf, _ := per.EncLengthDeterminant(len(v), 0, 0)
 	head = append(head, bf.Value...)
 	v = append(head, v...)
 	return
