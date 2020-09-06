@@ -174,6 +174,8 @@ func main() {
 	t.sendtoAMF(buf)
 	t.recvfromAMF()
 
+	buf = t.gnb.MakePDUSessionResourceSetupResponse()
+	t.sendtoAMF(buf)
 	time.Sleep(time.Second * 5)
 
 	return

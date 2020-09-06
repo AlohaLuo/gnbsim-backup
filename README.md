@@ -1,5 +1,5 @@
 # gnbsim
-gnbsim is a 5G SA gNB/UE (Release 16) simulator for testing 5GC system. The project is aimed to understand 5GC system more efficiently than just reading 3GPP standard documents.
+gnbsim is a 5G SA gNB/UE (Rel. 16) simulator for testing 5G System. The project is aimed to understand 5GC more efficiently than just reading 3GPP standard documents.
 
 ## Getting Started
 <!--
@@ -21,28 +21,30 @@ These instructions will get you a copy of the project up and running on your loc
 
 * Download the related files.
 
-```shell
+```
 $ git clone https://github.com/hhorai/gnbsim.git
 $ cd gnbsim
 ```
 
 * Build example binary.
 
-```shell
+```
 $ make test		# test for each libary.
 $ make			# building example binary.
 ```
 
-* Edit the configuration file. In case of free5gc with default configuration, it might not be needed to edit, excluding 'msin' parameter.
+* Edit the configuration file.
+  - `msin` for the registered value in free5gc web console.
+  - `GTPuAddr` for the address of gnbsim.
 
-```shell
+```
 $ cd example
 $ vi example.json
 ```
 
 * run 'example' with 'ip' option and specify the AMF ip address.
 
-```shell
+```
 $ ./example -ip <AMF NGAP listen ip address set above>
 ```
 
@@ -52,6 +54,12 @@ $ ./example -ip <AMF NGAP listen ip address set above>
 ```
 
 * And you could also find your UE in 'subscriber' page of free5gc web console. In my environment, free5gc dashboard doesn't show my UE, but the actual transfered packet that is respond from web conole includes the information (PLMN and IMSI) of it in json format.
+
+### Progress
+* [done] Initial Registration
+* [in progress] PDU Session Establishment
+  - gnbsim can respond 'PDU Session Resource Setup Response' to AMF.
+  - user plane functionalities are developed in progress.
 
 <!--
 ## Running the tests
