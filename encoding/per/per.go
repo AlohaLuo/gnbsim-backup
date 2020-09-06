@@ -133,12 +133,38 @@ func EncConstrainedWholeNumber(input, min, max int64) (bf BitField, err error) {
 	return
 }
 
+func encConstrainedWholeNumberWithExtmark(input, min, max int64, extmark bool) (
+	bf BitField, v []byte, err error) {
+
+	bf, err = EncConstrainedWholeNumber(input, min, max)
+	if err != nil {
+		return
+	}
+
+	// octet aligned
+	if bf.Len == 0 {
+		v = bf.Value
+		bf.Value = []byte{}
+	}
+
+	if extmark == true {
+		if bf.Len%8 == 0 {
+			bf.Value = append([]byte{0x00}, bf.Value...)
+		}
+		bf.Len++
+	}
+	bf = ShiftLeftMost(bf)
+
+	return
+}
+
 // EncLengthDeterminant is the implementation for
 // 11.9 General rules for encoding a length determinant
-func EncLengthDeterminant(input, max int) (bf BitField, err error) {
+func EncLengthDeterminant(input, min, max int) (bf BitField, err error) {
 
 	if max != 0 && max < 65536 {
-		bf, err = EncConstrainedWholeNumber(int64(input), 0, int64(max))
+		bf, err = EncConstrainedWholeNumber(
+			int64(input), int64(min), int64(max))
 		return
 	}
 
@@ -179,18 +205,14 @@ func DecLengthDeterminant(pdu *[]byte, max int) (length int, err error) {
 	return
 }
 
-func encConstrainedWholeNumberWithExtmark(input, min, max int64, extmark bool) (
+func encLengthWithExtmark(inlen, min, max int, extmark bool) (
 	bf BitField, v []byte, err error) {
 
-	bf, err = EncConstrainedWholeNumber(input, min, max)
-	if err != nil {
-		return
-	}
-
-	// octet aligned
+	bf, err = EncLengthDeterminant(inlen, min, max)
 	if bf.Len == 0 {
 		v = bf.Value
 		bf.Value = []byte{}
+		bf.Len = 0
 	}
 
 	if extmark == true {
@@ -199,6 +221,7 @@ func encConstrainedWholeNumberWithExtmark(input, min, max int64, extmark bool) (
 		}
 		bf.Len++
 	}
+
 	bf = ShiftLeftMost(bf)
 
 	return
@@ -282,9 +305,7 @@ func EncBitString(input []byte, inputlen, min, max int, extmark bool) (
 		return
 	}
 
-	// range is constrained whole number.
-	bf, v2, err := encConstrainedWholeNumberWithExtmark(int64(inputlen),
-		int64(min), int64(max), extmark)
+	bf, v2, err := encLengthWithExtmark(inputlen, min, max, extmark)
 	v = append(v2, v...)
 
 	return
@@ -298,7 +319,7 @@ func EncBitString(input []byte, inputlen, min, max int, extmark bool) (
 //   fixed length and the lenght is less than 3. And then the octet string is
 //   encoded as bit field.
 func EncOctetString(input []byte, min, max int, extmark bool) (
-	pre BitField, v []byte, err error) {
+	bf BitField, v []byte, err error) {
 
 	inputlen := len(input)
 	if max != 0 && (inputlen < min || inputlen > max) {
@@ -308,41 +329,31 @@ func EncOctetString(input []byte, min, max int, extmark bool) (
 		return
 	}
 
+	// fixed length case
 	if min == max && min != 0 {
 		switch {
-		case min < 3:
-			pre.Value = input
-			pre.Len = inputlen * 8
+		case min < 3: // not octet aligned
+			bf.Value = input
+			bf.Len = inputlen * 8
 			if extmark == true {
-				pre.Value = append([]byte{0x00}, pre.Value...)
-				pre.Len++
+				bf.Value = append([]byte{0x00}, bf.Value...)
+				bf.Len++
 			}
-			pre = ShiftLeftMost(pre)
+			bf = ShiftLeftMost(bf)
 		case min < 65537:
 			v = input
 			if extmark == true {
-				pre.Value = []byte{0x00}
-				pre.Len = 1
-				pre = ShiftLeftMost(pre)
+				bf.Value = []byte{0x00}
+				bf.Len = 1
+				bf = ShiftLeftMost(bf)
 			}
 		}
 		return
 	}
 
 	v = input
-	if max == 0 {
-		// infinite upper bound case.
-		pre, err = EncLengthDeterminant(inputlen, max)
-		if pre.Len == 0 {
-			v = append(pre.Value, v...)
-			pre.Value = []byte{}
-		}
-		return
-	}
 
-	// lower bound and upper bound are specified.
-	pre, v2, err := encConstrainedWholeNumberWithExtmark(int64(inputlen),
-		int64(min), int64(max), extmark)
+	bf, v2, err := encLengthWithExtmark(inputlen, min, max, extmark)
 	v = append(v2, v...)
 
 	return

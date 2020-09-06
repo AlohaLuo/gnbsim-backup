@@ -125,23 +125,24 @@ func TestEncLengthDeterminant(t *testing.T) {
 
 	pattern := []struct {
 		in   int
+		min  int
 		max  int
 		ebf  BitField
 		eerr bool
 	}{
-		{1, 255,
+		{1, 0, 255,
 			BitField{[]byte{1}, 0}, false},
-		{1, 0,
+		{1, 0, 0,
 			BitField{[]byte{1}, 0}, false},
-		{16383, 0,
+		{16383, 0, 0,
 			BitField{[]byte{0xbf, 0xff}, 0}, false},
-		{16384, 0,
+		{16384, 0, 0,
 			BitField{[]byte{}, 0}, true},
 	}
 
 	for _, p := range pattern {
 
-		bf, err := EncLengthDeterminant(p.in, p.max)
+		bf, err := EncLengthDeterminant(p.in, p.min, p.max)
 
 		ebf := p.ebf
 		eerr := p.eerr
@@ -312,6 +313,10 @@ func TestBitString(t *testing.T) {
 			BitField{[]byte{0x10}, 4}, []byte{0, 0, 0x04}, false},
 		{[]byte{0, 0, 0, 0x03}, 25, 22, 32, false,
 			BitField{[]byte{0x30}, 4}, []byte{0, 0, 0x01, 0x80}, false},
+		{[]byte{0, 0, 0, 0x03}, 25, 22, 32, true,
+			BitField{[]byte{0x18}, 5}, []byte{0, 0, 0x01, 0x80}, false},
+		{[]byte{0, 0, 0, 0x03}, 25, 0, 128, true,
+			BitField{[]byte{0x0c, 0x80}, 9}, []byte{0, 0, 0x01, 0x80}, false},
 	}
 
 	for _, p := range pattern {
