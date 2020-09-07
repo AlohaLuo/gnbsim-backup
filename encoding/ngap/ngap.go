@@ -1086,7 +1086,6 @@ func (gnb *GNB) encGTPTEID() (pdu []byte) {
 	// 999 for now, should be a random value.
 	binary.BigEndian.PutUint32(teid, 999)
 	_, pdu, _ = per.EncOctetString(teid, min, max, extmark)
-	gnb.dprint("enc GTPTEID: %v", pdu)
 
 	return
 }
@@ -1255,7 +1254,6 @@ PDUSessionID ::= INTEGER (0..255)
 */
 func (gnb *GNB) encPDUSessionID() (pdu []byte) {
 	_, pdu, _ = per.EncInteger(int64(gnb.recv.PDUSessionID), 0, 255, false)
-	gnb.dprint("encPDUSessionID: pdu: %v", pdu)
 	return
 }
 
@@ -1357,10 +1355,7 @@ func (gnb *GNB) encAssociatedQosFlowList() (pdu []byte) {
 	const extmark = true
 
 	bf, _, _ := per.EncSequenceOf(1, min, max, extmark)
-	gnb.dprint("encAssociatedQosFlowList bitfield: %v", bf)
-
 	pdu = gnb.encAssociatedQosFlowItem(&bf)
-	// need QosFlowSetupRequestList decoder.
 
 	return
 }
