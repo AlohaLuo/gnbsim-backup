@@ -899,7 +899,7 @@ func (ue *UE) decSNSSAI(iei bool, pdu *[]byte) (snssai SNSSAI) {
 	case 4, 5, 8:
 		snssai.SD = hex.EncodeToString((*pdu)[:3])
 		*pdu = (*pdu)[3:]
-		ue.dprinti("SD: 0x%x", snssai.SD)
+		ue.dprinti("SD: 0x%s", snssai.SD)
 	}
 
 	switch length {
@@ -912,7 +912,7 @@ func (ue *UE) decSNSSAI(iei bool, pdu *[]byte) (snssai SNSSAI) {
 	if length == 8 {
 		snssai.mappedsd = hex.EncodeToString((*pdu)[:3])
 		*pdu = (*pdu)[3:]
-		ue.dprinti("Mapped HPLMN SD: 0x%x", snssai.mappedsd)
+		ue.dprinti("Mapped HPLMN SD: 0x%s", snssai.mappedsd)
 	}
 	ue.indent--
 
