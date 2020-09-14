@@ -15,3 +15,4 @@ cover:
 
 clean:
 	rm -f go.sum cover.html
+	git checkout go.mod

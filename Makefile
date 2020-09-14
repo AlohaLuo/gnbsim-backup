@@ -12,3 +12,8 @@ cover:
 	make -C encoding/per cover
 	make -C encoding/ngap cover
 	make -C encoding/nas cover
+
+clean:
+	make -C encoding/per clean
+	make -C encoding/ngap clean
+	make -C encoding/nas clean
