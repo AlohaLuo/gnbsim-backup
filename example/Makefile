@@ -7,5 +7,5 @@ update:
 	go get -u
 
 clean:
-	rm -f example
+	rm -f example go.sum
 	git checkout go.mod
