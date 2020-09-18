@@ -105,8 +105,8 @@ func TestMakeSecurityModeComplete(t *testing.T) {
 	receive(ue, TestSecurityModeCommand)
 
 	for i, p := range pattern {
-		ue.recv.flag.imeisv = p.imeisv
-		ue.recv.flag.rinmr = p.rinmr
+		ue.Recv.flag.imeisv = p.imeisv
+		ue.Recv.flag.rinmr = p.rinmr
 		ue.wa.forceRINMR = p.forceRINMR
 		v = ue.MakeSecurityModeComplete()
 		expect_str := TestSecurityModeComplete[i]

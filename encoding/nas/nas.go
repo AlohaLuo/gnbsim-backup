@@ -46,7 +46,7 @@ type UE struct {
 		procedureTransactionId uint8
 	}
 
-	recv struct {
+	Recv struct {
 		flag struct {
 			imeisv bool
 			rinmr  bool
@@ -57,6 +57,7 @@ type UE struct {
 		allowedNSSAI []SNSSAI
 		t3502        int
 		t3512        int
+		PDUAddress	net.IP
 	}
 
 	NasCount uint32
@@ -224,7 +225,7 @@ func (ue *UE) PowerON() {
 	ue.dbgLevel = 0
 
 	ue.state5GMM = state5GMMDeregistared
-	ue.recv.state = rcvdNull
+	ue.Recv.state = rcvdNull
 
 	ue.wa.forceRINMR = true
 }
@@ -236,9 +237,9 @@ func (ue *UE) Receive(pdu *[]byte) {
 
 func (ue *UE) MakeNasPdu() (pdu []byte) {
 
-	ue.dprint("MakeNasPdu: called in %s", rcvdStateStr[ue.recv.state])
+	ue.dprint("MakeNasPdu: called in %s", rcvdStateStr[ue.Recv.state])
 
-	switch ue.recv.state {
+	switch ue.Recv.state {
 	case rcvdNull:
 	case rcvdAuthenticationRequest:
 		pdu = ue.MakeAuthenticationResponse()
@@ -482,7 +483,7 @@ func (ue *UE) decAuthenticationRequest(pdu *[]byte) {
 	ue.dprint("received and calculated MAC values match.")
 	ue.indent = orig
 
-	ue.recv.state = rcvdAuthenticationRequest
+	ue.Recv.state = rcvdAuthenticationRequest
 
 	return
 }
@@ -547,7 +548,7 @@ func (ue *UE) decRegistrationAccept(pdu *[]byte) {
 	ue.decInformationElement(pdu, ieStrRegAcc)
 	ue.indent--
 
-	ue.recv.state = rcvdRegistrationAccept
+	ue.Recv.state = rcvdRegistrationAccept
 
 	return
 }
@@ -648,7 +649,7 @@ func (ue *UE) decSecurityModeCommand(pdu *[]byte) {
 	ue.decInformationElement(pdu, ieStrSecModeCmd)
 	ue.indent--
 
-	ue.recv.state = rcvdSecurityModeCommand
+	ue.Recv.state = rcvdSecurityModeCommand
 
 	return
 }
@@ -660,15 +661,15 @@ func (ue *UE) MakeSecurityModeComplete() (pdu []byte) {
 		SecurityHeaderTypePlain,
 		MessageTypeSecurityModeComplete)
 
-	if ue.recv.flag.imeisv {
+	if ue.Recv.flag.imeisv {
 		pdu = append(pdu, ue.enc5GSMobileID(true, TypeIDIMEISV)...)
-		ue.recv.flag.imeisv = false
+		ue.Recv.flag.imeisv = false
 	}
 
-	if ue.recv.flag.rinmr || ue.wa.forceRINMR {
+	if ue.Recv.flag.rinmr || ue.wa.forceRINMR {
 		pdu = append(pdu,
 			ue.encNASMessageContainer(true, MessageTypeRegistrationRequest)...)
-		ue.recv.flag.rinmr = false
+		ue.Recv.flag.rinmr = false
 	}
 
 	head := ue.enc5GSecurityProtectedMessageHeader(
@@ -833,9 +834,9 @@ func (ue *UE) decGPRSTimer2(pdu *[]byte) {
 		multiple = 0 // deactivated
 	}
 
-	ue.recv.t3502 = (tmp & 0x1f) * multiple
+	ue.Recv.t3502 = (tmp & 0x1f) * multiple
 	*pdu = (*pdu)[2:]
-	ue.dprinti("GPRS timer 2: %d sec", ue.recv.t3502)
+	ue.dprinti("GPRS timer 2: %d sec", ue.Recv.t3502)
 
 	return
 }
@@ -864,9 +865,9 @@ func (ue *UE) decGPRSTimer3(pdu *[]byte) {
 		multiple = 0 // deactivated
 	}
 
-	ue.recv.t3512 = (tmp & 0x1f) * multiple
+	ue.Recv.t3512 = (tmp & 0x1f) * multiple
 	*pdu = (*pdu)[2:]
-	ue.dprinti("GPRS timer 3: %d sec", ue.recv.t3512)
+	ue.dprinti("GPRS timer 3: %d sec", ue.Recv.t3512)
 	return
 }
 
@@ -1140,8 +1141,8 @@ func (ue *UE) dec5GSMobileID(pdu *[]byte) {
 }
 
 func (ue *UE) dec5GSMobileIDType5GGUTI(pdu []byte) {
-	ue.recv.fiveGGUTI = pdu
-	ue.dprinti("5G-GUTI: %x", ue.recv.fiveGGUTI)
+	ue.Recv.fiveGGUTI = pdu
+	ue.dprinti("5G-GUTI: %x", ue.Recv.fiveGGUTI)
 	return
 }
 
@@ -1247,7 +1248,7 @@ func (ue *UE) decTAIListType00(pdu *[]byte, num int) {
 	for num > 0 {
 		tac := (*pdu)[:tacSize]
 		*pdu = (*pdu)[tacSize:]
-		ue.recv.tai = append(ue.recv.tai, TAI{mcc, mnc, tac})
+		ue.Recv.tai = append(ue.Recv.tai, TAI{mcc, mnc, tac})
 		ue.dprinti("tac: 0x%x", tac)
 		num--
 	}
@@ -1293,11 +1294,11 @@ func (ue *UE) decAdditional5GSecInfo(pdu *[]byte) {
 	}
 	ue.dprinti("KAMF derivation is %srequired", not)
 
-	ue.recv.flag.rinmr = true
+	ue.Recv.flag.rinmr = true
 	not = ""
 	if val&0x02 == 0x00 {
 		not = "not "
-		ue.recv.flag.rinmr = false
+		ue.Recv.flag.rinmr = false
 	}
 	ue.dprinti("Retransmission of the initial NAS message %srequested", not)
 
@@ -1383,7 +1384,7 @@ func (ue *UE) decIMEISVRequest(pdu *[]byte) {
 	val := int((*pdu)[0])
 	ue.dprinti("value: 0x%x", val)
 	if val&0x01 != 0 {
-		ue.recv.flag.imeisv = true
+		ue.Recv.flag.imeisv = true
 	}
 	*pdu = (*pdu)[1:]
 	return
@@ -1446,7 +1447,7 @@ func (ue *UE) decNSSAI(pdu *[]byte) {
 	for length > 0 {
 		lenBefore := len(*pdu)
 		snssai := ue.decSNSSAI(false, pdu)
-		ue.recv.allowedNSSAI = append(ue.recv.allowedNSSAI, snssai)
+		ue.Recv.allowedNSSAI = append(ue.Recv.allowedNSSAI, snssai)
 
 		lenAfter := len(*pdu)
 		length -= lenBefore - lenAfter
@@ -1594,11 +1595,10 @@ func (ue *UE) decPDUAddress(pdu *[]byte) {
 	ue.dprinti("PDU session type: %s(%d)",
 		pduSessionTypeStr[pduSessionType], pduSessionType)
 
-	var ueAddress net.IP
 	switch pduSessionType {
 	case PDUSessionIPv4:
-		ueAddress = readPduByteSlice(pdu, net.IPv4len)
-		ue.dprinti("PDU address information: %v", ueAddress)
+		ue.Recv.PDUAddress = readPduByteSlice(pdu, net.IPv4len)
+		ue.dprinti("PDU address information: %v", ue.Recv.PDUAddress)
 	default:
 		ue.dprinti("unsupported PDU session type: %d", pduSessionType)
 	}
