@@ -94,11 +94,13 @@ type GNB struct {
 	UE              nas.UE
 	ULInfoNR        UserLocationInformationNR
 	GTPuAddr        string
+	GTPuIFname      string
 
-	recv struct {
+	Recv struct {
 		AMFUENGAPID  []byte
 		PDUSessionID uint8
 		QosFlowID    uint8
+		GTPuPeerAddr net.IP
 	}
 
 	SendNasMsg *[]byte
@@ -1068,6 +1070,7 @@ func (gnb *GNB) decTransportLayerAddress(tla *per.BitField) {
 	octLen := int((length-1)/8 + 1)
 	addr = readPduByteSlice(&tla.Value, octLen)
 	gnb.dprinti("address: %v", addr)
+	gnb.Recv.GTPuPeerAddr = addr
 
 	return
 }
@@ -1253,14 +1256,14 @@ func (gnb *GNB) decSNSSAI(pdu *[]byte) {
 PDUSessionID ::= INTEGER (0..255)
 */
 func (gnb *GNB) encPDUSessionID() (pdu []byte) {
-	_, pdu, _ = per.EncInteger(int64(gnb.recv.PDUSessionID), 0, 255, false)
+	_, pdu, _ = per.EncInteger(int64(gnb.Recv.PDUSessionID), 0, 255, false)
 	return
 }
 
 func (gnb *GNB) decPDUSessionID(pdu *[]byte) (val int) {
 	val = int(readPduByte(pdu))
 	gnb.dprinti("PDU Session ID: %d", val)
-	gnb.recv.PDUSessionID = uint8(val)
+	gnb.Recv.PDUSessionID = uint8(val)
 	return
 }
 
@@ -1272,7 +1275,7 @@ func (gnb *GNB) encQosFlowIdentifier() (pdu []byte) {
 	const min = 0
 	const max = 63
 	const extmark = true
-	bf, _, _ := per.EncInteger(int64(gnb.recv.QosFlowID), min, max, extmark)
+	bf, _, _ := per.EncInteger(int64(gnb.Recv.QosFlowID), min, max, extmark)
 	pdu = bf.Value
 
 	return
@@ -1288,7 +1291,7 @@ func (gnb *GNB) decQosFlowIdentifier(item *per.BitField) {
 	id >>= 1
 	item.Len -= 7
 	gnb.dprinti("Qos Flow Identifier: %d", id)
-	gnb.recv.QosFlowID = id
+	gnb.Recv.QosFlowID = id
 	return
 }
 
@@ -1430,7 +1433,7 @@ AMF-UE-NGAP-ID ::= INTEGER (0..1099511627775) // 20^40 -1
 */
 func (gnb *GNB) encAMFUENGAPID() (v []byte) {
 	head, _ := encProtocolIE(idAMFUENGAPID, reject)
-	v = gnb.recv.AMFUENGAPID
+	v = gnb.Recv.AMFUENGAPID
 
 	bf, _ := per.EncLengthDeterminant(len(v), 0, 0)
 	head = append(head, bf.Value...)
@@ -1440,7 +1443,7 @@ func (gnb *GNB) encAMFUENGAPID() (v []byte) {
 
 func (gnb *GNB) decAMFUENGAPID(pdu *[]byte, length int) {
 	// just storing the received value for now.
-	gnb.recv.AMFUENGAPID = readPduByteSlice(pdu, length)
+	gnb.Recv.AMFUENGAPID = readPduByteSlice(pdu, length)
 	return
 }
 
