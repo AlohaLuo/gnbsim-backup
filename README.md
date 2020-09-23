@@ -9,9 +9,9 @@ These instructions will get you a copy of the project up and running on your loc
 ### Prerequisites
 
 * golang environment on linux host.
-  - gnbsim can complete 'Initial Registration'.
-  - gnbsim cannot complete 'PDU Session Establishment' for now.
-  - I will try to update my code step by step...
+  - root previledge is required to set an IP address which is dynamically assigned by SMF.
+  - GTP kernel module capability is required for using [go-gtp](https://github.com/wmnsk/go-gtp)
+    - If you would like to use 'Raspberry Pi' to run gnbsim, Kernel Compiling is required for activating GTP kernel module (gtp.ko).
 
 * running free5gc somewhere.
   - subscriber has been registered by free5gc web console.
@@ -35,14 +35,14 @@ $ make			# building example binary.
 
 * Edit the configuration file.
   - `msin` for the registered value in free5gc web console.
-  - `GTPuAddr` for the address of gnbsim.
+  - `GTPuAddr` for the IP address of gnbsim.
 
 ```
 $ cd example
 $ vi example.json
 ```
 
-* run 'example' with 'ip' option and specify the AMF ip address.
+* run 'example' with 'ip' option and specify the AMF IP address.
 
 ```
 $ ./example -ip <AMF NGAP listen ip address set above>
@@ -55,11 +55,11 @@ $ ./example -ip <AMF NGAP listen ip address set above>
 
 * And you could also find your UE in 'subscriber' page of free5gc web console. In my environment, free5gc dashboard doesn't show my UE, but the actual transfered packet that is respond from web conole includes the information (PLMN and IMSI) of it in json format.
 
-### Progress
+## Progress
 * [done] Initial Registration
 * [in progress] PDU Session Establishment
   - gnbsim can respond 'PDU Session Resource Setup Response' to AMF.
-  - user plane functionalities are developed in progress.
+  - User plane functionalities are developed in progress.
 
 <!--
 ## Running the tests
