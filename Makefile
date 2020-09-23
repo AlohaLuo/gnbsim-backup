@@ -17,3 +17,4 @@ clean:
 	make -C encoding/per clean
 	make -C encoding/ngap clean
 	make -C encoding/nas clean
+	make -C example clean
