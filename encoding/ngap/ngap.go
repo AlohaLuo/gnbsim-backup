@@ -106,16 +106,13 @@ type GNB struct {
 	SendNasMsg *[]byte
 	RecvNasMsg *[]byte
 
+	DecodeError error
+
 	dbgLevel int
 	indent   int // indent for debug print.
-
-	DecodeError error
 }
 
 func NewNGAP(filename string) (p *GNB) {
-
-	log.SetPrefix("[ngap]")
-	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
 
 	bytes, err := ioutil.ReadFile(filename)
 	if err != nil {
