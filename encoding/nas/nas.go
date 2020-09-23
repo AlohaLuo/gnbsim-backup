@@ -57,7 +57,7 @@ type UE struct {
 		allowedNSSAI []SNSSAI
 		t3502        int
 		t3512        int
-		PDUAddress	net.IP
+		PDUAddress   net.IP
 	}
 
 	NasCount uint32
