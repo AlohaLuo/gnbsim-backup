@@ -18,6 +18,7 @@ import (
 	"io/ioutil"
 	"log"
 	"math/bits"
+	"math/rand"
 	"net"
 	"strconv"
 	"strings"
@@ -95,12 +96,14 @@ type GNB struct {
 	ULInfoNR        UserLocationInformationNR
 	GTPuAddr        string
 	GTPuIFname      string
+	GTPuTEID        uint32
 
 	Recv struct {
 		AMFUENGAPID  []byte
 		PDUSessionID uint8
 		QosFlowID    uint8
 		GTPuPeerAddr net.IP
+		GTPuPeerTEID uint32
 	}
 
 	SendNasMsg *[]byte
@@ -1084,7 +1087,10 @@ func (gnb *GNB) encGTPTEID() (pdu []byte) {
 
 	teid := make([]byte, 4)
 	// 999 for now, should be a random value.
-	binary.BigEndian.PutUint32(teid, 999)
+	if gnb.GTPuTEID == 0 {
+		gnb.GTPuTEID = rand.Uint32()
+	}
+	binary.BigEndian.PutUint32(teid, gnb.GTPuTEID)
 	_, pdu, _ = per.EncOctetString(teid, min, max, extmark)
 
 	return
@@ -1094,6 +1100,7 @@ func (gnb *GNB) decGTPTEID(pdu *[]byte) {
 
 	id := readPduUint32(pdu)
 	gnb.dprint("GTP TEID: %d", id)
+	gnb.Recv.GTPuPeerTEID = id
 
 	return
 }
