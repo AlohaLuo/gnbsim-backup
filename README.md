@@ -15,7 +15,7 @@ These instructions will get you a copy of the project up and running on your loc
       ```
       find /lib/modules/`uname -r` -name gtp.ko
       ```
-      If you get someting like:
+      If you get something like:
       ```
       /lib/modules/5.4.0-42-generic/kernel/drivers/net/gtp.ko
       ```
