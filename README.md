@@ -11,6 +11,16 @@ These instructions will get you a copy of the project up and running on your loc
 * golang environment on linux host.
   - root previledge is required to set an IP address which is dynamically assigned by SMF.
   - GTP kernel module capability is required for using [go-gtp](https://github.com/wmnsk/go-gtp)
+    - To check if GTP kernel module is present in your system, try the following command
+      ```
+      find /lib/modules/`uname -r` -name gtp.ko
+      ```
+      If you get someting like:
+      ```
+      /lib/modules/5.4.0-42-generic/kernel/drivers/net/gtp.ko
+      ```
+      it means that the module is present in your system. You may also want to try `modinfo gtp`.
+      Otherwise, you need to install the GTP kernel module by following instructions here: https://osmocom.org/projects/openggsn/wiki/Kernel_GTP
     - If you would like to use 'Raspberry Pi' to run gnbsim, Kernel Compiling is required for activating GTP kernel module (gtp.ko).
 
 * running free5gc somewhere.
@@ -34,8 +44,10 @@ $ make			# building example binary.
 ```
 
 * Edit the configuration file.
-  - `msin` for the registered value in free5gc web console.
-  - `GTPuAddr` for the IP address of gnbsim.
+  - `imeisv` replace with the registered value of IMSI in free5gc web console (e.g. `208930000000003`)
+  - `msin` replace with last 10 digits of the IMSI (e.g. `0000000003`)
+  - `GTPuAddr` for the IP address of gnbsim
+  - `GTPuIFname` for the network interface of gnbsim
 
 ```
 $ cd example
