@@ -34,57 +34,59 @@ const (
 )
 
 const (
-	idAllowedNSSAI                     = 0
-	idAMFName                          = 1
-	idAMFUENGAPID                      = 10
-	idDefaultPagingDRX                 = 21
-	idGlobalRANNodeID                  = 27
-	idGUAMI                            = 28
-	idMaskedIMEISV                     = 34
-	idMobilityRestrictionList          = 36
-	idNASPDU                           = 38
-	idPDUSessionResourceSetupListSUReq = 74
-	idPDUSessionResourceSetupListSURes = 75
-	idPLMNSupportList                  = 80
-	idRANUENGAPID                      = 85
-	idRelativeAMFCapacity              = 86
-	idRRCEstablishmentCause            = 90
-	idSecurityKey                      = 94
-	idServedGUAMIList                  = 96
-	idSupportedTAList                  = 102
-	idUEContextRequest                 = 112
-	idUESecurityCapabilities           = 119
-	idUserLocationInformation          = 121
-	idPDUSessionType                   = 134
-	idQosFlowSetupRequestList          = 136
-	idULNGUUPTNLInformation            = 139
+	idAllowedNSSAI                      = 0
+	idAMFName                           = 1
+	idAMFUENGAPID                       = 10
+	idDefaultPagingDRX                  = 21
+	idGlobalRANNodeID                   = 27
+	idGUAMI                             = 28
+	idMaskedIMEISV                      = 34
+	idMobilityRestrictionList           = 36
+	idNASPDU                            = 38
+	idPDUSessionResourceSetupListCxtReq = 71
+	idPDUSessionResourceSetupListSUReq  = 74
+	idPDUSessionResourceSetupListSURes  = 75
+	idPLMNSupportList                   = 80
+	idRANUENGAPID                       = 85
+	idRelativeAMFCapacity               = 86
+	idRRCEstablishmentCause             = 90
+	idSecurityKey                       = 94
+	idServedGUAMIList                   = 96
+	idSupportedTAList                   = 102
+	idUEContextRequest                  = 112
+	idUESecurityCapabilities            = 119
+	idUserLocationInformation           = 121
+	idPDUSessionType                    = 134
+	idQosFlowSetupRequestList           = 136
+	idULNGUUPTNLInformation             = 139
 )
 
 var ieID = map[int]string{
-	idAllowedNSSAI:                     "id-AllowedNSSAI",
-	idAMFName:                          "id-AMFName",
-	idAMFUENGAPID:                      "id-AMF-UE-NGAP-ID",
-	idDefaultPagingDRX:                 "",
-	idGlobalRANNodeID:                  "",
-	idGUAMI:                            "id-GUAMI",
-	idMaskedIMEISV:                     "id-MaskedIMEISV",
-	idMobilityRestrictionList:          "id-MobilityRestrictionList",
-	idNASPDU:                           "id-NAS-PDU",
-	idPDUSessionResourceSetupListSUReq: "id-PDUSessionResourceSetupListSUReq",
-	idPDUSessionResourceSetupListSURes: "id-PDUSessionResourceSetupListSURes",
-	idPLMNSupportList:                  "id-PLMNSupportList",
-	idRANUENGAPID:                      "id-RAN-UE-NGAP-ID",
-	idRelativeAMFCapacity:              "id-RelativeAMFCapacity",
-	idRRCEstablishmentCause:            "",
-	idSecurityKey:                      "id-SecurityKey",
-	idServedGUAMIList:                  "id-ServedGUAMIList",
-	idSupportedTAList:                  "",
-	idUEContextRequest:                 "",
-	idUESecurityCapabilities:           "id-UESecurityCapabilities",
-	idUserLocationInformation:          "",
-	idPDUSessionType:                   "id-PDUSessionType",
-	idQosFlowSetupRequestList:          "id-QosFlowSetupRequestList",
-	idULNGUUPTNLInformation:            "id-UL-NGU-UP-TNLInformation",
+	idAllowedNSSAI:                      "id-AllowedNSSAI",
+	idAMFName:                           "id-AMFName",
+	idAMFUENGAPID:                       "id-AMF-UE-NGAP-ID",
+	idDefaultPagingDRX:                  "",
+	idGlobalRANNodeID:                   "",
+	idGUAMI:                             "id-GUAMI",
+	idMaskedIMEISV:                      "id-MaskedIMEISV",
+	idMobilityRestrictionList:           "id-MobilityRestrictionList",
+	idNASPDU:                            "id-NAS-PDU",
+	idPDUSessionResourceSetupListCxtReq: "idPDUSessionResourceSetupListCxtReq",
+	idPDUSessionResourceSetupListSUReq:  "id-PDUSessionResourceSetupListSUReq",
+	idPDUSessionResourceSetupListSURes:  "id-PDUSessionResourceSetupListSURes",
+	idPLMNSupportList:                   "id-PLMNSupportList",
+	idRANUENGAPID:                       "id-RAN-UE-NGAP-ID",
+	idRelativeAMFCapacity:               "id-RelativeAMFCapacity",
+	idRRCEstablishmentCause:             "",
+	idSecurityKey:                       "id-SecurityKey",
+	idServedGUAMIList:                   "id-ServedGUAMIList",
+	idSupportedTAList:                   "",
+	idUEContextRequest:                  "",
+	idUESecurityCapabilities:            "id-UESecurityCapabilities",
+	idUserLocationInformation:           "",
+	idPDUSessionType:                    "id-PDUSessionType",
+	idQosFlowSetupRequestList:           "id-QosFlowSetupRequestList",
+	idULNGUUPTNLInformation:             "id-UL-NGU-UP-TNLInformation",
 }
 
 type GNB struct {
@@ -634,7 +636,7 @@ func (gnb *GNB) decProtocolIE(pdu *[]byte) (err error) {
 
 	id := int(readPduUint16(pdu))
 	if ieID[id] == "" {
-		log.Printf("unsupported Protocol IE: %d", id)
+		log.Printf("Unsupported Protocol IE: %d", id)
 	}
 
 	gnb.dprint("Protocol IE: %s (%d)", ieID[id], id)
@@ -651,6 +653,8 @@ func (gnb *GNB) decProtocolIE(pdu *[]byte) (err error) {
 		gnb.decAMFUENGAPID(pdu, length)
 	case idNASPDU: // 38
 		gnb.decNASPDU(pdu)
+	case idPDUSessionResourceSetupListCxtReq: // 71
+		gnb.decPDUSessionResourceSetupListCtxReq(pdu, length)
 	case idPDUSessionResourceSetupListSUReq: // 74
 		gnb.decPDUSessionResourceSetupListSUReq(pdu, length)
 	case idPDUSessionType: // 134
@@ -1234,6 +1238,10 @@ func encSNSSAI(sstInt uint8, sdString string) (b per.BitField, v []byte) {
 
 func (gnb *GNB) decSNSSAI(pdu *[]byte) {
 
+	level := gnb.GetDebugLevel()
+	defer gnb.SetDebugLevel(level)
+
+	gnb.indent++
 	gnb.dprint("S-NSSAI")
 
 	var seq per.BitField
@@ -1586,11 +1594,74 @@ func (gnb *GNB) encPDUSessionResourceSetupResponseTransfer() (pdu []byte) {
 }
 
 /*
- * following IEs/Group Names are defined in each message definitions in 9.2.
- * alphabetical order
+ * following IEs/Group Names are defined in each message definitions in
+ * 9.2, 9.3.
  */
 
-// Broadcast PLMN List is defined in 9.2.6.1 NG SETUP REQUEST
+// PDU Session Resource Setup Request List is defined in
+// 9.2.2.1 INITIAL CONTEXT SETUP REQUEST
+/*
+PDUSessionResourceSetupListCxtReq ::= SEQUENCE (SIZE(1..maxnoofPDUSessions)) OF PDUSessionResourceSetupItemCxtReq
+1..256
+*/
+func (gnb *GNB) decPDUSessionResourceSetupListCtxReq(pdu *[]byte, length int) {
+
+	gnb.dprint("PDU Session Resource Setup Request Request List")
+
+	var list per.BitField
+	list.Value = readPduByteSlice(pdu, length)
+	//gnb.dprinti("dump: %02x", list.Value)
+
+	// TODO: generic per decoder.
+	itemNum := int(readPduByte(&list.Value))
+	itemNum += 1
+	list.Len = len(list.Value) * 8
+
+	for i := 0; i < itemNum; i++ {
+		gnb.dprint("Item %d", i)
+		gnb.decPDUSessionResourceSetupItemCxtReq(&list)
+	}
+
+	return
+}
+
+/*
+PDUSessionResourceSetupItemCxtReq ::= SEQUENCE {
+    pDUSessionID                                PDUSessionID,
+    nAS-PDU                                     NAS-PDU                                             OPTIONAL,
+    s-NSSAI                                     S-NSSAI,
+    pDUSessionResourceSetupRequestTransfer      OCTET STRING (CONTAINING PDUSessionResourceSetupRequestTransfer),
+    iE-Extensions       ProtocolExtensionContainer { {PDUSessionResourceSetupItemCxtReq-ExtIEs} }   OPTIONAL,
+    ...
+}
+*/
+func (gnb *GNB) decPDUSessionResourceSetupItemCxtReq(item *per.BitField) {
+
+	// TODO: generic per decoder.
+	// 0000 0000
+	// ^           extension marker
+	//  ^^         options
+	opt := item.Value[0]
+	hasNasPdu := false
+	if opt&0x4 != 0 {
+		hasNasPdu = true
+	}
+	*item = per.ShiftLeft(*item, 8)
+
+	gnb.decPDUSessionID(&item.Value)
+
+	gnb.dprinti("NAS-PDU: %v", hasNasPdu)
+	if hasNasPdu {
+		gnb.decNASPDU(&item.Value)
+	}
+	gnb.decSNSSAI(&item.Value)
+	gnb.decPDUSessionResourceSetupRequestTransfer(&item.Value)
+
+	return
+}
+
+// Broadcast PLMN List is defined in
+// 9.2.6.1 NG SETUP REQUEST
 /*
 BroadcastPLMNList ::= SEQUENCE (SIZE(1..maxnoofBPLMNs)) OF BroadcastPLMNItem
     maxnoofBPLMNs                       INTEGER ::= 12
@@ -1697,11 +1768,6 @@ func (gnb *GNB) encUEContextRequest() (v []byte, err error) {
 	return
 }
 
-/*
- * following IEs/Group Names are defined in each message definitions in 9.3.
- * alphabetical order
- */
-
 // QoS Characteristics is defined in 9.3.1.12 QoS Flow Level QoS Parameters
 /*
 QosCharacteristics ::= CHOICE {
@@ -1791,6 +1857,10 @@ func readPduByteSlice(pdu *[]byte, length int) (val []byte) {
 	val = (*pdu)[:length]
 	*pdu = (*pdu)[length:]
 	return
+}
+
+func (gnb *GNB) GetDebugLevel() int {
+	return gnb.dbgLevel
 }
 
 func (gnb *GNB) SetDebugLevel(level int) {
