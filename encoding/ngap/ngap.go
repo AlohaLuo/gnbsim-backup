@@ -1258,7 +1258,7 @@ func (gnb *GNB) decSNSSAI(pdu *[]byte) {
 
 	if option {
 		sd := readPduByteSlice(pdu, 3)
-		gnb.dprinti("SST: 0x%0x", sd)
+		gnb.dprinti("SD: 0x%0x", sd)
 	}
 	return
 }
