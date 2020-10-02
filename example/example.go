@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"github.com/hhorai/gnbsim/encoding/nas"
@@ -10,6 +11,7 @@ import (
 	"github.com/wmnsk/go-gtp/gtpv1"
 	"log"
 	"net"
+	"net/http"
 	"strings"
 	"time"
 )
@@ -188,10 +190,16 @@ func (t *testSession) establishPDUSession() {
 	return
 }
 
-func (t *testSession) setupN3Tunnel() {
+func (t *testSession) setupN3Tunnel(ctx context.Context) {
 
 	gnb := t.gnb
-	fmt.Printf("test: GTPuIFname: %s\n", gnb.GTPuIFname)
+	ue := t.ue
+
+	log.Printf("test: GTPuIFname: %s\n", gnb.GTPuIFname)
+	log.Printf("test: GTP-U Peer: %v\n", gnb.Recv.GTPuPeerAddr)
+	log.Printf("test: GTP-U Peer TEID: %v\n", gnb.Recv.GTPuPeerTEID)
+	log.Printf("test: GTP-U Local TEID: %v\n", gnb.GTPuTEID)
+	log.Printf("test: UE address: %v\n", ue.Recv.PDUAddress)
 
 	addr, err := net.ResolveUDPAddr("udp", gnb.GTPuAddr+gtpv1.GTPUPort)
 	if err != nil {
@@ -200,10 +208,26 @@ func (t *testSession) setupN3Tunnel() {
 	}
 	fmt.Printf("test: gNB UDP local address: %v\n", addr)
 	uConn := gtpv1.NewUPlaneConn(addr)
+	//defer uConn.Close()
 
 	if err = uConn.EnableKernelGTP("gtp-gnb", gtpv1.RoleSGSN); err != nil {
 		log.Fatalf("failed to EnableKernelGTP: %v", err)
 		return
+	}
+
+	go func() {
+		if err := uConn.ListenAndServe(ctx); err != nil {
+			log.Println(err)
+			return
+		}
+		log.Println("uConn.ListenAndServe exited")
+	}()
+
+	if err := uConn.AddTunnelOverride(
+	    gnb.Recv.GTPuPeerAddr, ue.Recv.PDUAddress,
+	    gnb.Recv.GTPuPeerTEID, gnb.GTPuTEID); err != nil {
+			log.Println(err)
+			return
 	}
 
 	if err = t.addRoute(uConn); err != nil {
@@ -221,6 +245,13 @@ func (t *testSession) setupN3Tunnel() {
 	if err != nil {
 		log.Fatalf("failed to addRuleLocal: %v", err)
 		return
+	}
+
+	go t.runUPlane(ctx)
+
+	select {
+	case <-ctx.Done():
+			log.Fatalf("exit gnbsim")
 	}
 
 	return
@@ -318,6 +349,51 @@ func (t *testSession) addRuleLocal() (err error) {
 	return
 }
 
+func (t *testSession) runUPlane(ctx context.Context) {
+
+	fmt.Printf("runUPlane\n")
+
+	ue := t.ue
+
+	laddr, err := net.ResolveTCPAddr("tcp", ue.Recv.PDUAddress.String()+":0")
+	if err != nil {
+		return
+	}
+
+	dialer := net.Dialer{LocalAddr: laddr}
+	client := http.Client{
+		Transport: &http.Transport{Dial: dialer.Dial},
+		Timeout:   3 * time.Second,
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(5 * time.Second):
+			// do nothing here and go forward
+		}
+
+		url := "http://172.16.1.2:8080/"
+		rsp, err := client.Get(url)
+		if err != nil {
+			log.Fatalf("failed to GET %s: %s", url, err)
+			continue
+		}
+
+		if rsp.StatusCode == http.StatusOK {
+			log.Printf("[HTTP Probe] Successfully GET %s: Status: %s",
+			    url, rsp.Status)
+			rsp.Body.Close()
+			continue
+		}
+		rsp.Body.Close()
+		log.Printf("[HTTP Probe] got invalid response on HTTP probe: %v",
+		    rsp.StatusCode)
+	}
+	return
+}
+
 func runN3test() (err error) {
 
 	t := initRANwithoutSCTP()
@@ -328,11 +404,13 @@ func runN3test() (err error) {
 
 	// temporary setting
 	gnb.Recv.GTPuPeerAddr = net.ParseIP("192.168.1.18")
+	gnb.Recv.GTPuPeerTEID = 0x12345678
 	ue.Recv.PDUAddress = net.ParseIP("60.60.60.1")
-	fmt.Printf("test: GTP-U Peer: %v\n", gnb.Recv.GTPuPeerAddr)
-	fmt.Printf("test: UE address: %v\n", ue.Recv.PDUAddress)
 
-	t.setupN3Tunnel()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	t.setupN3Tunnel(ctx)
 
 	return
 }
@@ -359,7 +437,9 @@ func main() {
 	t.establishPDUSession()
 	time.Sleep(time.Second * 3)
 
-	t.setupN3Tunnel()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	t.setupN3Tunnel(ctx)
 	time.Sleep(time.Second * 3)
 
 	return
