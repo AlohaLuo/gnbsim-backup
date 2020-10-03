@@ -70,7 +70,7 @@ $ vi example.json
 * run 'example' with 'ip' option and specify the AMF IP address.
 
 ```
-$ ./example -ip <AMF NGAP listen ip address set above>
+$ sudo ./example -ip <AMF NGAP listen ip address set above>
 ```
 
 * Then you can find the following line in the debug message. In this case, your configuration for `OPc` and `K` are both correct.
