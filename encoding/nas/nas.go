@@ -37,6 +37,7 @@ type UE struct {
 	AuthParam        AuthParam
 	SNSSAI           SNSSAI
 	DNN              string
+	URL              string
 
 	state5GMM int
 	state5GSM int

@@ -137,8 +137,8 @@ func TestMakePDUSessionEstablishmentRequest(t *testing.T) {
 
 func TestDecode(t *testing.T) {
 	ue := NewNAS("nas_test.json")
-
 	ue.dbgLevel = 1
+	fmt.Printf("URL = %s\n", ue.URL)
 
 	pattern := []struct {
 		in_str string
