@@ -38,7 +38,8 @@
 			"sst": 1,
 			"sd": "010203"
 		},
-		"dnn": "internet"
+		"dnn": "internet",
+		"url": "http://172.16.1.2:8080/"
 	},
 	"ULInfoNR": {
 		"NRCGI": {

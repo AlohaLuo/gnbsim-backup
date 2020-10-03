@@ -374,16 +374,15 @@ func (t *testSession) runUPlane(ctx context.Context) {
 			// do nothing here and go forward
 		}
 
-		url := "http://172.16.1.2:8080/"
-		rsp, err := client.Get(url)
+		rsp, err := client.Get(ue.URL)
 		if err != nil {
-			log.Fatalf("failed to GET %s: %s", url, err)
+			log.Fatalf("failed to GET %s: %s", ue.URL, err)
 			continue
 		}
 
 		if rsp.StatusCode == http.StatusOK {
-			log.Printf("[HTTP Probe] Successfully GET %s: Status: %s",
-			    url, rsp.Status)
+			log.Printf("[HTTP Probe] Successfully GET %s: "+
+			"Status: %s", ue.URL, rsp.Status)
 			rsp.Body.Close()
 			continue
 		}
