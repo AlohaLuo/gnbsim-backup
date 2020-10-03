@@ -10,7 +10,7 @@ These instructions will get you a copy of the project up and running on your loc
 
 * golang environment on linux host.
   - root previledge is required to set an IP address which is dynamically assigned by SMF.
-  - GTP kernel module capability is required for using [go-gtp](https://github.com/wmnsk/go-gtp)
+  - GTP kernel module capability is required for using [wmnsk/go-gtp](https://github.com/wmnsk/go-gtp)
     - To check if GTP kernel module is present in your system, try the following command
       ```
       find /lib/modules/`uname -r` -name gtp.ko
@@ -21,11 +21,23 @@ These instructions will get you a copy of the project up and running on your loc
       ```
       it means that the module is present in your system. You may also want to try `modinfo gtp`.
       Otherwise, you need to install the GTP kernel module by following instructions here: https://osmocom.org/projects/openggsn/wiki/Kernel_GTP
-    - If you would like to use 'Raspberry Pi' to run gnbsim, Kernel Compiling is required for activating GTP kernel module (gtp.ko).
+  - If you would like to use 'Raspberry Pi' to run gnbsim, Kernel Compiling is required for activating GTP kernel module (gtp.ko).
 
 * running free5gc somewhere.
   - subscriber has been registered by free5gc web console.
-  - change 'ngapIPList' to external ip address in 'amfcfg.conf' 
+  - change 'ngapIPList' to external ip address in `config/amfcfg.conf`. 
+    ```
+        ngapIpList:
+          #- 127.0.0.1
+          - 192.168.1.17      # extern IP address fot N1/N2 address.
+    ```
+  - change 'gtpu.addr' to external ip address in `src/upf/build/config/upfcfg.yaml`. 
+    ```
+      gtpu:
+        #- addr: 127.0.0.8
+        - addr: 192.168.1.18  # external IP address for GTP-U (N3) address.
+    ```
+  - [free5gc/free5gc](https://github.com/free5gc/free5gc) v3.0.4 is used in my test environment.
 
 ### Installing and testing
 
@@ -48,6 +60,7 @@ $ make			# building example binary.
   - `msin` replace with last 10 digits of the IMSI (e.g. `0000000003`)
   - `GTPuAddr` for the IP address of gnbsim
   - `GTPuIFname` for the network interface of gnbsim
+  - `UE.url` is access URL for testing U-Plane.
 
 ```
 $ cd example
@@ -60,18 +73,18 @@ $ vi example.json
 $ ./example -ip <AMF NGAP listen ip address set above>
 ```
 
-* Then you can find the following line in the debug message. In this case, your configuration for free5gc and gnbsim are both correct.
+* Then you can find the following line in the debug message. In this case, your configuration for `OPc` and `K` are both correct.
 ```
 ***** Integrity check passed
 ```
 
-* And you could also find your UE in 'subscriber' page of free5gc web console. In my environment, free5gc dashboard doesn't show my UE, but the actual transfered packet that is respond from web conole includes the information (PLMN and IMSI) of it in json format.
+* And you could also find your UE in 'subscriber' page of free5gc web console.
 
 ## Progress
-* [done] Initial Registration
-* [in progress] PDU Session Establishment
-  - gnbsim can respond 'PDU Session Resource Setup Response' to AMF.
-  - User plane functionalities are developed in progress.
+* [x] Initial Registration
+* [x] PDU Session Establishment
+* [x] User Plane functionality
+* [ ] Deregistration
 
 <!--
 ## Running the tests
