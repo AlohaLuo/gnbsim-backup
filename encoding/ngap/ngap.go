@@ -360,7 +360,7 @@ func (gnb *GNB) MakeInitialUEMessage() (pdu []byte) {
 
 	pdu = encNgapPdu(initiatingMessage, idInitialUEMessage, ignore)
 
-	v := encProtocolIEContainer(4)
+	v := encProtocolIEContainer(5)
 
 	tmp := gnb.encRANUENGAPID()
 	v = append(v, tmp...)
