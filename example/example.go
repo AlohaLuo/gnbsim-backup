@@ -89,21 +89,36 @@ func (t *testSession) sendtoAMF(pdu []byte) {
 	return
 }
 
-func (t *testSession) recvfromAMF() {
+func (t *testSession) recvfromAMF(timeout time.Duration) {
 
-	buf := make([]byte, 1500)
-	n, info, err := t.conn.SCTPRead(buf)
-	t.info = info
+	const defaultTimer = 10 // sec
 
-	if err != nil {
-		log.Fatalf("failed to read: %v", err)
+	if timeout == 0 {
+		timeout = defaultTimer
 	}
-	log.Printf("read: len %d, info: %+v", n, t.info)
 
-	buf = buf[:n]
-	fmt.Printf("dump: %x\n", buf)
-	t.gnb.Decode(&buf)
+	c := make(chan bool, 1)
+	go func() {
+		buf := make([]byte, 1500)
+		n, info, err := t.conn.SCTPRead(buf)
+		t.info = info
 
+		if err != nil {
+			log.Fatalf("failed to read: %v", err)
+		}
+		log.Printf("read: len %d, info: %+v", n, t.info)
+
+		buf = buf[:n]
+		fmt.Printf("dump: %x\n", buf)
+		t.gnb.Decode(&buf)
+		c <- true
+	}()
+	select {
+	case <-c:
+		break
+	case <-time.After(timeout * time.Second):
+		log.Printf("read: timeout")
+	}
 	return
 }
 
@@ -121,7 +136,7 @@ func initRAN() (t *testSession) {
 
 	pdu := gnb.MakeNGSetupRequest()
 	t.sendtoAMF(pdu)
-	t.recvfromAMF()
+	t.recvfromAMF(0)
 
 	return
 }
@@ -151,19 +166,19 @@ func (t *testSession) registrateUE() {
 
 	buf := t.gnb.MakeInitialUEMessage()
 	t.sendtoAMF(buf)
-	t.recvfromAMF()
+	t.recvfromAMF(0)
 
 	pdu = t.ue.MakeAuthenticationResponse()
 	t.gnb.RecvfromUE(&pdu)
 	buf = t.gnb.MakeUplinkNASTransport()
 	t.sendtoAMF(buf)
-	t.recvfromAMF()
+	t.recvfromAMF(0)
 
 	pdu = t.ue.MakeSecurityModeComplete()
 	t.gnb.RecvfromUE(&pdu)
 	buf = t.gnb.MakeUplinkNASTransport()
 	t.sendtoAMF(buf)
-	t.recvfromAMF()
+	t.recvfromAMF(0)
 
 	buf = t.gnb.MakeInitialContextSetupResponse()
 	t.sendtoAMF(buf)
@@ -172,6 +187,9 @@ func (t *testSession) registrateUE() {
 	t.gnb.RecvfromUE(&pdu)
 	buf = t.gnb.MakeUplinkNASTransport()
 	t.sendtoAMF(buf)
+
+	// for Configuration Update Command from open5gs AMF.
+	t.recvfromAMF(3)
 
 	return
 }
@@ -182,7 +200,7 @@ func (t *testSession) establishPDUSession() {
 	t.gnb.RecvfromUE(&pdu)
 	buf := t.gnb.MakeUplinkNASTransport()
 	t.sendtoAMF(buf)
-	t.recvfromAMF()
+	t.recvfromAMF(0)
 
 	buf = t.gnb.MakePDUSessionResourceSetupResponse()
 	t.sendtoAMF(buf)
@@ -224,10 +242,10 @@ func (t *testSession) setupN3Tunnel(ctx context.Context) {
 	}()
 
 	if err := uConn.AddTunnelOverride(
-	    gnb.Recv.GTPuPeerAddr, ue.Recv.PDUAddress,
-	    gnb.Recv.GTPuPeerTEID, gnb.GTPuTEID); err != nil {
-			log.Println(err)
-			return
+		gnb.Recv.GTPuPeerAddr, ue.Recv.PDUAddress,
+		gnb.Recv.GTPuPeerTEID, gnb.GTPuTEID); err != nil {
+		log.Println(err)
+		return
 	}
 
 	if err = t.addRoute(uConn); err != nil {
@@ -251,7 +269,7 @@ func (t *testSession) setupN3Tunnel(ctx context.Context) {
 
 	select {
 	case <-ctx.Done():
-			log.Fatalf("exit gnbsim")
+		log.Fatalf("exit gnbsim")
 	}
 
 	return
@@ -382,13 +400,13 @@ func (t *testSession) runUPlane(ctx context.Context) {
 
 		if rsp.StatusCode == http.StatusOK {
 			log.Printf("[HTTP Probe] Successfully GET %s: "+
-			"Status: %s", ue.URL, rsp.Status)
+				"Status: %s", ue.URL, rsp.Status)
 			rsp.Body.Close()
 			continue
 		}
 		rsp.Body.Close()
 		log.Printf("[HTTP Probe] got invalid response on HTTP probe: %v",
-		    rsp.StatusCode)
+			rsp.StatusCode)
 	}
 	return
 }
