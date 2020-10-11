@@ -25,6 +25,13 @@ var TestInitialContextSetupRequest string = "000e0080a7000009000a000200010055000
 var TestInitialContextSetupRequest2 string = "000e0080f500000b000a00020001005500020000006e0008080f4240200f4240001c00070002f839cafe000047002a000001402001020321000003008b000a01f07f00000800000001008600010000880007000000000938000000000a2201010203100811223300770009000000100000000000005e0020473007e30d4d0d77a7073e5b43b909562b7a8c461fc7ef0b73ab4026edbb91aa002440040002f839002240080000000100ffff010026404a497e02809e40eb027e006801003a2e0101c211000901000631310101ff00060103e80103e859322905013c3c0001220401010203790006002041010109250908696e7465726e65741201"
 var TestDLPDUSessionEstablishmentAccept string = "001d006d000003000a00020001005500020000004a005a0040012f7e0222994e9f027e00680100202e0100c21100090100063131010100000601e80301e80359322905013c3c00011201402001020321000003008b000a01f0c0a801120000000100860001000088000700000000093800"
 
+var TestOpen5gsNGSetupResponse string = "201500320000040001000e05806f70656e3567732d616d663000600008000002f83901004000564001ff005000080002f83900000008"
+var TestOpen5gsDLAuthenticationRequest string = "0004403e000003000a000200020055000200000026002b2a7e00560002000021d231c4098df35d5ea33e62ffad05d2fa2010aaf6a4fd4c3b800059dc4597900d4b1f"
+var TestOpen5gsDLSecurityModeCommand string = "00044027000003000a0002000200550002000000260014137e03fd70f3b3007e005d02000280a0e1360102"
+var TestOpen5gsInitialContextSetupRequest string = "000e00809e000009000a00020002005500020000006e000a0c3e800000303e800000001c00070002f83901004000000002000100770009000004000000000000005e002050437b88f28f5f228eebd3e4517265f99473dbc12b7475a56da62e755d60166e002240080000000100ffff010026402f2e7e0227d3fd9f017e0042010177000bf202f839010040c800cbd954072002f83900000115020101210201005e0129"
+var TestOpen5gsConfigurationUpdateCommand string = "0004403a000003000a0002000200550002000000260027267e024745e85a027e0054430f10004f00700065006e0035004700534702010151114500490100"
+var TestOpen5gsDLPDUSessionEstablishmentAccept string = "001d00808f000003000a00020002005500020000004a007c004001467e02f1620a15037e00680100372e0101c211000901000631210101ff01060a00030a000359322905010a2e0002220101790006012041010109250908696e7465726e6574120100202f0000040082000a0c3e800000303e800000008b000a01f0c0a8c7ca0000000100860001000088000700010000091c00"
+
 func recvfromNW(gnb *GNB, msg string) {
 	in, _ := hex.DecodeString(msg)
 	gnb.Decode(&in)
@@ -148,21 +155,38 @@ func TestDecode(t *testing.T) {
 		desc   string
 	}{
 		{TestNGSetupResponse,
-			"NG Setup Response"},
+			"free5gc: NG Setup Response"},
 		{TestDLAuthenticationRequest,
-			"DL Authentication Request"},
+			"free5gc: DL Authentication Request"},
 		{TestDLSecurityModeCommand,
-			"DL Security Mode Command"},
+			"free5gc: DL Security Mode Command"},
 		{TestInitialContextSetupRequest,
-			"Initial Context Setup Request"},
+			"free5gc: Initial Context Setup Request"},
 		{TestInitialContextSetupRequest2,
-			"Initial Context Setup Request #2"},
+			"free5gc: Initial Context Setup Request #2"},
 		{TestDLPDUSessionEstablishmentAccept,
-			"PDU Session Establishment Accept"},
+			"free5gc: PDU Session Establishment Accept"},
+	}
+
+	pattern2 := []struct {
+		in_str string
+		desc   string
+	}{
+		{TestOpen5gsNGSetupResponse,
+			"open5gs: NG Setup Response"},
+		{TestOpen5gsDLAuthenticationRequest,
+			"open5gs: DL Authentication Request"},
+		{TestOpen5gsDLSecurityModeCommand,
+			"open5gs: DL Security Mode Command"},
+		{TestOpen5gsInitialContextSetupRequest,
+			"open5gs: Initial Context Setup Request"},
+		{TestOpen5gsConfigurationUpdateCommand,
+			"open5gs: Configuration Update Command"},
+		{TestOpen5gsDLPDUSessionEstablishmentAccept,
+			"open5gs: PDU Session Establishment Accept"},
 	}
 
 	gnb := NewNGAP("ngap_test.json")
-
 	for _, p := range pattern {
 		fmt.Printf("---------- test decode: %s\n", p.desc)
 
@@ -174,4 +198,18 @@ func TestDecode(t *testing.T) {
 			t.Errorf("%s: %v", p.desc, gnb.DecodeError)
 		}
 	}
+
+	gnb = NewNGAP("ngap_test.json")
+	for _, p := range pattern2 {
+		fmt.Printf("---------- test decode: %s\n", p.desc)
+
+		gnb.SetDebugLevel(1)
+		gnb.UE.SetDebugLevel(1)
+		recvfromNW(gnb, p.in_str)
+
+		if gnb.DecodeError != nil {
+			t.Errorf("%s: %v", p.desc, gnb.DecodeError)
+		}
+	}
+
 }
