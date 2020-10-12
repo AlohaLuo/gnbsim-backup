@@ -1283,12 +1283,12 @@ func (gnb *GNB) decPDUSessionID(pdu *[]byte) (val int) {
 /*
 QosFlowIdentifier ::= INTEGER (0..63, ...)
 */
-func (gnb *GNB) encQosFlowIdentifier() (pdu []byte) {
+func (gnb *GNB) encQosFlowIdentifier() (bf per.BitField) {
+
 	const min = 0
 	const max = 63
 	const extmark = true
-	bf, _, _ := per.EncInteger(int64(gnb.Recv.QosFlowID), min, max, extmark)
-	pdu = bf.Value
+	bf, _, _ = per.EncInteger(int64(gnb.Recv.QosFlowID), min, max, extmark)
 
 	return
 }
@@ -1367,7 +1367,7 @@ func (gnb *GNB) encAssociatedQosFlowList() (pdu []byte) {
 
 	const min = 1
 	const max = 64
-	const extmark = true
+	const extmark = false
 
 	bf, _, _ := per.EncSequenceOf(1, min, max, extmark)
 	pdu = gnb.encAssociatedQosFlowItem(&bf)
@@ -1377,7 +1377,7 @@ func (gnb *GNB) encAssociatedQosFlowList() (pdu []byte) {
 
 func (gnb *GNB) encAssociatedQosFlowItem(pre *per.BitField) (pdu []byte) {
 
-	const optnum = 0
+	const optnum = 2
 	const optflag = 0
 	const extmark = true
 
@@ -1385,8 +1385,9 @@ func (gnb *GNB) encAssociatedQosFlowItem(pre *per.BitField) (pdu []byte) {
 	if pre != nil {
 		bf = per.MergeBitField(*pre, bf)
 	}
-	pdu = gnb.encQosFlowIdentifier()
-	pdu = append(bf.Value, pdu...)
+	bf2 := gnb.encQosFlowIdentifier()
+	bf = per.MergeBitField(bf, bf2)
+	pdu = bf.Value
 
 	return
 }
