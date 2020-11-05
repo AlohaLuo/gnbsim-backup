@@ -275,6 +275,46 @@ func (t *testSession) setupN3Tunnel(ctx context.Context) {
 	return
 }
 
+func (t *testSession) setupN3Tunnel2(ctx context.Context) {
+
+	gnb := t.gnb
+	ue := t.ue
+
+	log.Printf("test: GTPuIFname: %s\n", gnb.GTPuIFname)
+	log.Printf("test: GTP-U Peer: %v\n", gnb.Recv.GTPuPeerAddr)
+	log.Printf("test: GTP-U Peer TEID: %v\n", gnb.Recv.GTPuPeerTEID)
+	log.Printf("test: GTP-U Local TEID: %v\n", gnb.GTPuTEID)
+	log.Printf("test: UE address: %v\n", ue.Recv.PDUAddress)
+
+	addr, err := net.ResolveUDPAddr("udp", gnb.GTPuAddr+gtpv1.GTPUPort)
+	if err != nil {
+		log.Fatalf("failed to net.ResolveUDPAddr: %v", err)
+		return
+	}
+	fmt.Printf("test: gNB UDP local address: %v\n", addr)
+
+	return
+}
+
+func (t *testSession) addTunnel() (err error) {
+
+	link := &netlink.Tuntap{
+		LinkAttrs: netlink.LinkAttrs{Name: "gtp0"},
+		Mode:      netlink.TUNTAP_MODE_TUN,
+		Flags:     netlink.TUNTAP_DEFAULTS | netlink.TUNTAP_NO_PI,
+		Queues:    1,
+	}
+	if err = netlink.LinkAdd(link); err != nil {
+		err = fmt.Errorf("failed to ADD tun device=gtp0: %s", err)
+		return
+	}
+	if err = netlink.LinkSetUp(link); err != nil {
+		err = fmt.Errorf("failed to UP tun device=gtp0: %s", err)
+		return
+	}
+	return
+}
+
 func (t *testSession) addIP() (err error) {
 
 	gnb := t.gnb
@@ -427,7 +467,7 @@ func runN3test() (err error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	t.setupN3Tunnel(ctx)
+	t.setupN3Tunnel2(ctx)
 
 	return
 }
