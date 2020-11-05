@@ -116,7 +116,7 @@ func (gtp *GTP) encExtensionHeader(extHeaderType uint8) (pdu []byte) {
 // 5.5.2.2 UL PDU SESSION INFORMATION (PDU Type 1) in TS 38.415
 const (
 	pduTypeDL = iota
-	pduTypeUL = iota
+	pduTypeUL
 )
 
 type ULPduSessionInformation struct {
