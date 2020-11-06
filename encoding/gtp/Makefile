@@ -3,6 +3,7 @@ all: build
 build: update
 
 update:
+	go get -u
 
 test: update
 	go test -v --cover
@@ -13,4 +14,5 @@ cover: update
 	rm cover.out
 
 clean:
-	rm -f cover.html
+	rm -f go.sum cover.html
+	git checkout go.mod
