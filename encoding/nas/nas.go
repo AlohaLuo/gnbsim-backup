@@ -1065,7 +1065,7 @@ func (ue *UE) enc5GSMobileIDTypeIMEISV() (pdu []byte) {
 func encPLMN(mcc, mnc int) (plmn [3]byte) {
 	format := "%d%d"
 	if mnc < 100 {
-		format = "%df%d"
+		format = "%df%02d"
 	}
 
 	str := fmt.Sprintf(format, mcc, mnc)
@@ -1998,7 +1998,7 @@ func (ue *UE) ComputeKamf() {
 	fc := []byte{0x6d}
 	s = append(s, fc...)
 
-	supi := fmt.Sprintf("%d%d%s", ue.MCC, ue.MNC, ue.MSIN)
+	supi := fmt.Sprintf("%d%02d%s", ue.MCC, ue.MNC, ue.MSIN)
 	p0 := []byte(supi)
 	s = append(s, p0...)
 
@@ -2013,8 +2013,8 @@ func (ue *UE) ComputeKamf() {
 	l1 := make([]byte, 2)
 	binary.BigEndian.PutUint16(l1, uint16(len(p1)))
 	s = append(s, l1...)
-	//ue.dprint("ComputeKamf: abba(%d): %x", len(p1), p1)
 
+	//ue.dprint("ComputeKamf: abba(%d): %x", len(p1), p1)
 	//ue.dprint("ComputeKamf: S: %x", s)
 	//ue.dprint("ComputeKamf: Kseaf: %x", ue.AuthParam.Kseaf)
 
