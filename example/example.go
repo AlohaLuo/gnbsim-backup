@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/hhorai/gnbsim/encoding/gtp"
 	"github.com/hhorai/gnbsim/encoding/nas"
 	"github.com/hhorai/gnbsim/encoding/ngap"
 	"github.com/ishidawataru/sctp"
@@ -208,7 +209,7 @@ func (t *testSession) establishPDUSession() {
 	return
 }
 
-func (t *testSession) setupN3Tunnel(ctx context.Context) {
+func (t *testSession) setupN3Tunnel2(ctx context.Context) {
 
 	gnb := t.gnb
 	ue := t.ue
@@ -248,18 +249,18 @@ func (t *testSession) setupN3Tunnel(ctx context.Context) {
 		return
 	}
 
-	if err = t.addRoute(uConn); err != nil {
-		log.Fatalf("failed to addRoute: %v", err)
+	if err = addRoute2(uConn); err != nil {
+		log.Fatalf("failed to addRoute2: %v", err)
 		return
 	}
 
-	err = t.addIP()
+	err = addIP(gnb.GTPuIFname, ue.Recv.PDUAddress, 28)
 	if err != nil {
 		log.Fatalf("failed to addIP: %v", err)
 		return
 	}
 
-	err = t.addRuleLocal()
+	err = addRuleLocal(ue.Recv.PDUAddress)
 	if err != nil {
 		log.Fatalf("failed to addRuleLocal: %v", err)
 		return
@@ -275,7 +276,7 @@ func (t *testSession) setupN3Tunnel(ctx context.Context) {
 	return
 }
 
-func (t *testSession) setupN3Tunnel2(ctx context.Context) {
+func (t *testSession) setupN3Tunnel(ctx context.Context) {
 
 	gnb := t.gnb
 	ue := t.ue
@@ -285,42 +286,70 @@ func (t *testSession) setupN3Tunnel2(ctx context.Context) {
 	log.Printf("test: GTP-U Peer TEID: %v\n", gnb.Recv.GTPuPeerTEID)
 	log.Printf("test: GTP-U Local TEID: %v\n", gnb.GTPuTEID)
 	log.Printf("test: UE address: %v\n", ue.Recv.PDUAddress)
+	laddr := &net.UDPAddr{
+		IP:   net.ParseIP(gnb.GTPuAddr),
+		Port: gtp.Port,
+	}
+	fmt.Printf("test: gNB UDP local address: %v\n", laddr)
 
-	addr, err := net.ResolveUDPAddr("udp", gnb.GTPuAddr+gtpv1.GTPUPort)
+	gtpConn, err := net.ListenUDP("udp", laddr)
 	if err != nil {
-		log.Fatalf("failed to net.ResolveUDPAddr: %v", err)
+		log.Fatalln(err)
 		return
 	}
-	fmt.Printf("test: gNB UDP local address: %v\n", addr)
+
+	tun, err := addTunnel("gtp-gnbsim")
+	if err != nil {
+		log.Fatalln(err)
+		return
+	}
+
+	go decap(gtpConn, tun)
+
+	if err = addRoute(tun); err != nil {
+		log.Fatalf("failed to addRoute: %v", err)
+		return
+	}
+
+	err = addIP(gnb.GTPuIFname, ue.Recv.PDUAddress, 28)
+	if err != nil {
+		log.Fatalf("failed to addIP: %v", err)
+		return
+	}
+
+	err = addRuleLocal(ue.Recv.PDUAddress)
+	if err != nil {
+		log.Fatalf("failed to addRuleLocal: %v", err)
+		return
+	}
+
+	encap(gtpConn, tun)
 
 	return
 }
 
-func (t *testSession) addTunnel() (err error) {
+func addTunnel(tunname string) (tun *netlink.Tuntap, err error) {
 
-	link := &netlink.Tuntap{
-		LinkAttrs: netlink.LinkAttrs{Name: "gtp0"},
+	tun = &netlink.Tuntap{
+		LinkAttrs: netlink.LinkAttrs{Name: tunname},
 		Mode:      netlink.TUNTAP_MODE_TUN,
 		Flags:     netlink.TUNTAP_DEFAULTS | netlink.TUNTAP_NO_PI,
 		Queues:    1,
 	}
-	if err = netlink.LinkAdd(link); err != nil {
+	if err = netlink.LinkAdd(tun); err != nil {
 		err = fmt.Errorf("failed to ADD tun device=gtp0: %s", err)
 		return
 	}
-	if err = netlink.LinkSetUp(link); err != nil {
+	if err = netlink.LinkSetUp(tun); err != nil {
 		err = fmt.Errorf("failed to UP tun device=gtp0: %s", err)
 		return
 	}
 	return
 }
 
-func (t *testSession) addIP() (err error) {
+func addIP(ifname string, ip net.IP, masklen int) (err error) {
 
-	gnb := t.gnb
-	ue := t.ue
-
-	link, err := netlink.LinkByName(gnb.GTPuIFname)
+	link, err := netlink.LinkByName(ifname)
 	if err != nil {
 		return err
 	}
@@ -330,15 +359,15 @@ func (t *testSession) addIP() (err error) {
 		return err
 	}
 
-	netToAdd := &net.IPNet{
-		IP:   ue.Recv.PDUAddress,
-		Mask: net.CIDRMask(28, 32),
+	netToAdd := &net.IPNet {
+		IP:   ip,
+		Mask: net.CIDRMask(masklen, 32),
 	}
 
 	var addr netlink.Addr
 	var found bool
 	for _, a := range addrs {
-		if a.Label != gnb.GTPuIFname {
+		if a.Label != ifname {
 			continue
 		}
 		found = true
@@ -350,8 +379,8 @@ func (t *testSession) addIP() (err error) {
 	}
 
 	if !found {
-		err = fmt.Errorf("cannot find the interface to add address: %s",
-			gnb.GTPuIFname)
+		err = fmt.Errorf(
+		    "cannot find the interface to add address: %s", ifname)
 		return
 	}
 
@@ -364,27 +393,44 @@ func (t *testSession) addIP() (err error) {
 
 const routeTableID = 1001
 
-func (t *testSession) addRoute(uConn *gtpv1.UPlaneConn) (err error) {
+func addRoute(tun *netlink.Tuntap) (err error) {
 
 	route := &netlink.Route{
 		Dst: &net.IPNet{
 			IP:   net.IPv4zero,
 			Mask: net.CIDRMask(0, 32),
 		}, // default route
-		LinkIndex: uConn.GTPLink.Attrs().Index, // dev gtp-<ECI>
-		Scope:     netlink.SCOPE_LINK,          // scope link
-		Protocol:  4,                           // proto static
-		Priority:  1,                           // metric 1
-		Table:     routeTableID,                // table <ECI>
+		LinkIndex: tun.Attrs().Index,   // dev gtp-<ECI>
+		Scope:     netlink.SCOPE_LINK,  // scope link
+		Protocol:  4,                   // proto static
+		Priority:  1,                   // metric 1
+		Table:     routeTableID,        // table <ECI>
 	}
 
 	err = netlink.RouteReplace(route)
 	return
 }
 
-func (t *testSession) addRuleLocal() (err error) {
+//uConn *netlink.Tuntap) (err error) {
+func addRoute2(uConn *gtpv1.UPlaneConn) (err error) {
 
-	ue := t.ue
+	route := &netlink.Route{
+		Dst: &net.IPNet{
+			IP:   net.IPv4zero,
+			Mask: net.CIDRMask(0, 32),
+		}, // default route
+		LinkIndex:  uConn.GTPLink.Attrs().Index,   // dev gtp-<ECI>
+		Scope:     netlink.SCOPE_LINK,  // scope link
+		Protocol:  4,                   // proto static
+		Priority:  1,                   // metric 1
+		Table:     routeTableID,        // table <ECI>
+	}
+
+	err = netlink.RouteReplace(route)
+	return
+}
+
+func addRuleLocal(ip net.IP) (err error) {
 
 	// 0: NETLINK_ROUTE, no definition found.
 	rules, err := netlink.RuleList(0)
@@ -392,7 +438,11 @@ func (t *testSession) addRuleLocal() (err error) {
 		return err
 	}
 
-	mask32 := &net.IPNet{IP: ue.Recv.PDUAddress, Mask: net.CIDRMask(32, 32)}
+	mask32 := &net.IPNet {
+		IP: ip,
+		Mask: net.CIDRMask(32, 32),
+	}
+
 	for _, r := range rules {
 		if r.Src == mask32 && r.Table == routeTableID {
 			return
@@ -404,6 +454,35 @@ func (t *testSession) addRuleLocal() (err error) {
 	rule.Table = routeTableID
 	err = netlink.RuleAdd(rule)
 
+	return
+}
+
+func decap(gtp *net.UDPConn, tun *netlink.Tuntap) {
+
+	buf := make([]byte, 2048)
+	for {
+		n, addr, err := gtp.ReadFromUDP(buf)
+		if err != nil {
+			log.Fatalln(err)
+			return
+		}
+		fmt.Printf("n=%d, addr=%v\n", n, addr)
+	}
+}
+
+
+func encap(gtp *net.UDPConn, tun *netlink.Tuntap) {
+	/*
+	buf := make([]byte, 2048)
+	for {
+		n, addr, err := gtp.ReadFromUDP(buf)
+		if err != nil {
+			log.Fatalln(err)
+			return
+		}
+		fmt.Printf("n=%d, addr=%v\n", n, addr)
+	}
+	*/
 	return
 }
 
@@ -467,7 +546,7 @@ func runN3test() (err error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	t.setupN3Tunnel2(ctx)
+	t.setupN3Tunnel(ctx)
 
 	return
 }
@@ -496,7 +575,7 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	t.setupN3Tunnel(ctx)
+	t.setupN3Tunnel2(ctx)
 	time.Sleep(time.Second * 3)
 
 	return
