@@ -26,11 +26,18 @@ type GTP struct {
 	QosFlowID uint8
 }
 
-func NewGTP() (p *GTP) {
+func NewGTP(lteid uint32, pteid uint32) (p *GTP) {
 
 	var gtp GTP
-	p = &gtp
+	gtp.LocalTEID = lteid
+	gtp.PeerTEID = pteid
 
+	p = &gtp
+	return
+}
+
+func (gtp *GTP) SetQosFlowID(id uint8) {
+	gtp.QosFlowID = id
 	return
 }
 
