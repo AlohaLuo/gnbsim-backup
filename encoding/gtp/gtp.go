@@ -78,6 +78,9 @@ func (gtp *GTP) encGTPHeader(payloadLen int) (pdu []byte) {
 	binary.BigEndian.PutUint32(teid, gtp.PeerTEID)
 	pdu = append(pdu, teid...)
 
+	padding := make([]byte, 3)      // Sequence Number and N-PDU Number
+	pdu = append(pdu, padding...)
+
 	pdu = append(pdu, extHead...)
 
 	return
@@ -98,6 +101,7 @@ const (
 func (gtp *GTP) encExtensionHeader(extHeaderType uint8) (pdu []byte) {
 
 	var content []byte
+
 	switch extHeaderType {
 	case extHeaderTypeNone:
 		pdu = append(pdu, extHeaderType)
@@ -105,19 +109,18 @@ func (gtp *GTP) encExtensionHeader(extHeaderType uint8) (pdu []byte) {
 	case extHeaderTypePDUSessionContainer:
 		content = gtp.encULPduSessionInformation()
 	default:
-		fmt.Errorf("unknown extension header type.")
+		fmt.Printf("unknown extension header type.")
 		return
 	}
-
 	pdu = append(pdu, extHeaderType)
 
-	length := len(pdu)
+	length := len(content)
 	if length%4 != 2 {
-		fmt.Errorf("invalid extension header length=%d.", length)
+		fmt.Printf("invalid extension header length=%d.", length)
 		return
 	}
 
-	length = (len(pdu) + 2) / 4
+	length = (len(content) + 2) / 4
 	pdu = append(pdu, uint8(length))
 	pdu = append(pdu, content...)
 
