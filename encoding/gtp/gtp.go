@@ -83,6 +83,11 @@ func (gtp *GTP) encGTPHeader(payloadLen int) (pdu []byte) {
 	return
 }
 
+func (gtp *GTP) decGTPHeader(payload []byte) (raw []byte) {
+	raw = payload[16:]
+	return
+}
+
 // 5.2 GTP-U Extension Header
 // 5.2.1 General format of the GTP-U Extension Header
 const (
@@ -142,10 +147,15 @@ func (gtp *GTP) encULPduSessionInformation() (pdu []byte) {
 	return
 }
 
-func (gtp *GTP) Encap(pdu *[]byte) {
+func (gtp *GTP) Encap(raw []byte) (payload []byte) {
+	length := len(raw)
+	payload = append(payload, gtp.encGTPHeader(length)...)
+	payload = append(payload, raw...)
 	return
 }
 
-func (gtp *GTP) Decap(pdu *[]byte) {
+func (gtp *GTP) Decap(payload []byte) (raw []byte) {
+	raw = gtp.decGTPHeader(payload)
 	return
 }
+
