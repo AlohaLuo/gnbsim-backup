@@ -22,6 +22,7 @@ type testSession struct {
 	info *sctp.SndRcvInfo
 	gnb  *ngap.GNB
 	ue   *nas.UE
+	gtpu *gtp.GTP
 }
 
 func newTest() (t *testSession) {
@@ -292,6 +293,9 @@ func (t *testSession) setupN3Tunnel(ctx context.Context) {
 	}
 	fmt.Printf("test: gNB UDP local address: %v\n", laddr)
 
+	gtpu := gtp.NewGTP(gnb.GTPuTEID, gnb.Recv.GTPuPeerTEID)
+	t.gtpu = gtpu
+
 	gtpConn, err := net.ListenUDP("udp", laddr)
 	if err != nil {
 		log.Fatalln(err)
@@ -304,7 +308,7 @@ func (t *testSession) setupN3Tunnel(ctx context.Context) {
 		return
 	}
 
-	go decap(gtpConn, tun)
+	go t.decap(gtpConn, tun)
 
 	if err = addRoute(tun); err != nil {
 		log.Fatalf("failed to addRoute: %v", err)
@@ -323,7 +327,7 @@ func (t *testSession) setupN3Tunnel(ctx context.Context) {
 		return
 	}
 
-	encap(gtpConn, tun)
+	t.encap(gtpConn, tun)
 
 	return
 }
@@ -457,32 +461,55 @@ func addRuleLocal(ip net.IP) (err error) {
 	return
 }
 
-func decap(gtp *net.UDPConn, tun *netlink.Tuntap) {
+func (t *testSession) decap(gtpConn *net.UDPConn, tun *netlink.Tuntap) {
+
+	fd := tun.Fds[0]
 
 	buf := make([]byte, 2048)
 	for {
-		n, addr, err := gtp.ReadFromUDP(buf)
+		n, addr, err := gtpConn.ReadFromUDP(buf)
 		if err != nil {
 			log.Fatalln(err)
 			return
 		}
 		fmt.Printf("n=%d, addr=%v\n", n, addr)
+
+		payload := t.gtpu.Decap(buf[:n])
+
+		n, err = fd.Write(payload)
+		if err != nil {
+			log.Fatalln(err)
+			return
+		}
 	}
 }
 
 
-func encap(gtp *net.UDPConn, tun *netlink.Tuntap) {
-	/*
+func (t *testSession) encap(gtpConn *net.UDPConn, tun *netlink.Tuntap) {
+
+	fd := tun.Fds[0]
+	paddr := &net.UDPAddr{
+		IP:   t.gnb.Recv.GTPuPeerAddr,
+		Port: gtp.Port,
+	}
+
 	buf := make([]byte, 2048)
 	for {
-		n, addr, err := gtp.ReadFromUDP(buf)
+		n, err := fd.Read(buf)
 		if err != nil {
 			log.Fatalln(err)
 			return
 		}
-		fmt.Printf("n=%d, addr=%v\n", n, addr)
+		fmt.Printf("n=%d\n", n)
+
+		buf = t.gtpu.Encap(buf[:n])
+
+		n, err = gtpConn.WriteToUDP(buf, paddr)
+		if err != nil {
+			log.Fatalln(err)
+			return
+		}
 	}
-	*/
 	return
 }
 
