@@ -423,7 +423,7 @@ func addRoute2(uConn *gtpv1.UPlaneConn) (err error) {
 			IP:   net.IPv4zero,
 			Mask: net.CIDRMask(0, 32),
 		}, // default route
-		LinkIndex:  uConn.GTPLink.Attrs().Index,   // dev gtp-<ECI>
+		LinkIndex:  uConn.KernelGTP.Link.Attrs().Index,   // dev gtp-<ECI>
 		Scope:     netlink.SCOPE_LINK,  // scope link
 		Protocol:  4,                   // proto static
 		Priority:  1,                   // metric 1
