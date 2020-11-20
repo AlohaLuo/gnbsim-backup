@@ -215,11 +215,11 @@ func (t *testSession) setupN3Tunnel2(ctx context.Context) {
 	gnb := t.gnb
 	ue := t.ue
 
-	log.Printf("test: GTPuIFname: %s\n", gnb.GTPuIFname)
-	log.Printf("test: GTP-U Peer: %v\n", gnb.Recv.GTPuPeerAddr)
-	log.Printf("test: GTP-U Peer TEID: %v\n", gnb.Recv.GTPuPeerTEID)
-	log.Printf("test: GTP-U Local TEID: %v\n", gnb.GTPuTEID)
-	log.Printf("test: UE address: %v\n", ue.Recv.PDUAddress)
+	log.Printf("GTPuIFname: %s\n", gnb.GTPuIFname)
+	log.Printf("GTP-U Peer: %v\n", gnb.Recv.GTPuPeerAddr)
+	log.Printf("GTP-U Peer TEID: %v\n", gnb.Recv.GTPuPeerTEID)
+	log.Printf("GTP-U Local TEID: %v\n", gnb.GTPuTEID)
+	log.Printf("UE address: %v\n", ue.Recv.PDUAddress)
 
 	addr, err := net.ResolveUDPAddr("udp", gnb.GTPuAddr+gtpv1.GTPUPort)
 	if err != nil {
@@ -282,19 +282,22 @@ func (t *testSession) setupN3Tunnel(ctx context.Context) {
 	gnb := t.gnb
 	ue := t.ue
 
-	log.Printf("test: GTPuIFname: %s\n", gnb.GTPuIFname)
-	log.Printf("test: GTP-U Peer: %v\n", gnb.Recv.GTPuPeerAddr)
-	log.Printf("test: GTP-U Peer TEID: %v\n", gnb.Recv.GTPuPeerTEID)
-	log.Printf("test: GTP-U Local TEID: %v\n", gnb.GTPuTEID)
-	log.Printf("test: UE address: %v\n", ue.Recv.PDUAddress)
+	t.gtpu = gtp.NewGTP(gnb.GTPuTEID, gnb.Recv.GTPuPeerTEID)
+	gtpu := t.gtpu
+	gtpu.SetExtensionHeader(true)
+	gtpu.SetQosFlowID(gnb.Recv.QosFlowID)
+
+	log.Printf("GTPuIFname: %s\n", gnb.GTPuIFname)
+	log.Printf("GTP-U Peer: %v\n", gnb.Recv.GTPuPeerAddr)
+	log.Printf("GTP-U Peer TEID: %v\n", gnb.Recv.GTPuPeerTEID)
+	log.Printf("GTP-U Local TEID: %v\n", gnb.GTPuTEID)
+	log.Printf("QoS Flow ID: %d\n", gtpu.QosFlowID)
+	log.Printf("UE address: %v\n", ue.Recv.PDUAddress)
 	laddr := &net.UDPAddr{
 		IP:   net.ParseIP(gnb.GTPuAddr),
 		Port: gtp.Port,
 	}
 	fmt.Printf("test: gNB UDP local address: %v\n", laddr)
-
-	gtpu := gtp.NewGTP(gnb.GTPuTEID, gnb.Recv.GTPuPeerTEID)
-	t.gtpu = gtpu
 
 	gtpConn, err := net.ListenUDP("udp", laddr)
 	if err != nil {
@@ -302,13 +305,11 @@ func (t *testSession) setupN3Tunnel(ctx context.Context) {
 		return
 	}
 
-	tun, err := addTunnel("gtp-gnbsim")
+	tun, err := addTunnel("gtp-gnb")
 	if err != nil {
 		log.Fatalln(err)
 		return
 	}
-
-	go t.decap(gtpConn, tun)
 
 	if err = addRoute(tun); err != nil {
 		log.Fatalf("failed to addRoute: %v", err)
@@ -327,8 +328,14 @@ func (t *testSession) setupN3Tunnel(ctx context.Context) {
 		return
 	}
 
-	t.encap(gtpConn, tun)
+	go t.decap(gtpConn, tun)
+	go t.encap(gtpConn, tun)
+	go t.runUPlane(ctx)
 
+	select {
+	case <-ctx.Done():
+		log.Fatalf("exit gnbsim")
+	}
 	return
 }
 
@@ -467,16 +474,15 @@ func (t *testSession) decap(gtpConn *net.UDPConn, tun *netlink.Tuntap) {
 
 	buf := make([]byte, 2048)
 	for {
-		n, addr, err := gtpConn.ReadFromUDP(buf)
+		n, _, err := gtpConn.ReadFromUDP(buf)
 		if err != nil {
 			log.Fatalln(err)
 			return
 		}
-		fmt.Printf("n=%d, addr=%v\n", n, addr)
-
 		payload := t.gtpu.Decap(buf[:n])
+		//fmt.Printf("decap: %x\n", payload)
 
-		n, err = fd.Write(payload)
+		_, err = fd.Write(payload)
 		if err != nil {
 			log.Fatalln(err)
 			return
@@ -500,11 +506,9 @@ func (t *testSession) encap(gtpConn *net.UDPConn, tun *netlink.Tuntap) {
 			log.Fatalln(err)
 			return
 		}
-		fmt.Printf("n=%d\n", n)
+		payload := t.gtpu.Encap(buf[:n])
 
-		buf = t.gtpu.Encap(buf[:n])
-
-		n, err = gtpConn.WriteToUDP(buf, paddr)
+		_, err = gtpConn.WriteToUDP(payload, paddr)
 		if err != nil {
 			log.Fatalln(err)
 			return
@@ -561,11 +565,9 @@ func runN3test() (err error) {
 
 	t := initRANwithoutSCTP()
 	t.initUE()
-
 	gnb := t.gnb
 	ue := t.ue
 
-	// temporary setting
 	gnb.Recv.GTPuPeerAddr = net.ParseIP("192.168.1.18")
 	gnb.Recv.GTPuPeerTEID = 0x12345678
 	ue.Recv.PDUAddress = net.ParseIP("60.60.60.1")
@@ -602,7 +604,7 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	t.setupN3Tunnel2(ctx)
+	t.setupN3Tunnel(ctx)
 	time.Sleep(time.Second * 3)
 
 	return
