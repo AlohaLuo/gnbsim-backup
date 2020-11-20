@@ -24,6 +24,7 @@ type GTP struct {
 	LocalTEID uint32
 	PeerTEID  uint32
 	QosFlowID uint8
+	HasExtensionHeader bool
 }
 
 func NewGTP(lteid uint32, pteid uint32) (p *GTP) {
@@ -41,20 +42,29 @@ func (gtp *GTP) SetQosFlowID(id uint8) {
 	return
 }
 
+func (gtp *GTP) SetExtensionHeader(flag bool) {
+	gtp.HasExtensionHeader = flag
+	return
+}
+
 // 5 GTP-U header
 // 5.1 General format
+const (
+	gtpuVersion = 0x20
+	protocolTypeGTP = 0x10
+	protocolTypeGTPprime = 0x00
+	hasExtensionHeader = 0x04
+)
+
 func (gtp *GTP) encGTPHeader(payloadLen int) (pdu []byte) {
 
 	var versAndFlags uint8
-	var version uint8 = 1
-	versAndFlags = version << 5
-	var pt uint8 = 1 // GTP:1, GTP':0
-	versAndFlags |= pt << 4
+	versAndFlags |= gtpuVersion
+	versAndFlags |= protocolTypeGTP
 
 	extHeaders := []uint8{}
-	if gtp.QosFlowID != 0 {
-		var hasExtensionHeader uint8 = 1
-		versAndFlags |= hasExtensionHeader << 2
+	if gtp.HasExtensionHeader {
+		versAndFlags |= hasExtensionHeader
 		extHeaders = append(extHeaders,
 			extHeaderTypePDUSessionContainer)
 	}
@@ -69,6 +79,11 @@ func (gtp *GTP) encGTPHeader(payloadLen int) (pdu []byte) {
 		extHead = append(extHead, gtp.encExtensionHeader(extType)...)
 	}
 
+	if gtp.HasExtensionHeader {
+		padding := make([]byte, 3) // Sequence Number and N-PDU Number
+		extHead = append(padding, extHead...)
+	}
+
 	gtpLen := payloadLen + len(extHead)
 	length := make([]byte, 2)
 	binary.BigEndian.PutUint16(length, uint16(gtpLen))
@@ -77,17 +92,20 @@ func (gtp *GTP) encGTPHeader(payloadLen int) (pdu []byte) {
 	teid := make([]byte, 4)
 	binary.BigEndian.PutUint32(teid, gtp.PeerTEID)
 	pdu = append(pdu, teid...)
-
-	padding := make([]byte, 3)      // Sequence Number and N-PDU Number
-	pdu = append(pdu, padding...)
-
 	pdu = append(pdu, extHead...)
 
 	return
 }
 
 func (gtp *GTP) decGTPHeader(payload []byte) (raw []byte) {
-	raw = payload[16:]
+
+	versAndFlags := readPayloadByte(&payload)
+
+	if (versAndFlags & hasExtensionHeader) == 0 {
+		raw = payload[7:]
+		return
+	}
+	raw = payload[15:]
 	return
 }
 
@@ -161,4 +179,29 @@ func (gtp *GTP) Decap(payload []byte) (raw []byte) {
 	raw = gtp.decGTPHeader(payload)
 	return
 }
+//-----
+func readPayloadByte(payload *[]byte) (val byte) {
+	val = byte((*payload)[0])
+	*payload = (*payload)[1:]
+	return
+}
+
+func readPayloadUint16(payload *[]byte) (val uint16) {
+	val = binary.BigEndian.Uint16(*payload)
+	*payload = (*payload)[2:]
+	return
+}
+
+func readPayloadUint32(payload *[]byte) (val uint32) {
+	val = binary.BigEndian.Uint32(*payload)
+	*payload = (*payload)[4:]
+	return
+}
+
+func readPayloadByteSlice(payload *[]byte, length int) (val []byte) {
+	val = (*payload)[:length]
+	*payload = (*payload)[length:]
+	return
+}
+
 
