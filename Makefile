@@ -2,6 +2,7 @@ all: build
 
 build:
 	make -C example build
+	make -C cmd build
 
 test:
 	make -C encoding/gtp test
@@ -21,3 +22,4 @@ clean:
 	make -C encoding/nas clean
 	make -C encoding/ngap clean
 	make -C example clean
+	make -C cmd clean
