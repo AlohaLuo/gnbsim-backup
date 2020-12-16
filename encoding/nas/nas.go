@@ -134,6 +134,8 @@ const (
 	MessageTypeRegistrationRequest            = 0x41
 	MessageTypeRegistrationAccept             = 0x42
 	MessageTypeRegistrationComplete           = 0x43
+	MessageTypeDeregistrationRequest          = 0x45
+	MessageTypeDeregistrationAccept           = 0x46
 	MessageTypeAuthenticationRequest          = 0x56
 	MessageTypeAuthenticationResponse         = 0x57
 	MessageTypeSecurityModeCommand            = 0x5d
@@ -148,6 +150,8 @@ var msgTypeStr = map[int]string{
 	MessageTypeRegistrationRequest:            "Registration Request",
 	MessageTypeRegistrationAccept:             "Registration Accept",
 	MessageTypeRegistrationComplete:           "Registration Complete",
+	MessageTypeDeregistrationRequest:          "Deregistration Request",
+	MessageTypeDeregistrationAccept:           "Deregistration Accept",
 	MessageTypeAuthenticationRequest:          "Authentication Request",
 	MessageTypeAuthenticationResponse:         "Authentication Response",
 	MessageTypeSecurityModeCommand:            "Security Mode Command",
@@ -623,6 +627,25 @@ func (ue *UE) decDLNasTransport(pdu *[]byte) {
 
 	ue.decInformationElement(pdu, ieStrDLNasTransport)
 	ue.indent--
+
+	return
+}
+
+// 8.2.12 De-registration request (UE originating de-registration)
+func (ue *UE) MakeDeregistrationRequest() (pdu []byte) {
+
+	/*
+		pdu = ue.enc5GSMMMessageHeader(
+			SecurityHeaderTypePlain,
+			MessageTypeDeregistrationRequest)
+
+		ue.encDeregistrationType()
+
+		head := ue.enc5GSecurityProtectedMessageHeader(
+			SecurityHeaderTypeIntegrityProtectedAndCipheredWithNewContext, &pdu)
+
+		pdu = append(head, pdu...)
+	*/
 
 	return
 }
@@ -1375,6 +1398,25 @@ func (ue *UE) encAuthParamRes() (res AuthParamRes) {
 	//	binary.Write(data, binary.BigEndian, ue.encAuthParamRes())
 	//	pdu = append(pdu, data.Bytes()...)
 
+	return
+}
+
+// 9.11.3.20 De-registration type
+const (
+	accessTypeNull = iota
+	accessType3GPP
+	accessTypeNon3GPP
+	accessType3GPPandNon3GPP
+)
+
+func (ue *UE) encDeregistrationType() (pdu []byte) {
+
+	pdu = []byte{0}
+	switchOff := false
+	if switchOff {
+		pdu[0] |= (1 << 3)
+	}
+	pdu[0] |= accessType3GPP
 	return
 }
 
