@@ -4,28 +4,8 @@
 TMP_DIR=/tmp
 ARCH=`uname -m`
 GO_VERSION=`go version`
-VIMRC="set ts=2 sw=2 expandtab et number"
 OS_TYPE=$(awk '{ print $1 }' /proc/version)
 
-#--------------------------------------------------------------------------------------------------------------
-# Making sure that vim environment files exists
-if [ -f "$HOME/.vimrc" ] && [ -f "$HOME/.virc" ];
-then
-    echo "vimrc and virc file exists"
-else
-    touch ~/.vimrc
-    touch ~/.virc
-fi
-# Adding the VIMRC configuration to the vimrc and virc files
-if grep -Fxq "$VIMRC" $HOME/.vimrc && grep -Fxq "$VIMRC" $HOME/.virc;
-then
-    # code if found
-    echo "Already added the vim environment settings!"
-else
-    # code if not found
-    echo $VIMRC >> $HOME/.vimrc
-    echo $VIMRC >> $HOME/.virc
-fi
 #--------------------------------------------------------------------------------------------------------------
 # Making sure that last golang version available is installed
 if [ $OS_TYPE == "Linux" ]; then
