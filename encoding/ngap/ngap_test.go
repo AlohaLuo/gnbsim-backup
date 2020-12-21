@@ -146,6 +146,13 @@ func TestMakeNGSetupRequest(t *testing.T) {
 	if reflect.DeepEqual(expect, v) == false {
 		t.Errorf("NGSetupRequest\nexpect: %x\nactual: %x", expect, v)
 	}
+
+	expect_ip := "192.168.1.17"
+	if gnb.NGAPPeerAddr != "192.168.1.17" {
+		t.Errorf("NGSetupRequest\nexpect: %s\nactual: %s",
+			expect_ip, gnb.NGAPPeerAddr)
+	}
+	//fmt.Printf("NGAP Peer Addr: %s", gnb.NGAPPeerAddr)
 }
 
 func TestDecode(t *testing.T) {

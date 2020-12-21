@@ -96,6 +96,7 @@ type GNB struct {
 	RANUENGAPID     uint32
 	UE              nas.UE
 	ULInfoNR        UserLocationInformationNR
+	NGAPPeerAddr    string
 	GTPuAddr        string
 	GTPuIFname      string
 	GTPuTEID        uint32
