@@ -513,13 +513,8 @@ func (ue *UE) MakeRegistrationRequest() (pdu []byte) {
 	pdu = ue.enc5GSMMMessageHeader(SecurityHeaderTypePlain,
 		MessageTypeRegistrationRequest)
 
-	regType := RegistrationTypeInitialRegistration |
-		RegistrationTypeFlagFollowOnRequestPending
-	ngKSI := KeySetIdentityNoKeyIsAvailable
-
-	registrationTypeAndngKSI := byte(regType | (ngKSI << 4))
-
-	pdu = append(pdu, []byte{registrationTypeAndngKSI}...)
+	tmp := ue.encRegistrationType()
+	pdu = append(pdu, ue.encNASKeySetIdentifier(&tmp)...)
 	pdu = append(pdu, ue.enc5GSMobileID(false, TypeIDSUCI)...)
 
 	data := new(bytes.Buffer)
@@ -634,18 +629,19 @@ func (ue *UE) decDLNasTransport(pdu *[]byte) {
 // 8.2.12 De-registration request (UE originating de-registration)
 func (ue *UE) MakeDeregistrationRequest() (pdu []byte) {
 
-	/*
-		pdu = ue.enc5GSMMMessageHeader(
-			SecurityHeaderTypePlain,
-			MessageTypeDeregistrationRequest)
+	pdu = ue.enc5GSMMMessageHeader(SecurityHeaderTypePlain,
+		MessageTypeDeregistrationRequest)
+	tmp := ue.encDeregistrationType()
+	pdu = append(pdu, ue.encNASKeySetIdentifier(&tmp)...)
 
-		ue.encDeregistrationType()
+	// detail is shown in 5.5.2.2 UE-initiated de-registration procedure
+	//pdu = append(pdu, ue.enc5GSMobileID(false, TypeIDSUCI)...)
 
-		head := ue.enc5GSecurityProtectedMessageHeader(
-			SecurityHeaderTypeIntegrityProtectedAndCipheredWithNewContext, &pdu)
+	head := ue.enc5GSecurityProtectedMessageHeader(
+		SecurityHeaderTypeIntegrityProtectedAndCipheredWithNewContext,
+		&pdu)
 
-		pdu = append(head, pdu...)
-	*/
+	pdu = append(head, pdu...)
 
 	return
 }
@@ -1226,6 +1222,13 @@ const (
 	RegistrationTypeFlagFollowOnRequestPending = 0x08
 )
 
+func (ue *UE) encRegistrationType() (pdu []byte) {
+
+	pdu = []byte{RegistrationTypeInitialRegistration |
+		RegistrationTypeFlagFollowOnRequestPending}
+	return
+}
+
 // 9.11.3.9 5GS tracking area identity list
 func (ue *UE) decTAIList(pdu *[]byte) {
 	length := int((*pdu)[0])
@@ -1445,6 +1448,16 @@ func (ue *UE) decNASKeySetIdentifier(pdu *[]byte) {
 	ue.dprinti("NAS key set identifier: 0x%x", ksi)
 	*pdu = (*pdu)[1:]
 
+	return
+}
+
+func (ue *UE) encNASKeySetIdentifier(type1ie *[]byte) (pdu []byte) {
+
+	if type1ie == nil {
+		pdu = []byte{KeySetIdentityNoKeyIsAvailable}
+		return
+	}
+	pdu = []byte{(*type1ie)[0] | KeySetIdentityNoKeyIsAvailable<<4}
 	return
 }
 
