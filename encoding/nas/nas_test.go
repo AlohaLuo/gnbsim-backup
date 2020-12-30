@@ -18,12 +18,14 @@ var TestSecurityModeComplete []string = []string{
 }
 var TestRegistrationComplete string = "7e04006d1298007e0043"
 var TestPDUSessionEstablishmentRequest string = "7e0208d593cc007e00670100072e0101c1ffff93120181220401010203250908696e7465726e6574"
+var TestDeregistrationRequest string = "7e04d733af71007e004571000bf202f839cafe0000000001"
 
 // receive
 var TestAuthenticationRequest string = "7e00560002000021fc64081953bb33c0682edf1690b25821201094bbaf40940a8000c6a72c4efbaf0337"
 var TestSecurityModeCommand string = "7e03937711bc007e035d02000480a00000e1360100"
 var TestRegistrationAccept string = "7e02930d75cf017e0242010177000b0202f839cafe000000000154070002f839000001150a040101020304011122335e010616012c"
 var TestPDUSessionEstablishmentAccept string = "7e0222994e9f027e00680100202e0100c21100090100063131010100000601e80301e80359322905013c3c00011201"
+var TestDeregistrationAccept string = "7e0046"
 
 func receive(ue *UE, msg string) {
 	in, _ := hex.DecodeString(msg)
@@ -135,6 +137,23 @@ func TestMakePDUSessionEstablishmentRequest(t *testing.T) {
 
 }
 
+func TestMakeDeregistrationRequest(t *testing.T) {
+	ue := NewNAS("nas_test.json")
+
+	receive(ue, TestAuthenticationRequest)
+	receive(ue, TestSecurityModeCommand)
+	receive(ue, TestRegistrationAccept)
+	receive(ue, TestPDUSessionEstablishmentAccept)
+
+	v := ue.MakeDeregistrationRequest()
+	//fmt.Printf("MakeRegistrationRequest: %02x\n", v)
+	expect_str := TestDeregistrationRequest
+	expect, _ := hex.DecodeString(expect_str)
+	if reflect.DeepEqual(expect, v) == false {
+		t.Errorf("Deregistration Request\nexpect: %x\nactual: %x", expect, v)
+	}
+}
+
 func TestDecode(t *testing.T) {
 	ue := NewNAS("nas_test.json")
 	ue.dbgLevel = 1
@@ -144,10 +163,16 @@ func TestDecode(t *testing.T) {
 		in_str string
 		desc   string
 	}{
-		{TestAuthenticationRequest, "Authentication Request"},
-		{TestSecurityModeCommand, "Security Mode Command"},
-		{TestRegistrationAccept, "Registration Accept"},
-		{TestPDUSessionEstablishmentAccept, "PDU Session Establishemtn Accept"},
+		{TestAuthenticationRequest,
+			"Authentication Request"},
+		{TestSecurityModeCommand,
+			"Security Mode Command"},
+		{TestRegistrationAccept,
+			"Registration Accept"},
+		{TestPDUSessionEstablishmentAccept,
+			"PDU Session Establishemtn Accept"},
+		{TestDeregistrationAccept,
+			"Deregistration Accept"},
 	}
 
 	for _, p := range pattern {
