@@ -634,15 +634,13 @@ func (ue *UE) MakeDeregistrationRequest() (pdu []byte) {
 	tmp := ue.encDeregistrationType()
 	pdu = append(pdu, ue.encNASKeySetIdentifier(&tmp)...)
 
-	// detail is shown in 5.5.2.2 UE-initiated de-registration procedure
-	//pdu = append(pdu, ue.enc5GSMobileID(false, TypeIDSUCI)...)
-
+	// see detail is shown in 5.5.2.2 UE-initiated de-registration procedure
+	pdu = append(pdu, ue.enc5GSMobileID(false, TypeID5GGUTI)...)
 	head := ue.enc5GSecurityProtectedMessageHeader(
 		SecurityHeaderTypeIntegrityProtectedAndCipheredWithNewContext,
 		&pdu)
 
 	pdu = append(head, pdu...)
-
 	return
 }
 
@@ -1010,7 +1008,8 @@ func (ue *UE) enc5GSMobileID(iei bool, typeID int) (pdu []byte) {
 	//case TypeIDNoIdentity:
 	case TypeIDSUCI:
 		pdu = append(pdu, ue.enc5GSMobileIDTypeSUCI()...)
-	//case TypeID5GGUTI:
+	case TypeID5GGUTI:
+		pdu = append(pdu, ue.enc5GSMobileIDType5GGUTI()...)
 	//case TypeIDIMEI:
 	//case TypeID5GSTMSI:
 	case TypeIDIMEISV:
@@ -1051,6 +1050,19 @@ func (ue *UE) enc5GSMobileIDTypeSUCI() (pdu []byte) {
 	binary.Write(data, binary.BigEndian, f)
 	pdu = data.Bytes()
 
+	return
+}
+
+func (ue *UE) enc5GSMobileIDType5GGUTI() (pdu []byte) {
+
+	id := byte(TypeID5GGUTI)
+	id |= 0xf0
+	pdu = append(pdu, id)
+	pdu = append(pdu, ue.Recv.fiveGGUTI...)
+
+	length := make([]byte, 2)
+	binary.BigEndian.PutUint16(length, uint16(len(pdu)))
+	pdu = append(length, pdu...)
 	return
 }
 
@@ -1144,9 +1156,9 @@ func encSchemeOutput(msin string) (so [5]byte) {
 func (ue *UE) dec5GSMobileID(pdu *[]byte) {
 
 	ue.dprinti("5GS mobile identity")
-	length := binary.BigEndian.Uint16(*pdu)
-	id := int((*pdu)[2] & 0x7)
-	*pdu = (*pdu)[3:]
+	length := readPduUint16(pdu)
+	tmp := readPduByte(pdu)
+	id := int(tmp & 0x7)
 	length--
 
 	ue.indent++
