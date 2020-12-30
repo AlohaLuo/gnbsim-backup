@@ -196,6 +196,16 @@ func (t *testSession) registrateUE() {
 	return
 }
 
+func (t *testSession) deregistrateUE() {
+	pdu := t.ue.MakeDeregistrationRequest()
+	t.gnb.RecvfromUE(&pdu)
+	buf := t.gnb.MakeUplinkNASTransport()
+	t.sendtoAMF(buf)
+	t.recvfromAMF(0)
+
+	return
+}
+
 func (t *testSession) establishPDUSession() {
 
 	pdu := t.ue.MakePDUSessionEstablishmentRequest()
@@ -330,12 +340,14 @@ func (t *testSession) setupN3Tunnel(ctx context.Context) {
 
 	go t.decap(gtpConn, tun)
 	go t.encap(gtpConn, tun)
-	go t.runUPlane(ctx)
+	t.runUPlane(ctx)
 
-	select {
-	case <-ctx.Done():
-		log.Fatalf("exit gnbsim")
-	}
+	/*
+		select {
+		case <-ctx.Done():
+			log.Fatalf("exit gnbsim")
+		}
+	*/
 	return
 }
 
@@ -370,7 +382,7 @@ func addIP(ifname string, ip net.IP, masklen int) (err error) {
 		return err
 	}
 
-	netToAdd := &net.IPNet {
+	netToAdd := &net.IPNet{
 		IP:   ip,
 		Mask: net.CIDRMask(masklen, 32),
 	}
@@ -391,7 +403,7 @@ func addIP(ifname string, ip net.IP, masklen int) (err error) {
 
 	if !found {
 		err = fmt.Errorf(
-		    "cannot find the interface to add address: %s", ifname)
+			"cannot find the interface to add address: %s", ifname)
 		return
 	}
 
@@ -411,11 +423,11 @@ func addRoute(tun *netlink.Tuntap) (err error) {
 			IP:   net.IPv4zero,
 			Mask: net.CIDRMask(0, 32),
 		}, // default route
-		LinkIndex: tun.Attrs().Index,   // dev gtp-<ECI>
-		Scope:     netlink.SCOPE_LINK,  // scope link
-		Protocol:  4,                   // proto static
-		Priority:  1,                   // metric 1
-		Table:     routeTableID,        // table <ECI>
+		LinkIndex: tun.Attrs().Index,  // dev gtp-<ECI>
+		Scope:     netlink.SCOPE_LINK, // scope link
+		Protocol:  4,                  // proto static
+		Priority:  1,                  // metric 1
+		Table:     routeTableID,       // table <ECI>
 	}
 
 	err = netlink.RouteReplace(route)
@@ -430,11 +442,11 @@ func addRoute2(uConn *gtpv1.UPlaneConn) (err error) {
 			IP:   net.IPv4zero,
 			Mask: net.CIDRMask(0, 32),
 		}, // default route
-		LinkIndex:  uConn.KernelGTP.Link.Attrs().Index,   // dev gtp-<ECI>
-		Scope:     netlink.SCOPE_LINK,  // scope link
-		Protocol:  4,                   // proto static
-		Priority:  1,                   // metric 1
-		Table:     routeTableID,        // table <ECI>
+		LinkIndex: uConn.KernelGTP.Link.Attrs().Index, // dev gtp-<ECI>
+		Scope:     netlink.SCOPE_LINK,                 // scope link
+		Protocol:  4,                                  // proto static
+		Priority:  1,                                  // metric 1
+		Table:     routeTableID,                       // table <ECI>
 	}
 
 	err = netlink.RouteReplace(route)
@@ -449,8 +461,8 @@ func addRuleLocal(ip net.IP) (err error) {
 		return err
 	}
 
-	mask32 := &net.IPNet {
-		IP: ip,
+	mask32 := &net.IPNet{
+		IP:   ip,
 		Mask: net.CIDRMask(32, 32),
 	}
 
@@ -489,7 +501,6 @@ func (t *testSession) decap(gtpConn *net.UDPConn, tun *netlink.Tuntap) {
 		}
 	}
 }
-
 
 func (t *testSession) encap(gtpConn *net.UDPConn, tun *netlink.Tuntap) {
 
@@ -552,7 +563,7 @@ func (t *testSession) runUPlane(ctx context.Context) {
 			log.Printf("[HTTP Probe] Successfully GET %s: "+
 				"Status: %s", ue.URL, rsp.Status)
 			rsp.Body.Close()
-			continue
+			return
 		}
 		rsp.Body.Close()
 		log.Printf("[HTTP Probe] got invalid response on HTTP probe: %v",
@@ -597,15 +608,18 @@ func main() {
 	t.initUE()
 
 	t.registrateUE()
-	time.Sleep(time.Second * 3)
+	time.Sleep(time.Second * 1)
 
 	t.establishPDUSession()
-	time.Sleep(time.Second * 3)
+	time.Sleep(time.Second * 1)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	t.setupN3Tunnel(ctx)
-	time.Sleep(time.Second * 3)
+	time.Sleep(time.Second * 1)
+
+	t.deregistrateUE()
+	time.Sleep(time.Second * 1)
 
 	return
 }
