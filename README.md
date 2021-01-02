@@ -67,12 +67,6 @@ $ sudo ./example -ip <AMF NGAP listen ip address set above>
 
 * And you could also find your UE in 'subscriber' page of free5gc web console.
 
-## Progress
-* [x] Initial Registration
-* [x] PDU Session Establishment
-* [x] User Plane functionality
-* [ ] Deregistration
-
 <!--
 ## Running the tests
 
