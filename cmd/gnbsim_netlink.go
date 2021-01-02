@@ -52,7 +52,7 @@ func AddIPv4Address(ifName string, ip net.IP, masklen int) (err error) {
 		}
 		found = true
 		if a.IPNet.String() == netToAdd.String() {
-			// It has already set the IP address.
+			// The IP address has already been set.
 			return
 		}
 		addr = a
