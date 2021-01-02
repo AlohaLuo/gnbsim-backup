@@ -77,21 +77,39 @@ type UE struct {
 // 5.1.3 5GMM sublayer states
 // actual value is not defined in the standard.
 const (
-	//fiveGMMNULL = iota
-	state5GMMDeregistared = iota
-	state5GMMRegisteredInitiated
-	state5GMMRegistered
-	state5GMMServiceRequestInitiated
-	state5GMMDeregistaredInitiated
+	MMNULL = iota
+	MMDeregistared
+	MMRegisteredInitiated
+	MMRegistered
+	MMServiceRequestInitiated
+	MMDeregistaredInitiated
 )
 
 var state5GMMstr = map[int]string{
-	//state5GMMNULL:                    "5GMM-NULL",
-	state5GMMDeregistared:            "5GMM-DEREGISTERED",
-	state5GMMRegisteredInitiated:     "5GMM-REGISTERED-INITIATED",
-	state5GMMRegistered:              "5GMM-REGISTERED",
-	state5GMMServiceRequestInitiated: "5GMM-SERVICE-REQUEST-INITIATED",
-	state5GMMDeregistaredInitiated:   "5GMM-DEREGISTERED-INITIATED",
+	MMNULL:                    "5GMM NULL",
+	MMDeregistared:            "5GMM DEREGISTERED",
+	MMRegisteredInitiated:     "5GMM REGISTERED-INITIATED",
+	MMRegistered:              "5GMM REGISTERED",
+	MMServiceRequestInitiated: "5GMM SERVICE-REQUEST-INITIATED",
+	MMDeregistaredInitiated:   "5GMM DEREGISTERED-INITIATED",
+}
+
+// 6.1.3 5GSM sublayer states
+// actual value is not defined in the standard.
+const (
+	SMInactive = iota
+	SMActivePending
+	SMInactivePending
+	SMModificationPending
+	SMActive
+)
+
+var state5GSMstr = map[int]string{
+	SMInactive:            "5GSM PDU SESSION INACTIVE",
+	SMActivePending:       "5GSM PDU SESSION ACTIVE PENDING",
+	SMInactivePending:     "5GSM PDU SESSION INACTIVE PENDING",
+	SMModificationPending: "5GSM PDU SESSION MODIFICATION PENDING",
+	SMActive:              "5GSM PDU SESSION ACTIVE",
 }
 
 // my receive flag definition
@@ -229,7 +247,7 @@ func NewNAS(filename string) (ue *UE) {
 func (ue *UE) PowerON() {
 	ue.dbgLevel = 0
 
-	ue.state5GMM = state5GMMDeregistared
+	ue.state5GMM = MMDeregistared
 	ue.Recv.state = rcvdNull
 
 	ue.wa.forceRINMR = true
@@ -305,8 +323,8 @@ func (ue *UE) Decode5GMM(pdu *[]byte) (msgType int) {
 
 	if secHeader != 0x00 {
 		/*
-		 * free5gc seems to set the security header != 0 for the plain NAS
-		 * message. My workaround is invoked.
+		 * free5gc seems to set the security header != 0 for the plain
+		 * NAS message. My workaround is invoked.
 		 */
 		ue.dprinti("### workaround: SecurityHeaderParsed.")
 	}
@@ -522,7 +540,7 @@ func (ue *UE) MakeRegistrationRequest() (pdu []byte) {
 	binary.Write(data, binary.BigEndian, encUESecurityCapability())
 	pdu = append(pdu, data.Bytes()...)
 
-	ue.state5GMM = state5GMMRegisteredInitiated
+	ue.state5GMM = MMRegisteredInitiated
 
 	// start T3510 timer. see 5.5.1.2.2 Initial registration initiation
 
