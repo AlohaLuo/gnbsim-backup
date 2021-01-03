@@ -18,7 +18,9 @@ type GnbsimSession struct {
 }
 
 func main() {
+
 	s := initConfig("gnbsim.json")
+
 	for _, ue := range s.ue {
 		fmt.Printf("%v\n", *ue)
 	}
@@ -40,7 +42,7 @@ func initConfig(jsonFile string) (s *GnbsimSession) {
 		ue.MSIN = fmt.Sprintf("%010d", msin)
 		s.ue = append(s.ue, &ue)
 
-		imeisv += uint64(100)
+		imeisv += uint64(100) // serial number ++
 		msin += uint64(1)
 	}
 	return
