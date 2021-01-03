@@ -97,7 +97,8 @@ type GNB struct {
 	UE              nas.UE
 	ULInfoNR        UserLocationInformationNR
 	NGAPPeerAddr    string
-	GTPuAddr        string
+	GTPuAddr        string // to be obsolete
+	GTPuLocalAddr   string
 	GTPuIFname      string
 	GTPuTEID        uint32
 
