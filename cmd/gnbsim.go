@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	"github.com/ishidawataru/sctp"
 	"github.com/hhorai/gnbsim/encoding/ngap"
 	"github.com/hhorai/gnbsim/encoding/nas"
@@ -12,10 +13,35 @@ type GnbsimSession struct {
 	n1conn *sctp.SCTPConn
 	n1info *sctp.SndRcvInfo
 	gnb    *ngap.GNB
-	ue     *[]nas.UE
+	ue     []*nas.UE
 	gtpu   *gtp.GTP
 }
 
 func main() {
-	fmt.Printf("gnbsim\n")
+	s := initConfig("gnbsim.json")
+	for _, ue := range s.ue {
+		fmt.Printf("%v\n", *ue)
+	}
+	return
+}
+
+func initConfig(jsonFile string) (s *GnbsimSession) {
+
+	var obj GnbsimSession
+	s = &obj
+
+	s.gnb = ngap.NewNGAP(jsonFile)
+	imeisv, _ := strconv.ParseUint(s.gnb.UE.IMEISV, 10, 64)
+	msin, _ := strconv.ParseUint(s.gnb.UE.MSIN, 10, 64)
+
+	for i:=0; i<s.gnb.UE.Number; i++ {
+		ue := s.gnb.UE
+		ue.IMEISV = fmt.Sprintf("%016d", imeisv)
+		ue.MSIN = fmt.Sprintf("%010d", msin)
+		s.ue = append(s.ue, &ue)
+
+		imeisv += uint64(100)
+		msin += uint64(1)
+	}
+	return
 }
