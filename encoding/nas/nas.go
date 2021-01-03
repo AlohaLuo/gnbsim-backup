@@ -28,6 +28,7 @@ import (
 )
 
 type UE struct {
+	Number           int
 	MSIN             string
 	MCC              int
 	MNC              int
