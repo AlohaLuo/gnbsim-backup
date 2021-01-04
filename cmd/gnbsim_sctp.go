@@ -1,10 +1,13 @@
+// Copyright 2019-2021 hhorai. All rights reserved.
+// Use of this source code is governed by a MIT license that can be found
+// in the LICENSE file.
 package main
 
 import (
 	"fmt"
+	"github.com/ishidawataru/sctp"
 	"net"
 	"time"
-	"github.com/ishidawataru/sctp"
 )
 
 func NewN2Conn(amfAddr net.IPAddr, amfPort int) (
@@ -75,5 +78,3 @@ func (s *GnbsimSession) Recv(t time.Duration) (err error) {
 	}
 	return
 }
-
-

@@ -1,12 +1,15 @@
+// Copyright 2019-2021 hhorai. All rights reserved.
+// Use of this source code is governed by a MIT license that can be found
+// in the LICENSE file.
 package main
 
 import (
 	"fmt"
-	"strconv"
-	"github.com/ishidawataru/sctp"
-	"github.com/hhorai/gnbsim/encoding/ngap"
-	"github.com/hhorai/gnbsim/encoding/nas"
 	"github.com/hhorai/gnbsim/encoding/gtp"
+	"github.com/hhorai/gnbsim/encoding/nas"
+	"github.com/hhorai/gnbsim/encoding/ngap"
+	"github.com/ishidawataru/sctp"
+	"strconv"
 )
 
 type GnbsimSession struct {
@@ -36,7 +39,7 @@ func initConfig(jsonFile string) (s *GnbsimSession) {
 	imeisv, _ := strconv.ParseUint(s.gnb.UE.IMEISV, 10, 64)
 	msin, _ := strconv.ParseUint(s.gnb.UE.MSIN, 10, 64)
 
-	for i:=0; i<s.gnb.UE.Number; i++ {
+	for i := 0; i < s.gnb.UE.Number; i++ {
 		ue := s.gnb.UE
 		ue.IMEISV = fmt.Sprintf("%016d", imeisv)
 		ue.MSIN = fmt.Sprintf("%010d", msin)
