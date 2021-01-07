@@ -10,6 +10,8 @@ import (
 	"time"
 )
 
+const recvTimer = 5 // sec
+
 func NewN2Conn(amfAddr net.IPAddr, amfPort int) (
 	conn *sctp.SCTPConn, info *sctp.SndRcvInfo, err error) {
 
@@ -19,9 +21,21 @@ func NewN2Conn(amfAddr net.IPAddr, amfPort int) (
 		Port:    amfPort,
 	}
 
-	conn, err = sctp.DialSCTP("sctp", nil, addr)
-	if err != nil {
-		err = fmt.Errorf("failed to sctp dial: %s", err)
+	t := time.Duration(recvTimer)
+	c := make(chan bool, 1)
+	go func() {
+		conn, err = sctp.DialSCTP("sctp", nil, addr)
+		if err != nil {
+			err = fmt.Errorf("failed to sctp dial: %s", err)
+			return
+		}
+		c <- true
+	}()
+	select {
+	case <-c:
+		break
+	case <-time.After(t * time.Second):
+		err = fmt.Errorf("sctp dial timeout(%d sec)", t)
 		return
 	}
 
@@ -29,9 +43,7 @@ func NewN2Conn(amfAddr net.IPAddr, amfPort int) (
 		Stream: 0,
 		PPID:   0x3c000000, // Paylod Protocol Identifier: NGAP(60)
 	}
-
 	conn.SubscribeEvents(sctp.SCTP_EVENT_DATA_IO)
-
 	return
 }
 
@@ -46,10 +58,8 @@ func (s *GnbsimSession) Send(pdu []byte) {
 
 func (s *GnbsimSession) Recv(t time.Duration) (err error) {
 
-	const defaultTimer = 5 // sec
-
 	if t == 0 {
-		t = defaultTimer
+		t = recvTimer
 	}
 
 	c := make(chan bool, 1)

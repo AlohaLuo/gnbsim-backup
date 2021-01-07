@@ -7,6 +7,11 @@ import (
 	"fmt"
 )
 
-func ue() {
-	fmt.Printf("ue\n")
+func (s *GnbsimSession) InitUEs() (err error) {
+
+	for _, ue := range s.ue {
+		ue.PowerON()
+	}
+	fmt.Printf("InitUEs")
+	return
 }

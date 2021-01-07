@@ -24,9 +24,18 @@ func main() {
 
 	s := initConfig("gnbsim.json")
 
-	for _, ue := range s.ue {
-		fmt.Printf("%v\n", *ue)
+	err := s.InitRAN()
+	if err != nil {
+		fmt.Printf("InitRAN failed: %v\n", err)
+		return
 	}
+
+	err = s.InitUEs()
+	if err != nil {
+		fmt.Printf("InitUEs failed: %v\n", err)
+		return
+	}
+
 	return
 }
 
