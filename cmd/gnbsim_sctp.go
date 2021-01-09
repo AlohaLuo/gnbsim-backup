@@ -12,7 +12,7 @@ import (
 
 const recvTimer = 5 // sec
 
-func NewN2Conn(amfAddr net.IPAddr, amfPort int) (
+func newN2Conn(amfAddr net.IPAddr, amfPort int) (
 	conn *sctp.SCTPConn, info *sctp.SndRcvInfo, err error) {
 
 	ips := []net.IPAddr{amfAddr}
@@ -35,7 +35,7 @@ func NewN2Conn(amfAddr net.IPAddr, amfPort int) (
 	case <-c:
 		break
 	case <-time.After(t * time.Second):
-		err = fmt.Errorf("sctp dial timeout(%d sec)", t)
+		err = fmt.Errorf("sctp dial timeout (%d sec)", t)
 		return
 	}
 
@@ -47,7 +47,7 @@ func NewN2Conn(amfAddr net.IPAddr, amfPort int) (
 	return
 }
 
-func (s *GnbsimSession) Send(pdu []byte) {
+func (s *GnbsimSession) send(pdu []byte) {
 
 	_, err := s.n1conn.SCTPWrite(pdu, s.n1info)
 	if err != nil {
@@ -56,7 +56,7 @@ func (s *GnbsimSession) Send(pdu []byte) {
 	return
 }
 
-func (s *GnbsimSession) Recv(t time.Duration) (err error) {
+func (s *GnbsimSession) recv(t time.Duration) (err error) {
 
 	if t == 0 {
 		t = recvTimer
@@ -83,7 +83,7 @@ func (s *GnbsimSession) Recv(t time.Duration) (err error) {
 	case <-c:
 		break
 	case <-time.After(t * time.Second):
-		err = fmt.Errorf("sctp read timeout(%d sec)", t)
+		err = fmt.Errorf("sctp read timeout (%d sec)", t)
 		break
 	}
 	return

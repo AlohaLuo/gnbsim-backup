@@ -24,13 +24,13 @@ func main() {
 
 	s := initConfig("gnbsim.json")
 
-	err := s.InitRAN()
+	err := s.initRAN()
 	if err != nil {
 		fmt.Printf("InitRAN failed: %v\n", err)
 		return
 	}
 
-	err = s.InitUEs()
+	err = s.initUEs()
 	if err != nil {
 		fmt.Printf("InitUEs failed: %v\n", err)
 		return

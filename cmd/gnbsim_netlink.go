@@ -9,7 +9,7 @@ import (
 	"net"
 )
 
-func AddTunnel(name string) (tun *netlink.Tuntap, err error) {
+func addTunnel(name string) (tun *netlink.Tuntap, err error) {
 
 	tun = &netlink.Tuntap{
 		LinkAttrs: netlink.LinkAttrs{Name: name},
@@ -30,7 +30,7 @@ func AddTunnel(name string) (tun *netlink.Tuntap, err error) {
 	return
 }
 
-func AddIPv4Address(ifName string, ip net.IP, masklen int) (err error) {
+func addIPv4Address(ifName string, ip net.IP, masklen int) (err error) {
 
 	link, err := netlink.LinkByName(ifName)
 	if err != nil {

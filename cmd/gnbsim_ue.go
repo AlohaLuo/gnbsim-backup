@@ -7,7 +7,7 @@ import (
 	"fmt"
 )
 
-func (s *GnbsimSession) InitUEs() (err error) {
+func (s *GnbsimSession) initUEs() (err error) {
 
 	for _, ue := range s.ue {
 		ue.PowerON()
