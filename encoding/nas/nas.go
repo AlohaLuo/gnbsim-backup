@@ -250,8 +250,6 @@ func (ue *UE) PowerON() {
 
 	ue.state5GMM = MMDeregistared
 	ue.Recv.state = rcvdNull
-
-	ue.wa.forceRINMR = true
 }
 
 func (ue *UE) Receive(pdu *[]byte) {
