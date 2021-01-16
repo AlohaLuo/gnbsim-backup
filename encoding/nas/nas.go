@@ -40,8 +40,9 @@ type UE struct {
 	DNN              string
 	URL              string
 
-	state5GMM int
-	state5GSM int
+	RRCstate int
+	MMstate int
+	SMstate int
 
 	sm struct {
 		pduSessionId           uint8
@@ -86,7 +87,7 @@ const (
 	MMDeregistaredInitiated
 )
 
-var state5GMMstr = map[int]string{
+var MMstateStr = map[int]string{
 	MMNULL:                    "5GMM NULL",
 	MMDeregistared:            "5GMM DEREGISTERED",
 	MMRegisteredInitiated:     "5GMM REGISTERED-INITIATED",
@@ -105,7 +106,7 @@ const (
 	SMActive
 )
 
-var state5GSMstr = map[int]string{
+var SMstateStr = map[int]string{
 	SMInactive:            "5GSM PDU SESSION INACTIVE",
 	SMActivePending:       "5GSM PDU SESSION ACTIVE PENDING",
 	SMInactivePending:     "5GSM PDU SESSION INACTIVE PENDING",
@@ -248,7 +249,7 @@ func NewNAS(filename string) (ue *UE) {
 func (ue *UE) PowerON() {
 	ue.dbgLevel = 0
 
-	ue.state5GMM = MMDeregistared
+	ue.MMstate = MMDeregistared
 	ue.Recv.state = rcvdNull
 }
 
@@ -539,7 +540,7 @@ func (ue *UE) MakeRegistrationRequest() (pdu []byte) {
 	binary.Write(data, binary.BigEndian, encUESecurityCapability())
 	pdu = append(pdu, data.Bytes()...)
 
-	ue.state5GMM = MMRegisteredInitiated
+	ue.MMstate = MMRegisteredInitiated
 
 	// start T3510 timer. see 5.5.1.2.2 Initial registration initiation
 
