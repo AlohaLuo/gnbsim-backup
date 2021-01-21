@@ -110,6 +110,8 @@ type GNB struct {
 		GTPuPeerTEID uint32
 	}
 
+	Camper map[uint32]*nas.UE
+
 	SendNasMsg *[]byte
 	RecvNasMsg *[]byte
 
