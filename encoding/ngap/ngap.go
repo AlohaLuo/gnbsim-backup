@@ -34,59 +34,59 @@ const (
 )
 
 const (
-	idAllowedNSSAI                      = 0
-	idAMFName                           = 1
-	idAMFUENGAPID                       = 10
-	idDefaultPagingDRX                  = 21
-	idGlobalRANNodeID                   = 27
-	idGUAMI                             = 28
-	idMaskedIMEISV                      = 34
-	idMobilityRestrictionList           = 36
-	idNASPDU                            = 38
-	idPDUSessionResourceSetupListCxtReq = 71
-	idPDUSessionResourceSetupListSUReq  = 74
-	idPDUSessionResourceSetupListSURes  = 75
-	idPLMNSupportList                   = 80
-	idRANUENGAPID                       = 85
-	idRelativeAMFCapacity               = 86
-	idRRCEstablishmentCause             = 90
-	idSecurityKey                       = 94
-	idServedGUAMIList                   = 96
-	idSupportedTAList                   = 102
-	idUEContextRequest                  = 112
-	idUESecurityCapabilities            = 119
-	idUserLocationInformation           = 121
-	idPDUSessionType                    = 134
-	idQosFlowSetupRequestList           = 136
-	idULNGUUPTNLInformation             = 139
+	idAllowedNSSAI              = 0
+	idAMFName                   = 1
+	idAMFUENGAPID               = 10
+	idDefaultPagingDRX          = 21
+	idGlobalRANNodeID           = 27
+	idGUAMI                     = 28
+	idMaskedIMEISV              = 34
+	idMobilityRestrictionList   = 36
+	idNASPDU                    = 38
+	idPDUSessResSetupListCxtReq = 71
+	idPDUSessResSetupListSUReq  = 74
+	idPDUSessResSetupListSURes  = 75
+	idPLMNSupportList           = 80
+	idRANUENGAPID               = 85
+	idRelativeAMFCapacity       = 86
+	idRRCEstablishmentCause     = 90
+	idSecurityKey               = 94
+	idServedGUAMIList           = 96
+	idSupportedTAList           = 102
+	idUEContextRequest          = 112
+	idUESecurityCapabilities    = 119
+	idUserLocationInformation   = 121
+	idPDUSessionType            = 134
+	idQosFlowSetupRequestList   = 136
+	idULNGUUPTNLInformation     = 139
 )
 
 var ieID = map[int]string{
-	idAllowedNSSAI:                      "id-AllowedNSSAI",
-	idAMFName:                           "id-AMFName",
-	idAMFUENGAPID:                       "id-AMF-UE-NGAP-ID",
-	idDefaultPagingDRX:                  "",
-	idGlobalRANNodeID:                   "",
-	idGUAMI:                             "id-GUAMI",
-	idMaskedIMEISV:                      "id-MaskedIMEISV",
-	idMobilityRestrictionList:           "id-MobilityRestrictionList",
-	idNASPDU:                            "id-NAS-PDU",
-	idPDUSessionResourceSetupListCxtReq: "idPDUSessionResourceSetupListCxtReq",
-	idPDUSessionResourceSetupListSUReq:  "id-PDUSessionResourceSetupListSUReq",
-	idPDUSessionResourceSetupListSURes:  "id-PDUSessionResourceSetupListSURes",
-	idPLMNSupportList:                   "id-PLMNSupportList",
-	idRANUENGAPID:                       "id-RAN-UE-NGAP-ID",
-	idRelativeAMFCapacity:               "id-RelativeAMFCapacity",
-	idRRCEstablishmentCause:             "",
-	idSecurityKey:                       "id-SecurityKey",
-	idServedGUAMIList:                   "id-ServedGUAMIList",
-	idSupportedTAList:                   "",
-	idUEContextRequest:                  "",
-	idUESecurityCapabilities:            "id-UESecurityCapabilities",
-	idUserLocationInformation:           "",
-	idPDUSessionType:                    "id-PDUSessionType",
-	idQosFlowSetupRequestList:           "id-QosFlowSetupRequestList",
-	idULNGUUPTNLInformation:             "id-UL-NGU-UP-TNLInformation",
+	idAllowedNSSAI:              "id-AllowedNSSAI",
+	idAMFName:                   "id-AMFName",
+	idAMFUENGAPID:               "id-AMF-UE-NGAP-ID",
+	idDefaultPagingDRX:          "",
+	idGlobalRANNodeID:           "",
+	idGUAMI:                     "id-GUAMI",
+	idMaskedIMEISV:              "id-MaskedIMEISV",
+	idMobilityRestrictionList:   "id-MobilityRestrictionList",
+	idNASPDU:                    "id-NAS-PDU",
+	idPDUSessResSetupListCxtReq: "id-PDUSessionResourceSetupListCxtReq",
+	idPDUSessResSetupListSUReq:  "id-PDUSessionResourceSetupListSUReq",
+	idPDUSessResSetupListSURes:  "id-PDUSessionResourceSetupListSURes",
+	idPLMNSupportList:           "id-PLMNSupportList",
+	idRANUENGAPID:               "id-RAN-UE-NGAP-ID",
+	idRelativeAMFCapacity:       "id-RelativeAMFCapacity",
+	idRRCEstablishmentCause:     "",
+	idSecurityKey:               "id-SecurityKey",
+	idServedGUAMIList:           "id-ServedGUAMIList",
+	idSupportedTAList:           "",
+	idUEContextRequest:          "",
+	idUESecurityCapabilities:    "id-UESecurityCapabilities",
+	idUserLocationInformation:   "",
+	idPDUSessionType:            "id-PDUSessionType",
+	idQosFlowSetupRequestList:   "id-QosFlowSetupRequestList",
+	idULNGUUPTNLInformation:     "id-UL-NGU-UP-TNLInformation",
 }
 
 type GNB struct {
@@ -247,7 +247,7 @@ PDUSessionResourceSetupResponseIEs NGAP-PROTOCOL-IES ::= {
 */
 func (gnb *GNB) MakePDUSessionResourceSetupResponse() (pdu []byte) {
 
-	pdu = encNgapPdu(successfulOutcome, idPDUSessionResourceSetup, reject)
+	pdu = encNgapPdu(successfulOutcome, idPDUSessResSetup, reject)
 
 	v := encProtocolIEContainer(3)
 
@@ -284,7 +284,7 @@ PDUSessionResourceSetupItemSURes ::= SEQUENCE {
 */
 func (gnb *GNB) encPDUSessionResourceSetupListSURes() (v []byte) {
 
-	head, _ := encProtocolIE(idPDUSessionResourceSetupListSURes, ignore)
+	head, _ := encProtocolIE(idPDUSessResSetupListSURes, ignore)
 
 	_, v, _ = per.EncSequenceOf(1, 1, 256, false)
 	bf, _ := per.EncSequence(true, 1, 0)
@@ -525,21 +525,21 @@ UnsuccessfulOutcome ::= SEQUENCE {
 */
 
 const (
-	idDownlinkNASTransport    = 4
-	idInitialContextSetup     = 14
-	idInitialUEMessage        = 15
-	idNGSetup                 = 21
-	idPDUSessionResourceSetup = 29
-	idUplinkNASTransport      = 46
+	idDownlinkNASTransport = 4
+	idInitialContextSetup  = 14
+	idInitialUEMessage     = 15
+	idNGSetup              = 21
+	idPDUSessResSetup      = 29
+	idUplinkNASTransport   = 46
 )
 
 var procCodeStr = map[int]string{
-	idDownlinkNASTransport:    "id-DownlinkNASTransport",
-	idInitialContextSetup:     "id-InitialContextSetup",
-	idInitialUEMessage:        "id-InitialUEMessage",
-	idNGSetup:                 "id-NGSetup",
-	idPDUSessionResourceSetup: "id-PDUSessionResourceSetup",
-	idUplinkNASTransport:      "id-UplinkNASTransport",
+	idDownlinkNASTransport: "id-DownlinkNASTransport",
+	idInitialContextSetup:  "id-InitialContextSetup",
+	idInitialUEMessage:     "id-InitialUEMessage",
+	idNGSetup:              "id-NGSetup",
+	idPDUSessResSetup:      "id-PDUSessionResourceSetup",
+	idUplinkNASTransport:   "id-UplinkNASTransport",
 }
 
 const (
@@ -657,9 +657,9 @@ func (gnb *GNB) decProtocolIE(pdu *[]byte) (err error) {
 		gnb.decAMFUENGAPID(pdu, length)
 	case idNASPDU: // 38
 		gnb.decNASPDU(pdu)
-	case idPDUSessionResourceSetupListCxtReq: // 71
+	case idPDUSessResSetupListCxtReq: // 71
 		gnb.decPDUSessionResourceSetupListCtxReq(pdu, length)
-	case idPDUSessionResourceSetupListSUReq: // 74
+	case idPDUSessResSetupListSUReq: // 74
 		gnb.decPDUSessionResourceSetupListSUReq(pdu, length)
 	case idPDUSessionType: // 134
 		gnb.decPDUSessionType(pdu, length)
