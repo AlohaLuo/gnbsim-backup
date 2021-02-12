@@ -9,7 +9,6 @@ import (
 	"github.com/hhorai/gnbsim/encoding/ngap"
 	"github.com/ishidawataru/sctp"
 	"github.com/vishvananda/netlink"
-	"github.com/wmnsk/go-gtp/gtpv1"
 	"log"
 	"net"
 	"net/http"
@@ -21,7 +20,6 @@ type testSession struct {
 	conn *sctp.SCTPConn
 	info *sctp.SndRcvInfo
 	gnb  *ngap.GNB
-	ue   *nas.UE
 	gtpu *gtp.GTP
 }
 
@@ -155,39 +153,54 @@ func initRANwithoutSCTP() (t *testSession) {
 }
 
 func (t *testSession) initUE() {
-	t.ue = &t.gnb.UE
-	t.ue.PowerON()
-	t.ue.SetDebugLevel(1)
+
+	gnb := t.gnb
+	tmp := t.gnb.UEparam
+	ue := &tmp
+	ue.PowerON()
+	ue.SetDebugLevel(1)
+	gnb.CampIn(ue)
+
 	return
 }
 
-func (t *testSession) registrateUE() {
+func (t *testSession) registrteAll() {
+	gnb := t.gnb
+	for _, c := range gnb.Camper {
+		ue := c.UE
+		t.registrateUE(ue)
+	}
+}
 
-	pdu := t.ue.MakeRegistrationRequest()
-	t.gnb.RecvfromUE(&pdu)
+func (t *testSession) registrateUE(ue *nas.UE) {
 
-	buf := t.gnb.MakeInitialUEMessage()
+	gnb := t.gnb
+
+	pdu := ue.MakeRegistrationRequest()
+	gnb.RecvfromUE(ue, &pdu)
+
+	buf := gnb.MakeInitialUEMessage(ue)
 	t.sendtoAMF(buf)
 	t.recvfromAMF(0)
 
-	pdu = t.ue.MakeAuthenticationResponse()
-	t.gnb.RecvfromUE(&pdu)
-	buf = t.gnb.MakeUplinkNASTransport()
+	pdu = ue.MakeAuthenticationResponse()
+	gnb.RecvfromUE(ue, &pdu)
+	buf = gnb.MakeUplinkNASTransport(ue)
 	t.sendtoAMF(buf)
 	t.recvfromAMF(0)
 
-	pdu = t.ue.MakeSecurityModeComplete()
-	t.gnb.RecvfromUE(&pdu)
-	buf = t.gnb.MakeUplinkNASTransport()
+	pdu = ue.MakeSecurityModeComplete()
+	gnb.RecvfromUE(ue, &pdu)
+	buf = gnb.MakeUplinkNASTransport(ue)
 	t.sendtoAMF(buf)
 	t.recvfromAMF(0)
 
-	buf = t.gnb.MakeInitialContextSetupResponse()
+	buf = gnb.MakeInitialContextSetupResponse(ue)
 	t.sendtoAMF(buf)
 
-	pdu = t.ue.MakeRegistrationComplete()
-	t.gnb.RecvfromUE(&pdu)
-	buf = t.gnb.MakeUplinkNASTransport()
+	pdu = ue.MakeRegistrationComplete()
+	gnb.RecvfromUE(ue, &pdu)
+	buf = gnb.MakeUplinkNASTransport(ue)
 	t.sendtoAMF(buf)
 
 	// for Configuration Update Command from open5gs AMF.
@@ -196,118 +209,62 @@ func (t *testSession) registrateUE() {
 	return
 }
 
-func (t *testSession) deregistrateUE() {
-	pdu := t.ue.MakeDeregistrationRequest()
-	t.gnb.RecvfromUE(&pdu)
-	buf := t.gnb.MakeUplinkNASTransport()
+func (t *testSession) deregistrateAll() {
+	gnb := t.gnb
+	for _, c := range gnb.Camper {
+		ue := c.UE
+		t.deregistrateUE(ue)
+	}
+}
+
+func (t *testSession) deregistrateUE(ue *nas.UE) {
+
+	gnb := t.gnb
+
+	pdu := ue.MakeDeregistrationRequest()
+	gnb.RecvfromUE(ue, &pdu)
+	buf := gnb.MakeUplinkNASTransport(ue)
 	t.sendtoAMF(buf)
 	t.recvfromAMF(0)
 
 	return
 }
 
-func (t *testSession) establishPDUSession() {
+func (t *testSession) establishPDUSessionAll() {
+	gnb := t.gnb
+	for _, c := range gnb.Camper {
+		ue := c.UE
+		t.establishPDUSession(ue)
+	}
+}
 
-	pdu := t.ue.MakePDUSessionEstablishmentRequest()
-	t.gnb.RecvfromUE(&pdu)
-	buf := t.gnb.MakeUplinkNASTransport()
+func (t *testSession) establishPDUSession(ue *nas.UE) {
+
+	gnb := t.gnb
+
+	pdu := ue.MakePDUSessionEstablishmentRequest()
+	gnb.RecvfromUE(ue, &pdu)
+	buf := gnb.MakeUplinkNASTransport(ue)
 	t.sendtoAMF(buf)
 	t.recvfromAMF(0)
 
-	buf = t.gnb.MakePDUSessionResourceSetupResponse()
+	buf = gnb.MakePDUSessionResourceSetupResponse(ue)
 	t.sendtoAMF(buf)
 
 	return
 }
 
-func (t *testSession) setupN3Tunnel2(ctx context.Context) {
+func (t *testSession) setupN3Tunnel() (gtpConn *net.UDPConn, tun *netlink.Tuntap) {
 
 	gnb := t.gnb
-	ue := t.ue
+	log.Printf("GTP-U interface name: %s\n", gnb.GTPuIFname)
+	log.Printf("GTP-U local addr: %v\n", gnb.GTPuLocalAddr)
+	log.Printf("GTP-U peer addr : %v\n", gnb.Recv.GTPuPeerAddr)
 
-	log.Printf("GTPuIFname: %s\n", gnb.GTPuIFname)
-	log.Printf("GTP-U Peer: %v\n", gnb.Recv.GTPuPeerAddr)
-	log.Printf("GTP-U Peer TEID: %v\n", gnb.Recv.GTPuPeerTEID)
-	log.Printf("GTP-U Local TEID: %v\n", gnb.GTPuTEID)
-	log.Printf("UE address: %v\n", ue.Recv.PDUAddress)
-
-	addr, err := net.ResolveUDPAddr("udp", gnb.GTPuAddr+gtpv1.GTPUPort)
-	if err != nil {
-		log.Fatalf("failed to net.ResolveUDPAddr: %v", err)
-		return
-	}
-	fmt.Printf("test: gNB UDP local address: %v\n", addr)
-	uConn := gtpv1.NewUPlaneConn(addr)
-	//defer uConn.Close()
-
-	if err = uConn.EnableKernelGTP("gtp-gnb", gtpv1.RoleSGSN); err != nil {
-		log.Fatalf("failed to EnableKernelGTP: %v", err)
-		return
-	}
-
-	go func() {
-		if err := uConn.ListenAndServe(ctx); err != nil {
-			log.Println(err)
-			return
-		}
-		log.Println("uConn.ListenAndServe exited")
-	}()
-
-	if err := uConn.AddTunnelOverride(
-		gnb.Recv.GTPuPeerAddr, ue.Recv.PDUAddress,
-		gnb.Recv.GTPuPeerTEID, gnb.GTPuTEID); err != nil {
-		log.Println(err)
-		return
-	}
-
-	if err = addRoute2(uConn); err != nil {
-		log.Fatalf("failed to addRoute2: %v", err)
-		return
-	}
-
-	err = addIP(gnb.GTPuIFname, ue.Recv.PDUAddress, 28)
-	if err != nil {
-		log.Fatalf("failed to addIP: %v", err)
-		return
-	}
-
-	err = addRuleLocal(ue.Recv.PDUAddress)
-	if err != nil {
-		log.Fatalf("failed to addRuleLocal: %v", err)
-		return
-	}
-
-	go t.runUPlane(ctx)
-
-	select {
-	case <-ctx.Done():
-		log.Fatalf("exit gnbsim")
-	}
-
-	return
-}
-
-func (t *testSession) setupN3Tunnel(ctx context.Context) {
-
-	gnb := t.gnb
-	ue := t.ue
-
-	t.gtpu = gtp.NewGTP(gnb.GTPuTEID, gnb.Recv.GTPuPeerTEID)
-	gtpu := t.gtpu
-	gtpu.SetExtensionHeader(true)
-	gtpu.SetQosFlowID(gnb.Recv.QosFlowID)
-
-	log.Printf("GTPuIFname: %s\n", gnb.GTPuIFname)
-	log.Printf("GTP-U Peer: %v\n", gnb.Recv.GTPuPeerAddr)
-	log.Printf("GTP-U Peer TEID: %v\n", gnb.Recv.GTPuPeerTEID)
-	log.Printf("GTP-U Local TEID: %v\n", gnb.GTPuTEID)
-	log.Printf("QoS Flow ID: %d\n", gtpu.QosFlowID)
-	log.Printf("UE address: %v\n", ue.Recv.PDUAddress)
 	laddr := &net.UDPAddr{
-		IP:   net.ParseIP(gnb.GTPuAddr),
+		IP:   net.ParseIP(gnb.GTPuLocalAddr),
 		Port: gtp.Port,
 	}
-	fmt.Printf("test: gNB UDP local address: %v\n", laddr)
 
 	gtpConn, err := net.ListenUDP("udp", laddr)
 	if err != nil {
@@ -315,7 +272,7 @@ func (t *testSession) setupN3Tunnel(ctx context.Context) {
 		return
 	}
 
-	tun, err := addTunnel("gtp-gnb")
+	tun, err = addTunnel("gtp-gnb")
 	if err != nil {
 		log.Fatalln(err)
 		return
@@ -326,28 +283,6 @@ func (t *testSession) setupN3Tunnel(ctx context.Context) {
 		return
 	}
 
-	err = addIP(gnb.GTPuIFname, ue.Recv.PDUAddress, 28)
-	if err != nil {
-		log.Fatalf("failed to addIP: %v", err)
-		return
-	}
-
-	err = addRuleLocal(ue.Recv.PDUAddress)
-	if err != nil {
-		log.Fatalf("failed to addRuleLocal: %v", err)
-		return
-	}
-
-	go t.decap(gtpConn, tun)
-	go t.encap(gtpConn, tun)
-	t.runUPlane(ctx)
-
-	/*
-		select {
-		case <-ctx.Done():
-			log.Fatalf("exit gnbsim")
-		}
-	*/
 	return
 }
 
@@ -367,6 +302,75 @@ func addTunnel(tunname string) (tun *netlink.Tuntap, err error) {
 		err = fmt.Errorf("failed to UP tun device=gtp0: %s", err)
 		return
 	}
+	return
+}
+
+const routeTableID = 1001
+
+func addRoute(tun *netlink.Tuntap) (err error) {
+
+	route := &netlink.Route{
+		Dst: &net.IPNet{
+			IP:   net.IPv4zero,
+			Mask: net.CIDRMask(0, 32),
+		}, // default route
+		LinkIndex: tun.Attrs().Index,  // dev gtp-<ECI>
+		Scope:     netlink.SCOPE_LINK, // scope link
+		Protocol:  4,                  // proto static
+		Priority:  1,                  // metric 1
+		Table:     routeTableID,       // table <ECI>
+	}
+
+	err = netlink.RouteReplace(route)
+	return
+}
+
+func (t *testSession) runUPlaneAll(
+	ctx context.Context, gtpConn *net.UDPConn, tun *netlink.Tuntap) {
+
+	for _, c := range t.gnb.Camper {
+		t.runUPlane(ctx, c, gtpConn, tun)
+	}
+	return
+}
+
+func (t *testSession) runUPlane(ctx context.Context, c *ngap.Camper,
+	gtpConn *net.UDPConn, tun *netlink.Tuntap) {
+
+	gnb := t.gnb
+	ue := c.UE
+	c.GTPu = gtp.NewGTP(gnb.GTPuTEID, gnb.Recv.GTPuPeerTEID)
+	gtpu := t.gtpu
+	gtpu.SetExtensionHeader(true)
+	gtpu.SetQosFlowID(c.QosFlowID)
+
+	log.Printf("GTP-U Peer TEID: %v\n", gnb.Recv.GTPuPeerTEID)
+	log.Printf("GTP-U Local TEID: %v\n", gnb.GTPuTEID)
+	log.Printf("QoS Flow ID: %d\n", gtpu.QosFlowID)
+
+	log.Printf("UE address: %v\n", ue.Recv.PDUAddress)
+	err := addIP(gnb.GTPuIFname, ue.Recv.PDUAddress, 28)
+	if err != nil {
+		log.Fatalf("failed to addIP: %v", err)
+		return
+	}
+
+	err = addRuleLocal(ue.Recv.PDUAddress)
+	if err != nil {
+		log.Fatalf("failed to addRuleLocal: %v", err)
+		return
+	}
+
+	go t.decap(gtpConn, tun)
+	go t.encap(gtpConn, tun)
+	t.doUPlane(ctx, c)
+
+	/*
+		select {
+		case <-ctx.Done():
+			log.Fatalf("exit gnbsim")
+		}
+	*/
 	return
 }
 
@@ -411,45 +415,6 @@ func addIP(ifname string, ip net.IP, masklen int) (err error) {
 	if err := netlink.AddrAdd(link, &addr); err != nil {
 		return err
 	}
-	return
-}
-
-const routeTableID = 1001
-
-func addRoute(tun *netlink.Tuntap) (err error) {
-
-	route := &netlink.Route{
-		Dst: &net.IPNet{
-			IP:   net.IPv4zero,
-			Mask: net.CIDRMask(0, 32),
-		}, // default route
-		LinkIndex: tun.Attrs().Index,  // dev gtp-<ECI>
-		Scope:     netlink.SCOPE_LINK, // scope link
-		Protocol:  4,                  // proto static
-		Priority:  1,                  // metric 1
-		Table:     routeTableID,       // table <ECI>
-	}
-
-	err = netlink.RouteReplace(route)
-	return
-}
-
-//uConn *netlink.Tuntap) (err error) {
-func addRoute2(uConn *gtpv1.UPlaneConn) (err error) {
-
-	route := &netlink.Route{
-		Dst: &net.IPNet{
-			IP:   net.IPv4zero,
-			Mask: net.CIDRMask(0, 32),
-		}, // default route
-		LinkIndex: uConn.KernelGTP.Link.Attrs().Index, // dev gtp-<ECI>
-		Scope:     netlink.SCOPE_LINK,                 // scope link
-		Protocol:  4,                                  // proto static
-		Priority:  1,                                  // metric 1
-		Table:     routeTableID,                       // table <ECI>
-	}
-
-	err = netlink.RouteReplace(route)
 	return
 }
 
@@ -528,11 +493,11 @@ func (t *testSession) encap(gtpConn *net.UDPConn, tun *netlink.Tuntap) {
 	return
 }
 
-func (t *testSession) runUPlane(ctx context.Context) {
+func (t *testSession) doUPlane(ctx context.Context, c *ngap.Camper) {
 
-	fmt.Printf("runUPlane\n")
+	fmt.Printf("doUPlane\n")
 
-	ue := t.ue
+	ue := c.UE
 
 	laddr, err := net.ResolveTCPAddr("tcp", ue.Recv.PDUAddress.String()+":0")
 	if err != nil {
@@ -572,53 +537,30 @@ func (t *testSession) runUPlane(ctx context.Context) {
 	return
 }
 
-func runN3test() (err error) {
-
-	t := initRANwithoutSCTP()
-	t.initUE()
-	gnb := t.gnb
-	ue := t.ue
-
-	gnb.Recv.GTPuPeerAddr = net.ParseIP("192.168.1.18")
-	gnb.Recv.GTPuPeerTEID = 0x12345678
-	ue.Recv.PDUAddress = net.ParseIP("60.60.60.1")
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	t.setupN3Tunnel(ctx)
-
-	return
-}
-
 func main() {
 
 	log.SetPrefix("[gnbsim]")
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
 
-	n3test := false
-
-	if n3test {
-		runN3test()
-		return
-	}
-
 	// usual testing
 	t := initRAN()
 	t.initUE()
 
-	t.registrateUE()
+	t.registrteAll()
 	time.Sleep(time.Second * 1)
 
-	t.establishPDUSession()
+	t.establishPDUSessionAll()
+	time.Sleep(time.Second * 1)
+
+	gtpConn, tun := t.setupN3Tunnel()
 	time.Sleep(time.Second * 1)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	t.setupN3Tunnel(ctx)
+	t.runUPlaneAll(ctx, gtpConn, tun)
 	time.Sleep(time.Second * 1)
 
-	t.deregistrateUE()
+	t.deregistrateAll()
 	time.Sleep(time.Second * 1)
 
 	return

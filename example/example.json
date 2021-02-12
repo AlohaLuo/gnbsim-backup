@@ -23,7 +23,7 @@
 	],
 	"PagingDRX" : "v32",
 	"RANUENGAPID" : 0,
-	"UE": {
+	"UEparam": {
 		"imeisv": "0000000100000101",
 		"msin": "0123456789",
 		"mcc": 208,
@@ -57,6 +57,6 @@
 			"TAC": "0x000001"
 		}
 	},
-	"GTPuAddr": "192.168.1.3",
+	"GTPuLocalAddr": "192.168.1.3",
 	"GTPuIFname": "eth0"
 }
