@@ -106,7 +106,7 @@ type GNB struct {
 		GTPuPeerTEID uint32
 	}
 
-	camper []*Camper
+	Camper []*Camper
 
 	DecodeError error
 	dbgLevel    int
@@ -159,12 +159,12 @@ func (gnb *GNB) CampIn(ue *nas.UE) {
 	c.RanId = RanUeNgapId
 	RanUeNgapId++
 	c.camperType = CAMPER_TYPE_NORMAL
-	gnb.camper = append(gnb.camper, c)
+	gnb.Camper = append(gnb.Camper, c)
 }
 
 func (gnb *GNB) LookupCamperByUE(ue *nas.UE) (c *Camper) {
 
-	for _, c = range gnb.camper {
+	for _, c = range gnb.Camper {
 		if ue == c.UE {
 			return
 		}
@@ -175,7 +175,7 @@ func (gnb *GNB) LookupCamperByUE(ue *nas.UE) (c *Camper) {
 
 func (gnb *GNB) LookupCamperByRanId(id uint32) (c *Camper) {
 
-	for _, c = range gnb.camper {
+	for _, c = range gnb.Camper {
 		if c.RanId == id {
 			return
 		}
