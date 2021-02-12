@@ -29,6 +29,7 @@ import (
 
 type UE struct {
 	Number           int
+	SUPI             string
 	MSIN             string
 	MCC              int
 	MNC              int
@@ -40,7 +41,6 @@ type UE struct {
 	DNN              string
 	URL              string
 
-	RRCstate int
 	MMstate int
 	SMstate int
 
@@ -251,6 +251,7 @@ func (ue *UE) PowerON() {
 
 	ue.MMstate = MMDeregistared
 	ue.Recv.state = rcvdNull
+	ue.SUPI = fmt.Sprintf("%d%02d%s", ue.MCC, ue.MNC, ue.MSIN)
 }
 
 func (ue *UE) Receive(pdu *[]byte) {
@@ -2083,8 +2084,7 @@ func (ue *UE) ComputeKamf() {
 	fc := []byte{0x6d}
 	s = append(s, fc...)
 
-	supi := fmt.Sprintf("%d%02d%s", ue.MCC, ue.MNC, ue.MSIN)
-	p0 := []byte(supi)
+	p0 := []byte(ue.SUPI)
 	s = append(s, p0...)
 
 	l0 := make([]byte, 2)
