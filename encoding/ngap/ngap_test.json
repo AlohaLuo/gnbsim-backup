@@ -40,10 +40,10 @@
 		}
 	},
 	"NGAPPeerAddr": "192.168.1.17",
-	"GTPuAddr": "192.168.1.3",
+	"GTPuLocalAddr": "192.168.1.3",
 	"GTPuIFname": "eth0",
 	"GTPuTEID": 999,
-	"UE": {
+	"UEparam": {
 		"mcc": 208,
 		"mnc": 93,
 		"msin": "0123456789",

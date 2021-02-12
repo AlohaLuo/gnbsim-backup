@@ -6,6 +6,8 @@ import (
 	"log"
 	"reflect"
 	"testing"
+
+	"github.com/hhorai/gnbsim/encoding/nas"
 )
 
 // send message
@@ -32,6 +34,19 @@ var TestOpen5gsInitialContextSetupRequest string = "000e00809e000009000a00020002
 var TestOpen5gsConfigurationUpdateCommand string = "0004403a000003000a0002000200550002000000260027267e024745e85a027e0054430f10004f00700065006e0035004700534702010151114500490100"
 var TestOpen5gsDLPDUSessionEstablishmentAccept string = "001d00808f000003000a00020002005500020000004a007c004001467e02f1620a15037e00680100372e0101c211000901000631210101ff01060a00030a000359322905010a2e0002220101790006012041010109250908696e7465726e6574120100202f0000040082000a0c3e800000303e800000008b000a01f0c0a8c7ca0000000100860001000088000700010000091c00"
 
+func initEnv() (gnb *GNB, ue *nas.UE) {
+
+	RanUeNgapId = 0
+
+	gnb = NewNGAP("ngap_test.json")
+	tmp := gnb.UEparam
+	ue = &tmp
+	ue.PowerON()
+	gnb.CampIn(ue)
+
+	return
+}
+
 func recvfromNW(gnb *GNB, msg string) {
 	in, _ := hex.DecodeString(msg)
 	gnb.Decode(&in)
@@ -51,16 +66,15 @@ func TestMakePDUSessionResourceSetupResponse(t *testing.T) {
 		{TestDLPDUSessionEstablishmentAccept},
 	}
 
-	gnb := NewNGAP("ngap_test.json")
-	gnb.UE.PowerON()
+	gnb, ue := initEnv()
 
 	for _, p := range pattern {
 		recvfromNW(gnb, p.in_str)
 	}
 
 	gnb.SetDebugLevel(1)
-	gnb.UE.SetDebugLevel(1)
-	v := gnb.MakePDUSessionResourceSetupResponse()
+	ue.SetDebugLevel(1)
+	v := gnb.MakePDUSessionResourceSetupResponse(ue)
 	expect_str := TestPDUSessionResourceSetupResponse
 	expect, _ := hex.DecodeString(expect_str)
 	if reflect.DeepEqual(expect, v) == false {
@@ -71,11 +85,11 @@ func TestMakePDUSessionResourceSetupResponse(t *testing.T) {
 }
 
 func TestInitialContestSetupResponse(t *testing.T) {
-	gnb := NewNGAP("ngap_test.json")
-	gnb.UE.PowerON()
+
+	gnb, ue := initEnv()
 
 	recvfromNW(gnb, TestDLAuthenticationRequest)
-	v := gnb.MakeInitialContextSetupResponse()
+	v := gnb.MakeInitialContextSetupResponse(ue)
 	expect_str := TestInitialContextSetupResponse
 	expect, _ := hex.DecodeString(expect_str)
 	if reflect.DeepEqual(expect, v) == false {
@@ -84,12 +98,12 @@ func TestInitialContestSetupResponse(t *testing.T) {
 }
 
 func TestMakeInitialUEMessage(t *testing.T) {
-	gnb := NewNGAP("ngap_test.json")
-	gnb.UE.PowerON()
 
-	pdu := gnb.UE.MakeRegistrationRequest()
-	gnb.RecvfromUE(&pdu)
-	v := gnb.MakeInitialUEMessage()
+	gnb, ue := initEnv()
+
+	pdu := ue.MakeRegistrationRequest()
+	gnb.RecvfromUE(ue, &pdu)
+	v := gnb.MakeInitialUEMessage(ue)
 	expect_str := TestInitialUEMessage
 	expect, _ := hex.DecodeString(expect_str)
 	if reflect.DeepEqual(expect, v) == false {
@@ -98,17 +112,17 @@ func TestMakeInitialUEMessage(t *testing.T) {
 }
 
 func TestMakeUplinkNASTransport(t *testing.T) {
-	gnb := NewNGAP("ngap_test.json")
-	gnb.UE.PowerON()
+
+	gnb, ue := initEnv()
 
 	var expect_str string
 	var expect []byte
 
 	recvfromNW(gnb, TestDLAuthenticationRequest)
-	pdu := gnb.UE.MakeAuthenticationResponse()
-	gnb.RecvfromUE(&pdu)
+	pdu := ue.MakeAuthenticationResponse()
+	gnb.RecvfromUE(ue, &pdu)
 
-	v := gnb.MakeUplinkNASTransport()
+	v := gnb.MakeUplinkNASTransport(ue)
 	expect_str = TestULAuthenticationResponse
 	expect, _ = hex.DecodeString(expect_str)
 	if reflect.DeepEqual(expect, v) == false {
@@ -116,10 +130,10 @@ func TestMakeUplinkNASTransport(t *testing.T) {
 	}
 
 	recvfromNW(gnb, TestDLSecurityModeCommand)
-	pdu = gnb.UE.MakeSecurityModeComplete()
-	gnb.RecvfromUE(&pdu)
+	pdu = ue.MakeSecurityModeComplete()
+	gnb.RecvfromUE(ue, &pdu)
 
-	v = gnb.MakeUplinkNASTransport()
+	v = gnb.MakeUplinkNASTransport(ue)
 	expect_str = TestULSecurityModeComplete
 	expect, _ = hex.DecodeString(expect_str)
 	if reflect.DeepEqual(expect, v) == false {
@@ -127,10 +141,10 @@ func TestMakeUplinkNASTransport(t *testing.T) {
 	}
 
 	recvfromNW(gnb, TestInitialContextSetupRequest)
-	pdu = gnb.UE.MakeRegistrationComplete()
-	gnb.RecvfromUE(&pdu)
+	pdu = ue.MakeRegistrationComplete()
+	gnb.RecvfromUE(ue, &pdu)
 
-	v = gnb.MakeUplinkNASTransport()
+	v = gnb.MakeUplinkNASTransport(ue)
 	expect_str = TestULRegistrationComplete
 	expect, _ = hex.DecodeString(expect_str)
 	if reflect.DeepEqual(expect, v) == false {
@@ -139,7 +153,9 @@ func TestMakeUplinkNASTransport(t *testing.T) {
 }
 
 func TestMakeNGSetupRequest(t *testing.T) {
-	gnb := NewNGAP("ngap_test.json")
+
+	gnb, _ := initEnv()
+
 	v := gnb.MakeNGSetupRequest()
 	expect_str := TestNGSetupRequest
 	expect, _ := hex.DecodeString(expect_str)
@@ -193,12 +209,13 @@ func TestDecode(t *testing.T) {
 			"open5gs: PDU Session Establishment Accept"},
 	}
 
-	gnb := NewNGAP("ngap_test.json")
+	gnb, ue := initEnv()
+
 	for _, p := range pattern {
 		fmt.Printf("---------- test decode: %s\n", p.desc)
 
 		gnb.SetDebugLevel(1)
-		gnb.UE.SetDebugLevel(1)
+		ue.SetDebugLevel(1)
 		recvfromNW(gnb, p.in_str)
 
 		if gnb.DecodeError != nil {
@@ -206,17 +223,17 @@ func TestDecode(t *testing.T) {
 		}
 	}
 
-	gnb = NewNGAP("ngap_test.json")
+	gnb, ue = initEnv()
+
 	for _, p := range pattern2 {
 		fmt.Printf("---------- test decode: %s\n", p.desc)
 
 		gnb.SetDebugLevel(1)
-		gnb.UE.SetDebugLevel(1)
+		ue.SetDebugLevel(1)
 		recvfromNW(gnb, p.in_str)
 
 		if gnb.DecodeError != nil {
 			t.Errorf("%s: %v", p.desc, gnb.DecodeError)
 		}
 	}
-
 }

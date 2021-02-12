@@ -94,32 +94,44 @@ type GNB struct {
 	SupportedTAList []SupportedTA
 	PagingDRX       string
 	RANUENGAPID     uint32
-	UE              nas.UE
 	ULInfoNR        UserLocationInformationNR
 	NGAPPeerAddr    string
-	GTPuAddr        string // to be obsolete
 	GTPuLocalAddr   string
 	GTPuIFname      string
 	GTPuTEID        uint32
+	UEparam         nas.UE // base parameter to be used for each UE
 
 	Recv struct {
-		AMFUENGAPID  []byte
-		PDUSessionID uint8
-		QosFlowID    uint8
 		GTPuPeerAddr net.IP
 		GTPuPeerTEID uint32
 	}
 
-	Camper map[uint32]*nas.UE
-
-	SendNasMsg *[]byte
-	RecvNasMsg *[]byte
+	camper []*Camper
 
 	DecodeError error
-
-	dbgLevel int
-	indent   int // indent for debug print.
+	dbgLevel    int
+	indent      int // indent for debug print.
 }
+
+type Camper struct {
+	GNB          *GNB // camped in this gNB
+	UE           *nas.UE
+	AmfId        uint32
+	RanId        uint32
+	RRCstate     int
+	PDUSessionID uint8
+	QosFlowID    uint8
+
+	SendMsg *[]byte
+	RecvMsg *[]byte
+
+	camperType int
+}
+
+const (
+	CAMPER_TYPE_TEMPORARY = 0
+	CAMPER_TYPE_NORMAL    = 1
+)
 
 func NewNGAP(filename string) (p *GNB) {
 
@@ -137,17 +149,53 @@ func NewNGAP(filename string) (p *GNB) {
 	return
 }
 
-func (gnb *GNB) SendtoUE(pdu *[]byte) {
+var RanUeNgapId uint32 = 0
+
+func (gnb *GNB) CampIn(ue *nas.UE) {
+	var obj Camper
+	c := &obj
+	c.GNB = gnb
+	c.UE = ue
+	c.RanId = RanUeNgapId
+	RanUeNgapId++
+	c.camperType = CAMPER_TYPE_NORMAL
+	gnb.camper = append(gnb.camper, c)
+}
+
+func (gnb *GNB) LookupCamperByUE(ue *nas.UE) (c *Camper) {
+
+	for _, c = range gnb.camper {
+		if ue == c.UE {
+			return
+		}
+	}
+	c = nil
+	return
+}
+
+func (gnb *GNB) LookupCamperByRanId(id uint32) (c *Camper) {
+
+	for _, c = range gnb.camper {
+		if c.RanId == id {
+			return
+		}
+	}
+	c = nil
+	return
+}
+
+func (gnb *GNB) SendtoUE(c *Camper, pdu *[]byte) {
 
 	if pdu != nil {
-		gnb.UE.SetIndent(gnb.indent)
-		gnb.UE.Receive(pdu)
+		c.UE.SetIndent(gnb.indent)
+		c.UE.Receive(pdu)
 	}
 	return
 }
 
-func (gnb *GNB) RecvfromUE(pdu *[]byte) {
-	gnb.RecvNasMsg = pdu
+func (gnb *GNB) RecvfromUE(ue *nas.UE, pdu *[]byte) {
+	c := gnb.LookupCamperByUE(ue)
+	c.RecvMsg = pdu
 	return
 }
 
@@ -165,11 +213,14 @@ func (gnb *GNB) Decode(pdu *[]byte) {
 	length, _ := per.DecLengthDeterminant(pdu, 0)
 	gnb.dprint("PDU Length: %d", length)
 
-	gnb.decProtocolIEContainer(pdu)
+	c, err := gnb.decProtocolIEContainer(nil, pdu)
 
-	if gnb.UE.DecodeError != nil {
-		gnb.DecodeError = gnb.UE.DecodeError
+	gnb.DecodeError = err
+
+	if c != nil && c.UE.DecodeError != nil {
+		gnb.DecodeError = c.UE.DecodeError
 	}
+
 	return
 }
 
@@ -206,24 +257,25 @@ PDUSessionResourceSetupItemSUReq ::= SEQUENCE {
     maxnoofPDUSessions                  INTEGER ::= 256
 */
 
-func (gnb *GNB) decPDUSessionResourceSetupListSUReq(pdu *[]byte, length int) {
+func (gnb *GNB) decPDUSessionResourceSetupListSUReq(
+	c *Camper, pdu *[]byte, length int) {
 
 	seqNum := int(readPduByte(pdu)) + 1
 	gnb.dprint("number of sequence: %d", seqNum)
 
 	for i := 0; i < seqNum; i++ {
 		seq := readPduByte(pdu)
-		gnb.decPDUSessionID(pdu)
+		gnb.decPDUSessionID(c, pdu)
 
 		seq <<= 1 // skip extension marker
 
 		option := false
 		option = (seq & 0x80) != 0
 		if option {
-			gnb.decNASPDU(pdu)
+			gnb.decNASPDU(c, pdu)
 		}
 		gnb.decSNSSAI(pdu)
-		gnb.decPDUSessionResourceSetupRequestTransfer(pdu)
+		gnb.decPDUSessionResourceSetupRequestTransfer(c, pdu)
 	}
 
 	return
@@ -245,19 +297,21 @@ PDUSessionResourceSetupResponseIEs NGAP-PROTOCOL-IES ::= {
     ...
 }
 */
-func (gnb *GNB) MakePDUSessionResourceSetupResponse() (pdu []byte) {
+func (gnb *GNB) MakePDUSessionResourceSetupResponse(ue *nas.UE) (pdu []byte) {
+
+	c := gnb.LookupCamperByUE(ue)
 
 	pdu = encNgapPdu(successfulOutcome, idPDUSessResSetup, reject)
 
 	v := encProtocolIEContainer(3)
 
-	tmp := gnb.encAMFUENGAPID()
+	tmp := gnb.encAMFUENGAPID(c)
 	v = append(v, tmp...)
 
 	tmp = gnb.encRANUENGAPID()
 	v = append(v, tmp...)
 
-	tmp = gnb.encPDUSessionResourceSetupListSURes()
+	tmp = gnb.encPDUSessionResourceSetupListSURes(c)
 	v = append(v, tmp...)
 
 	bf, _ := per.EncLengthDeterminant(len(v), 0, 0)
@@ -282,7 +336,7 @@ PDUSessionResourceSetupItemSURes ::= SEQUENCE {
     ...
 }
 */
-func (gnb *GNB) encPDUSessionResourceSetupListSURes() (v []byte) {
+func (gnb *GNB) encPDUSessionResourceSetupListSURes(c *Camper) (v []byte) {
 
 	head, _ := encProtocolIE(idPDUSessResSetupListSURes, ignore)
 
@@ -290,10 +344,10 @@ func (gnb *GNB) encPDUSessionResourceSetupListSURes() (v []byte) {
 	bf, _ := per.EncSequence(true, 1, 0)
 	v = append(v, bf.Value...)
 
-	tmp := gnb.encPDUSessionID()
+	tmp := gnb.encPDUSessionID(c)
 	v = append(v, tmp...)
 
-	tmp = gnb.encPDUSessionResourceSetupResponseTransfer()
+	tmp = gnb.encPDUSessionResourceSetupResponseTransfer(c)
 	bf, tmp, _ = per.EncOctetString(tmp, 0, 0, false)
 	v = append(v, bf.Value...)
 	v = append(v, tmp...)
@@ -321,13 +375,15 @@ InitialContextSetupResponseIEs NGAP-PROTOCOL-IES ::= {
     ...
 }
 */
-func (gnb *GNB) MakeInitialContextSetupResponse() (pdu []byte) {
+func (gnb *GNB) MakeInitialContextSetupResponse(ue *nas.UE) (pdu []byte) {
+
+	c := gnb.LookupCamperByUE(ue)
 
 	pdu = encNgapPdu(successfulOutcome, idInitialContextSetup, reject)
 
 	v := encProtocolIEContainer(2)
 
-	tmp := gnb.encAMFUENGAPID()
+	tmp := gnb.encAMFUENGAPID(c)
 	v = append(v, tmp...)
 
 	tmp = gnb.encRANUENGAPID()
@@ -360,7 +416,9 @@ InitialUEMessage-IEs NGAP-PROTOCOL-IES ::= {
     ...
 }
 */
-func (gnb *GNB) MakeInitialUEMessage() (pdu []byte) {
+func (gnb *GNB) MakeInitialUEMessage(ue *nas.UE) (pdu []byte) {
+
+	c := gnb.LookupCamperByUE(ue)
 
 	pdu = encNgapPdu(initiatingMessage, idInitialUEMessage, ignore)
 
@@ -369,7 +427,7 @@ func (gnb *GNB) MakeInitialUEMessage() (pdu []byte) {
 	tmp := gnb.encRANUENGAPID()
 	v = append(v, tmp...)
 
-	tmp = gnb.encNASPDU()
+	tmp = gnb.encNASPDU(c)
 	v = append(v, tmp...)
 
 	tmp, _ = gnb.encUserLocationInformation()
@@ -425,21 +483,21 @@ UplinkNASTransport-IEs NGAP-PROTOCOL-IES ::= {
     ...
 }
 */
-func (gnb *GNB) MakeUplinkNASTransport() (pdu []byte) {
+func (gnb *GNB) MakeUplinkNASTransport(ue *nas.UE) (pdu []byte) {
 
-	// Authentiation Response only for now.
+	c := gnb.LookupCamperByUE(ue)
 
 	pdu = encNgapPdu(initiatingMessage, idUplinkNASTransport, ignore)
 
 	v := encProtocolIEContainer(4)
 
-	tmp := gnb.encAMFUENGAPID()
+	tmp := gnb.encAMFUENGAPID(c)
 	v = append(v, tmp...)
 
 	tmp = gnb.encRANUENGAPID()
 	v = append(v, tmp...)
 
-	tmp = gnb.encNASPDU()
+	tmp = gnb.encNASPDU(c)
 	v = append(v, tmp...)
 
 	tmp, _ = gnb.encUserLocationInformation()
@@ -590,7 +648,7 @@ func encProtocolIEContainer(num uint) (container []byte) {
 	return
 }
 
-func (gnb *GNB) decProtocolIEContainer(pdu *[]byte) (err error) {
+func (gnb *GNB) decProtocolIEContainer(c *Camper, pdu *[]byte) (c2 *Camper, err error) {
 
 	if len(*pdu) < 3 {
 		err = fmt.Errorf("remaining pdu length(%d) is too short. expect > %d",
@@ -606,9 +664,10 @@ func (gnb *GNB) decProtocolIEContainer(pdu *[]byte) (err error) {
 		gnb.indent++
 		gnb.dprint("Item %d", idx)
 		gnb.indent++
-		gnb.decProtocolIE(pdu)
+		c, err = gnb.decProtocolIE(c, pdu)
 		gnb.indent -= 2
 	}
+	c2 = c
 	return
 }
 
@@ -630,7 +689,11 @@ func encProtocolIE(id int64, criticality uint) (v []byte, err error) {
 	return
 }
 
-func (gnb *GNB) decProtocolIE(pdu *[]byte) (err error) {
+func (gnb *GNB) decProtocolIE(c *Camper, pdu *[]byte) (c2 *Camper, err error) {
+
+	if c != nil {
+		c2 = c
+	}
 
 	if len(*pdu) < 2 {
 		err = fmt.Errorf("remaining pdu length(%d) is too short. expect > %d",
@@ -652,19 +715,29 @@ func (gnb *GNB) decProtocolIE(pdu *[]byte) (err error) {
 	gnb.dprint("IE length: %d", length)
 	gnb.indent++
 
+	if c == nil {
+		fmt.Printf("pointer to camper is missing for %d\n", id)
+	} else if c.camperType == CAMPER_TYPE_TEMPORARY {
+		fmt.Printf("pointer to camper is temporary for %d\n", id)
+	} else {
+		fmt.Printf("pointer to camper is valid for %d\n", id)
+	}
+
 	switch id {
 	case idAMFUENGAPID: //10
-		gnb.decAMFUENGAPID(pdu, length)
+		c2, err = gnb.decAMFUENGAPID(pdu, length)
 	case idNASPDU: // 38
-		gnb.decNASPDU(pdu)
+		gnb.decNASPDU(c, pdu)
 	case idPDUSessResSetupListCxtReq: // 71
-		gnb.decPDUSessionResourceSetupListCtxReq(pdu, length)
+		gnb.decPDUSessionResourceSetupListCtxReq(c, pdu, length)
 	case idPDUSessResSetupListSUReq: // 74
-		gnb.decPDUSessionResourceSetupListSUReq(pdu, length)
+		gnb.decPDUSessionResourceSetupListSUReq(c, pdu, length)
+	case idRANUENGAPID: // 85
+		c2, err = gnb.decRANUENGAPID(c, pdu, length)
 	case idPDUSessionType: // 134
 		gnb.decPDUSessionType(pdu, length)
 	case idQosFlowSetupRequestList: // 136
-		gnb.decQosFlowSetupRequestList(pdu, length)
+		gnb.decQosFlowSetupRequestList(c, pdu, length)
 	case idULNGUUPTNLInformation: // 139
 		gnb.decUPTransportLayerInformation(pdu, length)
 	default:
@@ -1046,7 +1119,7 @@ func (gnb *GNB) encTransportLayerAddress(pre *per.BitField) (pdu []byte) {
 	const max = 160
 	const extmark = true
 
-	addr := net.ParseIP(gnb.GTPuAddr)
+	addr := net.ParseIP(gnb.GTPuLocalAddr)
 	ipv4addr := addr.To4()
 	bitlen := net.IPv4len * 8
 	bf, v, _ := per.EncBitString(ipv4addr, bitlen, min, max, extmark)
@@ -1122,7 +1195,8 @@ QosFlowPerTNLInformation ::= SEQUENCE {
     ...
 }
 */
-func (gnb *GNB) encQosFlowPerTNLInformation(pre *per.BitField) (pdu []byte) {
+func (gnb *GNB) encQosFlowPerTNLInformation(
+	c *Camper, pre *per.BitField) (pdu []byte) {
 
 	bf, _ := per.EncSequence(true, 1, 0)
 	if pre != nil { // has inherited preamble
@@ -1133,7 +1207,7 @@ func (gnb *GNB) encQosFlowPerTNLInformation(pre *per.BitField) (pdu []byte) {
 	tmp := gnb.encUPTransportLayerInformation(pre)
 	pdu = append(pdu, tmp...)
 
-	tmp = gnb.encAssociatedQosFlowList()
+	tmp = gnb.encAssociatedQosFlowList(c)
 	pdu = append(pdu, tmp...)
 
 	return
@@ -1271,15 +1345,15 @@ func (gnb *GNB) decSNSSAI(pdu *[]byte) {
 /*
 PDUSessionID ::= INTEGER (0..255)
 */
-func (gnb *GNB) encPDUSessionID() (pdu []byte) {
-	_, pdu, _ = per.EncInteger(int64(gnb.Recv.PDUSessionID), 0, 255, false)
+func (gnb *GNB) encPDUSessionID(c *Camper) (pdu []byte) {
+	_, pdu, _ = per.EncInteger(int64(c.PDUSessionID), 0, 255, false)
 	return
 }
 
-func (gnb *GNB) decPDUSessionID(pdu *[]byte) (val int) {
+func (gnb *GNB) decPDUSessionID(c *Camper, pdu *[]byte) (val int) {
 	val = int(readPduByte(pdu))
 	gnb.dprinti("PDU Session ID: %d", val)
-	gnb.Recv.PDUSessionID = uint8(val)
+	c.PDUSessionID = uint8(val)
 	return
 }
 
@@ -1287,17 +1361,17 @@ func (gnb *GNB) decPDUSessionID(pdu *[]byte) (val int) {
 /*
 QosFlowIdentifier ::= INTEGER (0..63, ...)
 */
-func (gnb *GNB) encQosFlowIdentifier() (bf per.BitField) {
+func (gnb *GNB) encQosFlowIdentifier(c *Camper) (bf per.BitField) {
 
 	const min = 0
 	const max = 63
 	const extmark = true
-	bf, _, _ = per.EncInteger(int64(gnb.Recv.QosFlowID), min, max, extmark)
+	bf, _, _ = per.EncInteger(int64(c.QosFlowID), min, max, extmark)
 
 	return
 }
 
-func (gnb *GNB) decQosFlowIdentifier(item *per.BitField) {
+func (gnb *GNB) decQosFlowIdentifier(c *Camper, item *per.BitField) {
 
 	// TODO: generic per decoder.
 	// 000 0000
@@ -1307,7 +1381,7 @@ func (gnb *GNB) decQosFlowIdentifier(item *per.BitField) {
 	id >>= 1
 	item.Len -= 7
 	gnb.dprinti("Qos Flow Identifier: %d", id)
-	gnb.Recv.QosFlowID = id
+	c.QosFlowID = id
 	return
 }
 
@@ -1367,19 +1441,20 @@ AssociatedQosFlowItem ::= SEQUENCE {
     ...
 }
 */
-func (gnb *GNB) encAssociatedQosFlowList() (pdu []byte) {
+func (gnb *GNB) encAssociatedQosFlowList(c *Camper) (pdu []byte) {
 
 	const min = 1
 	const max = 64
 	const extmark = false
 
 	bf, _, _ := per.EncSequenceOf(1, min, max, extmark)
-	pdu = gnb.encAssociatedQosFlowItem(&bf)
+	pdu = gnb.encAssociatedQosFlowItem(c, &bf)
 
 	return
 }
 
-func (gnb *GNB) encAssociatedQosFlowItem(pre *per.BitField) (pdu []byte) {
+func (gnb *GNB) encAssociatedQosFlowItem(
+	c *Camper, pre *per.BitField) (pdu []byte) {
 
 	const optnum = 2
 	const optflag = 0
@@ -1389,7 +1464,7 @@ func (gnb *GNB) encAssociatedQosFlowItem(pre *per.BitField) (pdu []byte) {
 	if pre != nil {
 		bf = per.MergeBitField(*pre, bf)
 	}
-	bf2 := gnb.encQosFlowIdentifier()
+	bf2 := gnb.encQosFlowIdentifier(c)
 	bf = per.MergeBitField(bf, bf2)
 	pdu = bf.Value
 
@@ -1448,19 +1523,31 @@ func (gnb *GNB) encRRCEstablishmentCause(cause uint) (v []byte, err error) {
 /*
 AMF-UE-NGAP-ID ::= INTEGER (0..1099511627775) // 20^40 -1
 */
-func (gnb *GNB) encAMFUENGAPID() (v []byte) {
-	head, _ := encProtocolIE(idAMFUENGAPID, reject)
-	v = gnb.Recv.AMFUENGAPID
+func (gnb *GNB) encAMFUENGAPID(c *Camper) (v []byte) {
 
+	head, _ := encProtocolIE(idAMFUENGAPID, reject)
+	_, v, _ = per.EncInteger(int64(c.AmfId), 0, 4294967295, false)
 	bf, _ := per.EncLengthDeterminant(len(v), 0, 0)
 	head = append(head, bf.Value...)
 	v = append(head, v...)
+
 	return
 }
 
-func (gnb *GNB) decAMFUENGAPID(pdu *[]byte, length int) {
-	// just storing the received value for now.
-	gnb.Recv.AMFUENGAPID = readPduByteSlice(pdu, length)
+func (gnb *GNB) decAMFUENGAPID(pdu *[]byte, length int) (c *Camper, err error) {
+
+	// need generic per encoder.
+	if length != 2 {
+		err = fmt.Errorf("unsupported AMF-UE-NGAP-ID length.")
+		return
+	}
+	id := uint32(readPduUint16(pdu))
+
+	var obj Camper
+	c = &obj
+	c.AmfId = id
+	c.camperType = CAMPER_TYPE_TEMPORARY
+
 	return
 }
 
@@ -1479,35 +1566,55 @@ func (gnb *GNB) encRANUENGAPID() (v []byte) {
 	return
 }
 
+func (gnb *GNB) decRANUENGAPID(
+	cTmp *Camper, pdu *[]byte, length int) (c *Camper, err error) {
+
+	if length != 2 {
+		err = fmt.Errorf("unsupported AMF-UE-NGAP-ID length.")
+		return
+	}
+	id := uint32(readPduUint16(pdu))
+	c = gnb.LookupCamperByRanId(id)
+
+	if c == nil {
+		err = fmt.Errorf("cannot find camper for RanId=%d", id)
+		fmt.Printf("cannot find camper for RanId=%d\n", id)
+		return
+	}
+	c.AmfId = cTmp.AmfId
+
+	return
+}
+
 // 9.3.3.4 NAS-PDU
 /*
 NAS-PDU ::= OCTET STRING
 */
-func (gnb *GNB) encNASPDU() (v []byte) {
+func (gnb *GNB) encNASPDU(c *Camper) (v []byte) {
 
-	if gnb.RecvNasMsg == nil {
+	if c.RecvMsg == nil {
 		return
 	}
 
 	head, _ := encProtocolIE(idNASPDU, reject)
 
-	pdu := *gnb.RecvNasMsg
+	pdu := *c.RecvMsg
 	pre, v, _ := per.EncOctetString(pdu, 0, 0, false)
 	v = append(pre.Value, v...)
 
 	bf, _ := per.EncLengthDeterminant(len(v), 0, 0)
 	head = append(head, bf.Value...)
 	v = append(head, v...)
-	gnb.RecvNasMsg = nil
+	c.RecvMsg = nil
 
 	return
 }
 
-func (gnb *GNB) decNASPDU(pdu *[]byte) (err error) {
+func (gnb *GNB) decNASPDU(c *Camper, pdu *[]byte) (err error) {
 
 	length := int(readPduByte(pdu))
 	naspdu := readPduByteSlice(pdu, length)
-	gnb.SendtoUE(&naspdu)
+	gnb.SendtoUE(c, &naspdu)
 
 	return
 }
@@ -1568,12 +1675,13 @@ PDUSessionResourceSetupRequestTransferIEs NGAP-PROTOCOL-IES ::= {
     ...
 }
 */
-func (gnb *GNB) decPDUSessionResourceSetupRequestTransfer(pdu *[]byte) {
+func (gnb *GNB) decPDUSessionResourceSetupRequestTransfer(
+	c *Camper, pdu *[]byte) {
 
 	gnb.dprint("PDU Session Resource Setup Request Transfer")
 	length, _ := per.DecLengthDeterminant(pdu, 0)
 	pdu2 := readPduByteSlice(pdu, length)
-	gnb.decProtocolIEContainer(&pdu2)
+	gnb.decProtocolIEContainer(c, &pdu2)
 
 	return
 }
@@ -1589,11 +1697,12 @@ PDUSessionResourceSetupResponseTransfer ::= SEQUENCE {
     ...
 }
 */
-func (gnb *GNB) encPDUSessionResourceSetupResponseTransfer() (pdu []byte) {
+func (gnb *GNB) encPDUSessionResourceSetupResponseTransfer(
+	c *Camper) (pdu []byte) {
 
 	bf, _ := per.EncSequence(true, 4, 0)
 	pre := &bf
-	pdu = gnb.encQosFlowPerTNLInformation(pre)
+	pdu = gnb.encQosFlowPerTNLInformation(c, pre)
 
 	return
 }
@@ -1609,7 +1718,7 @@ func (gnb *GNB) encPDUSessionResourceSetupResponseTransfer() (pdu []byte) {
 PDUSessionResourceSetupListCxtReq ::= SEQUENCE (SIZE(1..maxnoofPDUSessions)) OF PDUSessionResourceSetupItemCxtReq
 1..256
 */
-func (gnb *GNB) decPDUSessionResourceSetupListCtxReq(pdu *[]byte, length int) {
+func (gnb *GNB) decPDUSessionResourceSetupListCtxReq(c *Camper, pdu *[]byte, length int) {
 
 	gnb.dprint("PDU Session Resource Setup Request Request List")
 
@@ -1624,7 +1733,7 @@ func (gnb *GNB) decPDUSessionResourceSetupListCtxReq(pdu *[]byte, length int) {
 
 	for i := 0; i < itemNum; i++ {
 		gnb.dprint("Item %d", i)
-		gnb.decPDUSessionResourceSetupItemCxtReq(&list)
+		gnb.decPDUSessionResourceSetupItemCxtReq(c, &list)
 	}
 
 	return
@@ -1640,7 +1749,8 @@ PDUSessionResourceSetupItemCxtReq ::= SEQUENCE {
     ...
 }
 */
-func (gnb *GNB) decPDUSessionResourceSetupItemCxtReq(item *per.BitField) {
+func (gnb *GNB) decPDUSessionResourceSetupItemCxtReq(
+	c *Camper, item *per.BitField) {
 
 	// TODO: generic per decoder.
 	// 0000 0000
@@ -1653,14 +1763,14 @@ func (gnb *GNB) decPDUSessionResourceSetupItemCxtReq(item *per.BitField) {
 	}
 	*item = per.ShiftLeft(*item, 8)
 
-	gnb.decPDUSessionID(&item.Value)
+	gnb.decPDUSessionID(c, &item.Value)
 
 	gnb.dprinti("NAS-PDU: %v", hasNasPdu)
 	if hasNasPdu {
-		gnb.decNASPDU(&item.Value)
+		gnb.decNASPDU(c, &item.Value)
 	}
 	gnb.decSNSSAI(&item.Value)
-	gnb.decPDUSessionResourceSetupRequestTransfer(&item.Value)
+	gnb.decPDUSessionResourceSetupRequestTransfer(c, &item.Value)
 
 	return
 }
@@ -1800,7 +1910,7 @@ QosFlowSetupRequestItem ::= SEQUENCE {
     ...
 }
 */
-func (gnb *GNB) decQosFlowSetupRequestList(pdu *[]byte, length int) {
+func (gnb *GNB) decQosFlowSetupRequestList(c *Camper, pdu *[]byte, length int) {
 
 	var qoslist per.BitField
 	qoslist.Value = readPduByteSlice(pdu, length)
@@ -1819,13 +1929,13 @@ func (gnb *GNB) decQosFlowSetupRequestList(pdu *[]byte, length int) {
 
 	for i := 0; i < itemNum; i++ {
 		gnb.dprint("Item %d", i)
-		gnb.decQosFlowSetupRequestItem(&qoslist)
+		gnb.decQosFlowSetupRequestItem(c, &qoslist)
 	}
 
 	return
 }
 
-func (gnb *GNB) decQosFlowSetupRequestItem(item *per.BitField) {
+func (gnb *GNB) decQosFlowSetupRequestItem(c *Camper, item *per.BitField) {
 
 	// TODO: generic per decoder.
 	// 00 0000 0000
@@ -1833,7 +1943,7 @@ func (gnb *GNB) decQosFlowSetupRequestItem(item *per.BitField) {
 	//  ^ ^         options
 	*item = per.ShiftLeft(*item, 3)
 	item.Len -= 3
-	gnb.decQosFlowIdentifier(item)
+	gnb.decQosFlowIdentifier(c, item)
 	gnb.decQosFlowLevelQosParameters(item)
 
 	return
