@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/hhorai/gnbsim/encoding/gtp"
 	"github.com/hhorai/gnbsim/encoding/nas"
 	"github.com/hhorai/gnbsim/encoding/per"
 )
@@ -116,6 +117,7 @@ type GNB struct {
 type Camper struct {
 	GNB          *GNB // camped in this gNB
 	UE           *nas.UE
+	GTPu	     *gtp.GTP
 	AmfId        uint32
 	RanId        uint32
 	RRCstate     int
