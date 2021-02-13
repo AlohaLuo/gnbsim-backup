@@ -717,6 +717,7 @@ func (gnb *GNB) decProtocolIE(c *Camper, pdu *[]byte) (c2 *Camper, err error) {
 	gnb.dprint("IE length: %d", length)
 	gnb.indent++
 
+	/*
 	if c == nil {
 		fmt.Printf("pointer to camper is missing for %d\n", id)
 	} else if c.camperType == CAMPER_TYPE_TEMPORARY {
@@ -724,6 +725,7 @@ func (gnb *GNB) decProtocolIE(c *Camper, pdu *[]byte) (c2 *Camper, err error) {
 	} else {
 		fmt.Printf("pointer to camper is valid for %d\n", id)
 	}
+	*/
 
 	switch id {
 	case idAMFUENGAPID: //10
