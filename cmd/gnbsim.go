@@ -45,11 +45,11 @@ func initConfig(jsonFile string) (s *GnbsimSession) {
 	s = &obj
 
 	s.gnb = ngap.NewNGAP(jsonFile)
-	imeisv, _ := strconv.ParseUint(s.gnb.UE.IMEISV, 10, 64)
-	msin, _ := strconv.ParseUint(s.gnb.UE.MSIN, 10, 64)
+	imeisv, _ := strconv.ParseUint(s.gnb.UEparam.IMEISV, 10, 64)
+	msin, _ := strconv.ParseUint(s.gnb.UEparam.MSIN, 10, 64)
 
-	for i := 0; i < s.gnb.UE.Number; i++ {
-		ue := s.gnb.UE
+	for i := 0; i < s.gnb.UEparam.Number; i++ {
+		ue := s.gnb.UEparam
 		ue.IMEISV = fmt.Sprintf("%016d", imeisv)
 		ue.MSIN = fmt.Sprintf("%010d", msin)
 		s.ue = append(s.ue, &ue)
