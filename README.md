@@ -47,7 +47,7 @@ These instructions will get you a copy of the project up and running on your loc
   ```
 
 * Edit the configuration file (example.json).
-  - SUPI(IMSI) is formed by `mcc` + `mnc` + `msin`. (e.g. `208930123456788`)
+  - SUPI(IMSI) is formed by `mcc` + `mnc` + `msin`. (e.g. `208930123456789`)
   - `NGAPPeerAddr` indicates the IP address for N2 used by the AMF side.
   - `GTPuIFname` indicates the interface name for GTP-U used by gnbsim.
   - `GTPuLocalAddr` indicates the IP address for GTP-U used by gnbsim.
