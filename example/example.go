@@ -20,7 +20,7 @@ type testSession struct {
 	conn *sctp.SCTPConn
 	info *sctp.SndRcvInfo
 	gnb  *ngap.GNB
-	gtpu *gtp.GTP
+	//gtpu *gtp.GTP
 }
 
 func newTest() (t *testSession) {
@@ -340,7 +340,7 @@ func (t *testSession) runUPlane(ctx context.Context, c *ngap.Camper,
 	gnb := t.gnb
 	ue := c.UE
 	c.GTPu = gtp.NewGTP(gnb.GTPuTEID, gnb.Recv.GTPuPeerTEID)
-	gtpu := t.gtpu
+	gtpu := c.GTPu
 	gtpu.SetExtensionHeader(true)
 	gtpu.SetQosFlowID(c.QosFlowID)
 
@@ -361,8 +361,8 @@ func (t *testSession) runUPlane(ctx context.Context, c *ngap.Camper,
 		return
 	}
 
-	go t.decap(gtpConn, tun)
-	go t.encap(gtpConn, tun)
+	go t.decap(c, gtpConn, tun)
+	go t.encap(c, gtpConn, tun)
 	t.doUPlane(ctx, c)
 
 	/*
@@ -445,7 +445,7 @@ func addRuleLocal(ip net.IP) (err error) {
 	return
 }
 
-func (t *testSession) decap(gtpConn *net.UDPConn, tun *netlink.Tuntap) {
+func (t *testSession) decap(c *ngap.Camper, gtpConn *net.UDPConn, tun *netlink.Tuntap) {
 
 	fd := tun.Fds[0]
 
@@ -456,7 +456,7 @@ func (t *testSession) decap(gtpConn *net.UDPConn, tun *netlink.Tuntap) {
 			log.Fatalln(err)
 			return
 		}
-		payload := t.gtpu.Decap(buf[:n])
+		payload := c.GTPu.Decap(buf[:n])
 		//fmt.Printf("decap: %x\n", payload)
 
 		_, err = fd.Write(payload)
@@ -467,7 +467,7 @@ func (t *testSession) decap(gtpConn *net.UDPConn, tun *netlink.Tuntap) {
 	}
 }
 
-func (t *testSession) encap(gtpConn *net.UDPConn, tun *netlink.Tuntap) {
+func (t *testSession) encap(c *ngap.Camper, gtpConn *net.UDPConn, tun *netlink.Tuntap) {
 
 	fd := tun.Fds[0]
 	paddr := &net.UDPAddr{
@@ -482,7 +482,7 @@ func (t *testSession) encap(gtpConn *net.UDPConn, tun *netlink.Tuntap) {
 			log.Fatalln(err)
 			return
 		}
-		payload := t.gtpu.Encap(buf[:n])
+		payload := c.GTPu.Encap(buf[:n])
 
 		_, err = gtpConn.WriteToUDP(payload, paddr)
 		if err != nil {
