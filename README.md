@@ -8,64 +8,71 @@ These instructions will get you a copy of the project up and running on your loc
 
 ### Prerequisites
 
-* golang environment on linux host.
-  - root previledge is required to set an IP address which is dynamically assigned by SMF.
-* running free5gc somewhere.
-  - subscriber has been registered by free5gc web console.
-  - change 'ngapIPList' to external ip address in `config/amfcfg.conf`. 
-    ```
-        ngapIpList:
-          #- 127.0.0.1
-          - 192.168.1.17      # extern IP address fot N1/N2 address.
-    ```
-  - change 'gtpu.addr' to external ip address in `src/upf/build/config/upfcfg.yaml`. 
-    ```
+* Golang environment on a Linux server to run gnbsim.
+  - The project is tested on Raspbian GNU/Linux 10 (buster)
+
+* free5gc is running somewhere.
+  - [free5gc/free5gc](https://github.com/free5gc/free5gc) v3.0.4 is used for testing the project.
+  - Tested subscriber(s) have been provisioned by the free5gc web console.
+  - change the free5gc configurations.
+    - free5gc/config/amfcfg.conf
+
+      ```
+      ngapIpList:
+        #- 127.0.0.1
+        - 192.168.1.17        # external IP address for N2 address.
+      ```
+
+    - free5gc/src/upf/build/config/upfcfg.yaml
+
+      ```
       gtpu:
         #- addr: 127.0.0.8
         - addr: 192.168.1.18  # external IP address for GTP-U (N3) address.
-    ```
-  - [free5gc/free5gc](https://github.com/free5gc/free5gc) v3.0.4 is used in my test environment.
+      ```
 
 ### Installing and testing
 
 * Download the related files.
 
-```
-$ git clone https://github.com/hhorai/gnbsim.git
-$ cd gnbsim
-```
+  ```
+  $ git clone https://github.com/hhorai/gnbsim.git
+  $ cd gnbsim
+  ```
 
-* Build example binary.
+* Build the example binary.
+  ```
+  $ make test		# (optional) unit test for each libary.
+  $ make
+  ```
 
-```
-$ make test		# test for each libary.
-$ make			# building example binary.
-```
+* Edit the configuration file (example.json).
+  - SUPI(IMSI) is formed by `mcc` + `mnc` + `msin`. (e.g. `208930123456788`)
+  - `NGAPPeerAddr` indicates the IP address for N2 used by the AMF side.
+  - `GTPuIFname` indicates the interface name for GTP-U used by gnbsim.
+  - `GTPuLocalAddr` indicates the IP address for GTP-U used by gnbsim.
+  - `url` indicates the destined URL for testing U-plane directly accessed by UEs.
+  - [wiki page](https://github.com/hhorai/gnbsim/wiki) might be helpful to understand the environment.
 
-* Edit the configuration file.
-  - `imeisv` replace with the registered value of IMSI in free5gc web console (e.g. `208930000000003`)
-  - `msin` replace with last 10 digits of the IMSI (e.g. `0000000003`)
-  - `GTPuAddr` for the IP address of gnbsim
-  - `GTPuIFname` for the network interface of gnbsim
-  - `UE.url` is access URL for testing U-Plane.
+  ```
+  $ cd example
+  $ vi example.json
+  ```
 
-```
-$ cd example
-$ vi example.json
-```
+* Run gnbsim
+  - root privilege is required to set an IP address which is dynamically assigned by the SMF.
 
-* run 'example' with 'ip' option and specify the AMF IP address.
+  ```
+  $ sudo ./example
+  ```
 
-```
-$ sudo ./example -ip <AMF NGAP listen ip address set above>
-```
+  - Then you can find the following line in the debug message. In this case, your configuration for `OPc` and `K` are both correct.
 
-* Then you can find the following line in the debug message. In this case, your configuration for `OPc` and `K` are both correct.
-```
-***** Integrity check passed
-```
+  ```
+  ***** Integrity check passed
+  ```
 
-* And you could also find your UE in 'subscriber' page of free5gc web console.
+  - And you could also find your UEs in 'subscriber' page in the free5gc web console.
 
 <!--
 ## Running the tests
