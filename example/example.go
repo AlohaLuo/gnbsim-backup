@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"github.com/hhorai/gnbsim/encoding/gtp"
 	"github.com/hhorai/gnbsim/encoding/nas"
@@ -12,7 +11,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -30,43 +28,23 @@ func newTest() (t *testSession) {
 	return
 }
 
-func setupSCTP() (conn *sctp.SCTPConn, info *sctp.SndRcvInfo) {
+func setupSCTP(gnb *ngap.GNB) (conn *sctp.SCTPConn, info *sctp.SndRcvInfo) {
 
-	var ip = flag.String("ip", "localhost", "destinaion ip address")
-	var port = flag.Int("port", 38412, "destination port")
-	var lport = flag.Int("lport", 38412, "local port")
+	const amfPort = 38412
+	amfAddr, _ := net.ResolveIPAddr("ip", gnb.NGAPPeerAddr)
 
-	flag.Parse()
-
-	ips := []net.IPAddr{}
-
-	for _, i := range strings.Split(*ip, ",") {
-		a, _ := net.ResolveIPAddr("ip", i)
-		ips = append(ips, *a)
-	}
-
+	ips := []net.IPAddr{*amfAddr}
 	addr := &sctp.SCTPAddr{
 		IPAddrs: ips,
-		Port:    *port,
+		Port:    amfPort,
 	}
 
-	var laddr *sctp.SCTPAddr
-	if *lport != 0 {
-		laddr = &sctp.SCTPAddr{
-			Port: *lport,
-		}
-	}
-
-	conn, err := sctp.DialSCTP("sctp", laddr, addr)
+	conn, err := sctp.DialSCTP("sctp", nil, addr)
 	if err != nil {
 		log.Fatalf("failed to dial: %v", err)
 	}
 	log.Printf("Dail LocalAddr: %s; RemoteAddr: %s",
 		conn.LocalAddr(), conn.RemoteAddr())
-
-	sndbuf, err := conn.GetWriteBuffer()
-	rcvbuf, err := conn.GetReadBuffer()
-	log.Printf("SndBufSize: %d, RcvBufSize: %d", sndbuf, rcvbuf)
 
 	ppid := 0
 	info = &sctp.SndRcvInfo{
@@ -128,7 +106,7 @@ func initRAN() (t *testSession) {
 	gnb := ngap.NewNGAP("example.json")
 	gnb.SetDebugLevel(1)
 
-	conn, info := setupSCTP()
+	conn, info := setupSCTP(gnb)
 
 	t.gnb = gnb
 	t.conn = conn

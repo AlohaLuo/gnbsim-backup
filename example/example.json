@@ -57,6 +57,7 @@
 			"TAC": "0x000001"
 		}
 	},
+	"NGAPPeerAddr": "192.168.1.17",
 	"GTPuLocalAddr": "192.168.1.3",
 	"GTPuIFname": "eth0"
 }
