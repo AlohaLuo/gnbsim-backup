@@ -266,12 +266,16 @@ func (t *testSession) setupN3Tunnel() (gtpConn *net.UDPConn, tun *netlink.Tuntap
 
 func addTunnel(tunname string) (tun *netlink.Tuntap, err error) {
 
+	link, _ := netlink.LinkByName(tunname)
+	netlink.LinkDel(link) // Delete first.
+
 	tun = &netlink.Tuntap{
 		LinkAttrs: netlink.LinkAttrs{Name: tunname},
 		Mode:      netlink.TUNTAP_MODE_TUN,
 		Flags:     netlink.TUNTAP_DEFAULTS | netlink.TUNTAP_NO_PI,
 		Queues:    1,
 	}
+
 	if err = netlink.LinkAdd(tun); err != nil {
 		err = fmt.Errorf("failed to ADD tun device=gtp0: %s", err)
 		return
