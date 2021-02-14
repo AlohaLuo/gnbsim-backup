@@ -432,7 +432,7 @@ func (gnb *GNB) MakeInitialUEMessage(ue *nas.UE) (pdu []byte) {
 	tmp = gnb.encNASPDU(c)
 	v = append(v, tmp...)
 
-	tmp, _ = gnb.encUserLocationInformation()
+	tmp, _ = gnb.encUserLocationInformation(reject)
 	v = append(v, tmp...)
 
 	tmp, _ = gnb.encRRCEstablishmentCause(rrcMoSignalling)
@@ -502,7 +502,7 @@ func (gnb *GNB) MakeUplinkNASTransport(ue *nas.UE) (pdu []byte) {
 	tmp = gnb.encNASPDU(c)
 	v = append(v, tmp...)
 
-	tmp, _ = gnb.encUserLocationInformation()
+	tmp, _ = gnb.encUserLocationInformation(ignore)
 	v = append(v, tmp...)
 
 	bf, _ := per.EncLengthDeterminant(len(v), 0, 0)
@@ -608,11 +608,11 @@ const (
 	unsuccessfulOutcome
 )
 
-func encNgapPdu(pduType int, procCode int, criticality int) (pdu []byte) {
+func encNgapPdu(pduType int, procCode int, crit int) (pdu []byte) {
 	b, _, _ := per.EncChoice(pduType, 0, 2, true)
 	_, v, _ := per.EncInteger(int64(procCode), 0, 255, false)
 	pdu = append(b.Value, v...)
-	b, _, _ = per.EncEnumerated(uint(criticality), 0, 2, false)
+	b, _, _ = per.EncEnumerated(uint(crit), 0, 2, false)
 	pdu = append(pdu, b.Value...)
 
 	return
@@ -682,10 +682,10 @@ ProtocolIE-Field {NGAP-PROTOCOL-IES : IEsSetParam} ::= SEQUENCE {
     value           NGAP-PROTOCOL-IES.&Value            ({IEsSetParam}{@id})
 }
 */
-func encProtocolIE(id int64, criticality uint) (v []byte, err error) {
+func encProtocolIE(id int64, crit uint) (v []byte, err error) {
 
 	_, v, _ = per.EncInteger(id, 0, 65535, false)
-	bf, _, _ := per.EncEnumerated(criticality, 0, 2, false)
+	bf, _, _ := per.EncEnumerated(crit, 0, 2, false)
 	v = append(v, bf.Value...)
 
 	return
@@ -954,8 +954,9 @@ const (
 	ULInfoN3IWF
 )
 
-func (gnb *GNB) encUserLocationInformation() (v []byte, err error) {
-	head, err := encProtocolIE(idUserLocationInformation, ignore)
+func (gnb *GNB) encUserLocationInformation(crit uint) (v []byte, err error) {
+
+	head, err := encProtocolIE(idUserLocationInformation, crit)
 
 	// NG-ENB and N3IWF are not implemented yet...
 	b, _, _ := per.EncChoice(ULInfoNR, 0, 2, false)
