@@ -955,7 +955,7 @@ const (
 )
 
 func (gnb *GNB) encUserLocationInformation() (v []byte, err error) {
-	head, err := encProtocolIE(idUserLocationInformation, reject)
+	head, err := encProtocolIE(idUserLocationInformation, ignore)
 
 	// NG-ENB and N3IWF are not implemented yet...
 	b, _, _ := per.EncChoice(ULInfoNR, 0, 2, false)
