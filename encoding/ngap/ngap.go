@@ -608,18 +608,18 @@ const (
 	unsuccessfulOutcome
 )
 
-func encNgapPdu(pduType int, procCode int, crit int) (pdu []byte) {
+func encNgapPdu(pduType int, procCode int, crit uint) (pdu []byte) {
 	b, _, _ := per.EncChoice(pduType, 0, 2, true)
 	_, v, _ := per.EncInteger(int64(procCode), 0, 255, false)
 	pdu = append(b.Value, v...)
-	b, _, _ = per.EncEnumerated(uint(crit), 0, 2, false)
+	b, _, _ = per.EncEnumerated(crit, 0, 2, false)
 	pdu = append(pdu, b.Value...)
 
 	return
 }
 
 func decNgapPdu(pdu *[]byte) (
-	pduType int, procCode int, criticality int, err error) {
+	pduType int, procCode int, crit uint, err error) {
 
 	if len(*pdu) < 3 {
 		err = fmt.Errorf("remaining pdu length is too short.")
