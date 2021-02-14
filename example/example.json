@@ -23,7 +23,7 @@
 	],
 	"PagingDRX" : "v32",
 	"RANUENGAPID" : 0,
-	"UEparam": {
+	"UE": {
 		"imeisv": "0000000100000101",
 		"msin": "0123456789",
 		"mcc": 208,

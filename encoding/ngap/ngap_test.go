@@ -39,7 +39,7 @@ func initEnv() (gnb *GNB, ue *nas.UE) {
 	RanUeNgapId = 0
 
 	gnb = NewNGAP("ngap_test.json")
-	tmp := gnb.UEparam
+	tmp := gnb.UE
 	ue = &tmp
 	ue.PowerON()
 	gnb.CampIn(ue)

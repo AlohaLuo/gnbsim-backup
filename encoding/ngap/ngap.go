@@ -100,7 +100,7 @@ type GNB struct {
 	GTPuLocalAddr   string
 	GTPuIFname      string
 	GTPuTEID        uint32
-	UEparam         nas.UE // base parameter to be used for each UE
+	UE              nas.UE // base parameter to be used for each UE
 
 	Recv struct {
 		GTPuPeerAddr net.IP

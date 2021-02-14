@@ -133,7 +133,7 @@ func initRANwithoutSCTP() (t *testSession) {
 func (t *testSession) initUE() {
 
 	gnb := t.gnb
-	tmp := t.gnb.UEparam
+	tmp := t.gnb.UE
 	ue := &tmp
 	ue.PowerON()
 	ue.SetDebugLevel(1)
