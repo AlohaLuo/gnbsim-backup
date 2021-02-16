@@ -28,6 +28,14 @@ func newTest() (t *testSession) {
 	return
 }
 
+func validate(gnb *ngap.GNB) {
+
+	if gnb.GTPuLocalAddr == "" {
+		log.Fatalf("`GTPuLocalAddr' not found in configuration file.")
+	}
+	return
+}
+
 func setupSCTP(gnb *ngap.GNB) (conn *sctp.SCTPConn, info *sctp.SndRcvInfo) {
 
 	const amfPort = 38412
@@ -104,6 +112,7 @@ func initRAN() (t *testSession) {
 
 	t = new(testSession)
 	gnb := ngap.NewNGAP("example.json")
+	validate(gnb)
 	gnb.SetDebugLevel(1)
 
 	conn, info := setupSCTP(gnb)
