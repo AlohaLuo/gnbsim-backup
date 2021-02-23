@@ -1707,7 +1707,11 @@ var pduSessionTypeStr = map[byte]string{
 }
 
 func (ue *UE) encPDUSessionType() (pdu []byte) {
-	pdu = []byte{byte((ieiPDUSessionType << 4) | PDUSessionIPv4v6)}
+	/*
+	 * free5gc v3.0.5 doesn't support PDUSessionIPv4v6?
+	 */
+	//pdu = []byte{byte((ieiPDUSessionType << 4) | PDUSessionIPv4v6)}
+	pdu = []byte{byte((ieiPDUSessionType << 4) | PDUSessionIPv4)}
 	return
 }
 
