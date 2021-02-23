@@ -19,16 +19,26 @@ These instructions will get you a copy of the project up and running on your loc
 
       ```
       ngapIpList:
-        #- 127.0.0.1
         - 192.168.1.17        # external IP address for N2 address.
+        # - 127.0.0.1
+      ```
+
+    - free5gc/config/smfcfg.conf
+
+      ```
+      interfaces:
+        - interfaceType:
+          endpoints:
+            - 192.168.1.18 # external IP address for GTP-U (N3) address.
+            # - 127.0.0.8
       ```
 
     - free5gc/src/upf/build/config/upfcfg.yaml
 
       ```
       gtpu:
-        #- addr: 127.0.0.8
         - addr: 192.168.1.18  # external IP address for GTP-U (N3) address.
+        # - addr: 127.0.0.8
       ```
 
 ### Installing and testing
