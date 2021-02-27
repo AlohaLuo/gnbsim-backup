@@ -12,7 +12,7 @@ These instructions will get you a copy of the project up and running on your loc
   - The project is tested on Raspbian GNU/Linux 10 (buster)
 
 * free5gc is running somewhere.
-  - [free5gc/free5gc](https://github.com/free5gc/free5gc) v3.0.4 is used for testing the project.
+  - [free5gc/free5gc](https://github.com/free5gc/free5gc) v3.0.5 is used for testing the project.
   - Tested subscriber(s) have been provisioned by the free5gc web console.
   - change the free5gc configurations.
     - free5gc/config/amfcfg.conf
