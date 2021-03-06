@@ -483,7 +483,9 @@ func (ue *UE) decAuthenticationRequest(pdu *[]byte) {
 	*/
 
 	if reflect.DeepEqual(ue.AuthParam.mac, m.MACA) == false {
-		ue.dprinti("received and calculated MAC values do not match.\n")
+		ue.dprinti("received and calculated MAC values do not match.")
+		ue.dprinti("received  : %x", ue.AuthParam.mac)
+		ue.dprinti("calculated: %x", m.MACA)
 		ue.indent = orig
 		// need response for error.
 		return

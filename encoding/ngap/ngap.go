@@ -713,7 +713,7 @@ func (gnb *GNB) decProtocolIE(c *Camper, pdu *[]byte) (c2 *Camper, err error) {
 
 	readPduByte(pdu) // skip ciritcality
 
-	length := int(readPduByte(pdu))
+	length, _ := per.DecLengthDeterminant(pdu, 0)
 	gnb.dprint("IE length: %d", length)
 	gnb.indent++
 
