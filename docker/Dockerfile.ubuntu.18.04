@@ -1,0 +1,28 @@
+#---------------------------------------------------------------------
+# BUILDER IMAGE
+#---------------------------------------------------------------------
+
+FROM golang:1.16 as gnbsim-builder
+
+RUN apt update 
+
+WORKDIR /gnbsim
+COPY . /gnbsim
+
+RUN make
+
+#---------------------------------------------------------------------
+# TARGET IMAGE
+#---------------------------------------------------------------------
+FROM golang:1.16 as gnbsim
+
+RUN apt update && apt install iproute2 vim iputils-ping net-tools -y
+
+WORKDIR /gnbsim/bin
+COPY --from=gnbsim-builder /gnbsim/example/example .
+COPY --from=gnbsim-builder /gnbsim/docker/scripts/example.json .
+COPY --from=gnbsim-builder /gnbsim/docker/scripts/entrypoint.sh .
+
+ENTRYPOINT ["/gnbsim/bin/entrypoint.sh"]
+
+CMD ["/gnbsim/bin/example"]

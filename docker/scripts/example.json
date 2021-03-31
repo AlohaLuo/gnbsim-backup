@@ -1,0 +1,63 @@
+{
+	"GlobalGNBID": {
+		"mcc": @MCC@,
+		"mnc": @MNC@,
+		"gnbid": @GNBID@
+	},
+	"SupportedTAList" : [
+		{
+			"TAC": "@TAC@",
+			"BroadcastPLMNList": [
+				{
+					"MCC": @MCC@,
+					"MNC": @MNC@,
+					"SliceSupportList": [
+						{
+							"SST": @SST@,
+							"SD": "@SD@"
+						}
+					]
+				}
+			]
+		}
+	],
+	"PagingDRX" : "@PagingDRX@",
+	"RANUENGAPID" : @RANUENGAPID@,
+	"UE": {
+		"imeisv": "@IMEISV@",
+		"msin": "@MSIN@",
+		"mcc": @MCC@,
+		"mnc": @MNC@,
+		"RoutingIndicator": @RoutingIndicator@,
+		"ProtectionScheme": "@ProtectionScheme@",
+		"AuthParam": {
+			"K": "@KEY@",
+			"OPc": "@OPc@"
+		},
+		"snssai": {
+			"sst": @SST@,
+			"sd": "@SD@"
+		},
+		"dnn": "@DNN@",
+		"url": "@URL@"
+	},
+	"ULInfoNR": {
+		"NRCGI": {
+			"PLMN": {
+				"mcc": @MCC@,
+				"mnc": @MNC@
+			},
+			"NRCellID": 1
+		},
+		"TAI": {
+			"PLMN": {
+				"mcc": @MCC@,
+				"mnc": @MNC@
+			},
+			"TAC": "@TAC@"
+		}
+	},
+	"NGAPPeerAddr": "@NGAPPeerAddr@",
+	"GTPuLocalAddr": "@GTPuLocalAddr@",
+	"GTPuIFname": "@GTPuIFname@"
+}
