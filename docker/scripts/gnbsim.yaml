@@ -3,7 +3,6 @@ version: '3.8'
 services:
     gnbsim:
         image: gnbsim:latest
-        privileged: true
         container_name: gnbsim
         environment:
             MCC: 208
@@ -31,8 +30,6 @@ services:
                 ipv4_address: 192.168.1.3
             public_net_gtpu:
                 ipv4_address: 192.168.2.3
-        volumes:
-               - ./lib/modules/5.8.0-43-generic/kernel/drivers/net/gtp.ko:/lib/modules/5.8.0-43-generic/kernel/drivers/net/gtp.ko
 
 networks:
     public_net_ngap:
