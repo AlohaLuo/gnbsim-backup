@@ -276,7 +276,9 @@ func (t *testSession) setupN3Tunnel() (gtpConn *net.UDPConn, tun *netlink.Tuntap
 func addTunnel(tunname string) (tun *netlink.Tuntap, err error) {
 
 	link, _ := netlink.LinkByName(tunname)
-	netlink.LinkDel(link) // Delete first.
+	if link != nil {
+		netlink.LinkDel(link) // Delete first.
+	}
 
 	tun = &netlink.Tuntap{
 		LinkAttrs: netlink.LinkAttrs{Name: tunname},
