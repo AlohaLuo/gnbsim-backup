@@ -1,5 +1,5 @@
 # gnbsim
-gnbsim is a 5G SA gNB/UE (Rel. 16) simulator for testing 5G System. The project is aimed to understand 5GC more efficiently than just reading 3GPP standard documents.
+gnbsim is a 5G SA gNB/UE (Rel. 16) simulator for testing 5G System. The project is aimed to understand 5GC more efficiently than just reading 3GPP standard documents.The original repostitory has been deleted. This repo is for backup purpose.
 
 ## Getting Started
 <!--
@@ -46,7 +46,7 @@ These instructions will get you a copy of the project up and running on your loc
 * Download the related files.
 
   ```
-  $ git clone https://github.com/hhorai/gnbsim.git
+  $ git clone https://github.com/AlohaLuo/gnbsim-backup.git
   $ cd gnbsim
   ```
 
